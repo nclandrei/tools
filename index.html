@@ -124,16 +124,13 @@
       line-height: 1.4;
     }
 
+
     .no-results {
       font-size: 0.9rem;
       color: var(--color-text-muted);
       display: none;
     }
 
-    /* Hide category headings during search */
-    .searching .category h2 {
-      display: none;
-    }
   </style>
 </head>
 <body>
@@ -302,14 +299,21 @@
       </div>
     </div>
 
+    <div id="search-results" class="tools-list" style="display:none;"></div>
+
     <p id="no-results" class="no-results">No tools match your search.</p>
   </div>
 
   <script>
     const search = document.getElementById('search');
     const categoriesEl = document.getElementById('categories');
+    const searchResults = document.getElementById('search-results');
     const noResults = document.getElementById('no-results');
     const cards = Array.from(document.querySelectorAll('.tool-card'));
+
+    // Remember each card's original parent so we can restore it
+    const originalParents = new Map();
+    cards.forEach(card => originalParents.set(card, card.parentElement));
 
     function fuzzyScore(query, text) {
       if (!query) return 1;
@@ -332,21 +336,32 @@
       return 0;
     }
 
+    document.addEventListener('keydown', (e) => {
+      if ((e.key === '/' && !e.ctrlKey && !e.metaKey) ||
+          (e.key === 'f' && (e.metaKey || e.ctrlKey))) {
+        if (document.activeElement === search) return;
+        e.preventDefault();
+        search.focus();
+        search.select();
+      }
+    });
+
     search.addEventListener('input', () => {
       const query = search.value.trim();
-      const isSearching = query.length > 0;
-      categoriesEl.classList.toggle('searching', isSearching);
 
-      let anyVisible = false;
-
-      if (!isSearching) {
-        // Reset: show all cards in original positions
-        cards.forEach(c => c.style.display = '');
-        cards.forEach(c => c.style.order = '');
+      if (!query) {
+        // Restore cards to their original category containers
+        searchResults.style.display = 'none';
+        categoriesEl.style.display = '';
         noResults.style.display = 'none';
+        cards.forEach(card => {
+          card.style.display = '';
+          originalParents.get(card).appendChild(card);
+        });
         return;
       }
 
+      // Score and sort
       const scored = cards.map(card => {
         const title = card.dataset.title || '';
         const desc = card.dataset.desc || '';
@@ -359,12 +374,21 @@
 
       scored.sort((a, b) => b.score - a.score);
 
-      scored.forEach(({ card, score }, i) => {
-        const show = score > 0;
-        card.style.display = show ? '' : 'none';
-        card.style.order = i;
-        if (show) anyVisible = true;
-      });
+      // Hide categories, show flat results
+      categoriesEl.style.display = 'none';
+      searchResults.style.display = '';
+      searchResults.innerHTML = '';
+
+      let anyVisible = false;
+      for (const { card, score } of scored) {
+        if (score > 0) {
+          card.style.display = '';
+          searchResults.appendChild(card);
+          anyVisible = true;
+        } else {
+          card.style.display = 'none';
+        }
+      }
 
       noResults.style.display = anyVisible ? 'none' : '';
     });
