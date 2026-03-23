@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sheet Converter — XLSX ↔ CSV ↔ ODS</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0e0f11;
+  --surface: #16181c;
+  --surface-2: #1e2027;
+  --surface-3: #262830;
+  --border: #2a2d36;
+  --border-hover: #3d4150;
+  --text: #e8e9ed;
+  --text-dim: #8b8f9e;
+  --text-faint: #555968;
+  --accent: #4a9eed;
+  --accent-glow: rgba(74, 158, 237, 0.12);
+  --accent-dim: #3578b9;
+  --green: #5cb87a;
+  --green-glow: rgba(92, 184, 122, 0.12);
+  --orange: #e09a3a;
+  --error: #d4504c;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --mono: 'DM Mono', 'SF Mono', 'Fira Code', monospace;
+  --sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --transition: 150ms ease;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.logo-icon {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.logo-icon svg { width: 16px; height: 16px; }
+
+header h1 {
+  font-size: 16px; font-weight: 700;
+  letter-spacing: -0.02em;
+}
+header h1 span {
+  color: var(--text-dim); font-weight: 400;
+  font-size: 13px; margin-left: 6px;
+  font-family: var(--mono);
+}
+
+/* ── DROP ZONE ── */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+  position: relative;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.drop-zone input { display: none; }
+.drop-zone .drop-icon {
+  width: 48px; height: 48px;
+  margin: 0 auto 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  display: grid; place-items: center;
+}
+.drop-zone .drop-icon svg { width: 24px; height: 24px; color: var(--text-dim); }
+.drop-zone p { font-size: 14px; color: var(--text-dim); }
+.drop-zone p strong { color: var(--text); }
+.drop-zone .formats {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text-faint); margin-top: 6px;
+}
+
+/* ── FILE INFO ── */
+.file-info {
+  display: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-top: 16px;
+}
+.file-info.visible { display: block; }
+.file-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.file-meta {
+  display: flex; align-items: center; gap: 10px;
+}
+.file-badge {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; border-radius: 6px;
+  font-family: var(--mono); font-size: 12px; font-weight: 500;
+  text-transform: uppercase;
+}
+.file-badge.xlsx { background: rgba(74,158,237,0.12); color: var(--accent); }
+.file-badge.csv { background: rgba(92,184,122,0.12); color: var(--green); }
+.file-badge.ods { background: rgba(224,154,58,0.12); color: var(--orange); }
+.file-badge.tsv { background: rgba(224,154,58,0.12); color: var(--orange); }
+.file-badge.xls { background: rgba(74,158,237,0.12); color: var(--accent); }
+
+.file-name {
+  font-size: 14px; font-weight: 600;
+}
+.file-stats {
+  font-family: var(--mono); font-size: 12px;
+  color: var(--text-dim);
+}
+
+.btn-clear {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-dim); padding: 6px 12px;
+  border-radius: 6px; font-size: 12px;
+  font-family: var(--sans); cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-clear:hover {
+  border-color: var(--error); color: var(--error);
+}
+
+/* ── SHEET TABS ── */
+.sheet-tabs {
+  display: none;
+  gap: 2px;
+  margin-top: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.sheet-tabs::-webkit-scrollbar { display: none; }
+.sheet-tabs.visible { display: flex; }
+.sheet-tab {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-family: var(--mono); font-size: 12px;
+  color: var(--text-dim);
+  background: none; border: 1px solid transparent;
+  cursor: pointer; white-space: nowrap;
+  transition: all var(--transition);
+}
+.sheet-tab:hover { color: var(--text); background: var(--surface-2); }
+.sheet-tab.active {
+  color: var(--accent); background: var(--accent-glow);
+  border-color: rgba(74,158,237,0.2);
+}
+
+/* ── DATA PREVIEW ── */
+.preview-section {
+  display: none;
+  margin-top: 16px;
+  flex: 1;
+  min-height: 0;
+}
+.preview-section.visible { display: flex; flex-direction: column; }
+
+.preview-header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.preview-header h3 {
+  font-size: 13px; font-weight: 600;
+  color: var(--text-dim);
+}
+.row-count {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text-faint);
+}
+
+.table-wrap {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 420px;
+}
+.table-wrap table {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--mono); font-size: 12px;
+  table-layout: auto;
+}
+.table-wrap thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-2);
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.table-wrap thead th.row-num {
+  width: 40px; text-align: center;
+  color: var(--text-faint); font-size: 10px;
+  background: var(--surface-3);
+}
+.table-wrap tbody td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.table-wrap tbody td.row-num {
+  text-align: center;
+  color: var(--text-faint); font-size: 10px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+.table-wrap tbody tr:hover td {
+  background: var(--surface-2);
+}
+.table-wrap tbody tr:hover td.row-num {
+  background: var(--surface-3);
+}
+
+/* ── EXPORT SECTION ── */
+.export-section {
+  display: none;
+  margin-top: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+.export-section.visible { display: block; }
+
+.export-section h3 {
+  font-size: 13px; font-weight: 600;
+  color: var(--text-dim); margin-bottom: 12px;
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.export-card {
+  display: flex; align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+  background: var(--surface-2);
+}
+.export-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.export-card .fmt-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  flex-shrink: 0;
+}
+.export-card .fmt-icon.xlsx { background: rgba(74,158,237,0.15); color: var(--accent); }
+.export-card .fmt-icon.csv { background: rgba(92,184,122,0.15); color: var(--green); }
+.export-card .fmt-icon.ods { background: rgba(224,154,58,0.15); color: var(--orange); }
+.export-card .fmt-icon.tsv { background: rgba(224,154,58,0.15); color: var(--orange); }
+
+.export-card .fmt-info .fmt-name {
+  font-size: 13px; font-weight: 600;
+}
+.export-card .fmt-info .fmt-desc {
+  font-size: 11px; color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+/* ── CSV OPTIONS ── */
+.csv-options {
+  display: none;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.csv-options.visible { display: block; }
+.csv-options label {
+  font-size: 12px; color: var(--text-dim);
+  display: flex; align-items: center; gap: 8px;
+}
+.csv-options select {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 100;
+  white-space: nowrap;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.toast.success { border-color: var(--green); }
+.toast.error { border-color: var(--error); }
+
+/* ── FOOTER ── */
+footer {
+  margin-top: auto;
+  padding: 20px 0 8px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .app { padding: 12px; }
+  .drop-zone { padding: 32px 16px; }
+  .export-grid { grid-template-columns: 1fr; }
+  .file-info-header { flex-direction: column; align-items: flex-start; }
+  .table-wrap { max-height: 320px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+    </div>
+    <h1>Sheet Converter <span>xlsx · csv · ods</span></h1>
+  </header>
+
+  <!-- DROP ZONE -->
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.tsv,.ods,.txt">
+    <div class="drop-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </div>
+    <p>Drop a spreadsheet or <strong>click to browse</strong></p>
+    <div class="formats">.xlsx · .xls · .csv · .tsv · .ods</div>
+  </div>
+
+  <!-- FILE INFO -->
+  <div class="file-info" id="fileInfo">
+    <div class="file-info-header">
+      <div class="file-meta">
+        <span class="file-badge" id="fileBadge">XLSX</span>
+        <div>
+          <div class="file-name" id="fileName">—</div>
+          <div class="file-stats" id="fileStats">—</div>
+        </div>
+      </div>
+      <button class="btn-clear" id="btnClear">Clear</button>
+    </div>
+    <div class="sheet-tabs" id="sheetTabs"></div>
+  </div>
+
+  <!-- PREVIEW -->
+  <div class="preview-section" id="previewSection">
+    <div class="preview-header">
+      <h3>Preview</h3>
+      <span class="row-count" id="rowCount">—</span>
+    </div>
+    <div class="table-wrap" id="tableWrap">
+      <table id="previewTable"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="export-section" id="exportSection">
+    <h3>Export as</h3>
+    <div class="export-grid">
+      <div class="export-card" data-format="csv" title="Comma-separated values">
+        <div class="fmt-icon csv">CSV</div>
+        <div class="fmt-info">
+          <div class="fmt-name">CSV</div>
+          <div class="fmt-desc">comma-separated</div>
+        </div>
+      </div>
+      <div class="export-card" data-format="tsv" title="Tab-separated values">
+        <div class="fmt-icon tsv">TSV</div>
+        <div class="fmt-info">
+          <div class="fmt-name">TSV</div>
+          <div class="fmt-desc">tab-separated</div>
+        </div>
+      </div>
+      <div class="export-card" data-format="xlsx" title="Microsoft Excel">
+        <div class="fmt-icon xlsx">XLSX</div>
+        <div class="fmt-info">
+          <div class="fmt-name">Excel</div>
+          <div class="fmt-desc">.xlsx workbook</div>
+        </div>
+      </div>
+      <div class="export-card" data-format="ods" title="LibreOffice Calc">
+        <div class="fmt-icon ods">ODS</div>
+        <div class="fmt-info">
+          <div class="fmt-name">LibreOffice</div>
+          <div class="fmt-desc">.ods spreadsheet</div>
+        </div>
+      </div>
+    </div>
+    <div class="csv-options" id="csvOptions">
+      <label>
+        Delimiter
+        <select id="csvDelimiter">
+          <option value="," selected>Comma (,)</option>
+          <option value=";">Semicolon (;)</option>
+          <option value="|">Pipe (|)</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <footer>Runs entirely in the browser. No files are uploaded.</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── State ──
+  let workbook = null;
+  let currentSheet = 0;
+  let sourceFileName = '';
+  let sourceExt = '';
+
+  // ── DOM ──
+  const $drop = document.getElementById('dropZone');
+  const $fileInput = document.getElementById('fileInput');
+  const $fileInfo = document.getElementById('fileInfo');
+  const $fileBadge = document.getElementById('fileBadge');
+  const $fileName = document.getElementById('fileName');
+  const $fileStats = document.getElementById('fileStats');
+  const $btnClear = document.getElementById('btnClear');
+  const $sheetTabs = document.getElementById('sheetTabs');
+  const $preview = document.getElementById('previewSection');
+  const $rowCount = document.getElementById('rowCount');
+  const $table = document.getElementById('previewTable');
+  const $export = document.getElementById('exportSection');
+  const $csvOptions = document.getElementById('csvOptions');
+  const $toast = document.getElementById('toast');
+
+  // ── Helpers ──
+  function getExt(name) {
+    return (name.split('.').pop() || '').toLowerCase();
+  }
+
+  function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+  }
+
+  function toast(msg, type) {
+    $toast.textContent = msg;
+    $toast.className = 'toast show ' + (type || '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function() { $toast.className = 'toast'; }, 2400);
+  }
+
+  function stripExt(name) {
+    return name.replace(/\.[^.]+$/, '');
+  }
+
+  // ── File Loading ──
+  function loadFile(file) {
+    sourceFileName = file.name;
+    sourceExt = getExt(file.name);
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        var data = new Uint8Array(e.target.result);
+        workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        currentSheet = 0;
+        showFileInfo(file);
+        buildSheetTabs();
+        renderPreview();
+        $drop.style.display = 'none';
+        $fileInfo.classList.add('visible');
+        $preview.classList.add('visible');
+        $export.classList.add('visible');
+      } catch (err) {
+        toast('Failed to parse: ' + err.message, 'error');
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function showFileInfo(file) {
+    var ext = sourceExt;
+    $fileBadge.textContent = ext.toUpperCase();
+    $fileBadge.className = 'file-badge ' + ext;
+    $fileName.textContent = file.name;
+
+    var ws = workbook.Sheets[workbook.SheetNames[0]];
+    var range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    var rows = range.e.r - range.s.r + 1;
+    var cols = range.e.c - range.s.c + 1;
+    var sheets = workbook.SheetNames.length;
+    var parts = [rows + ' rows', cols + ' cols'];
+    if (sheets > 1) parts.push(sheets + ' sheets');
+    parts.push(formatBytes(file.size));
+    $fileStats.textContent = parts.join(' · ');
+  }
+
+  function buildSheetTabs() {
+    $sheetTabs.innerHTML = '';
+    if (workbook.SheetNames.length <= 1) {
+      $sheetTabs.classList.remove('visible');
+      return;
+    }
+    $sheetTabs.classList.add('visible');
+    workbook.SheetNames.forEach(function(name, i) {
+      var btn = document.createElement('button');
+      btn.className = 'sheet-tab' + (i === currentSheet ? ' active' : '');
+      btn.textContent = name;
+      btn.addEventListener('click', function() {
+        currentSheet = i;
+        document.querySelectorAll('.sheet-tab').forEach(function(t, j) {
+          t.classList.toggle('active', j === i);
+        });
+        renderPreview();
+      });
+      $sheetTabs.appendChild(btn);
+    });
+  }
+
+  // ── Preview ──
+  function renderPreview() {
+    var sheetName = workbook.SheetNames[currentSheet];
+    var ws = workbook.Sheets[sheetName];
+    var json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    if (!json.length) {
+      $table.querySelector('thead').innerHTML = '';
+      $table.querySelector('tbody').innerHTML = '<tr><td style="padding:24px;color:var(--text-faint)">Empty sheet</td></tr>';
+      $rowCount.textContent = '0 rows';
+      return;
+    }
+
+    // Use first row as headers
+    var headers = json[0];
+    var dataRows = json.slice(1);
+    var maxPreview = 200;
+    var truncated = dataRows.length > maxPreview;
+    var previewRows = truncated ? dataRows.slice(0, maxPreview) : dataRows;
+
+    // Find max cols across all rows
+    var maxCols = headers.length;
+    previewRows.forEach(function(r) { if (r.length > maxCols) maxCols = r.length; });
+
+    // Pad headers
+    while (headers.length < maxCols) headers.push('');
+
+    // Build thead
+    var thead = '<tr><th class="row-num">#</th>';
+    headers.forEach(function(h) {
+      thead += '<th>' + escapeHtml(String(h)) + '</th>';
+    });
+    thead += '</tr>';
+    $table.querySelector('thead').innerHTML = thead;
+
+    // Build tbody
+    var tbody = '';
+    previewRows.forEach(function(row, i) {
+      tbody += '<tr><td class="row-num">' + (i + 1) + '</td>';
+      for (var c = 0; c < maxCols; c++) {
+        var val = c < row.length ? row[c] : '';
+        if (val instanceof Date) {
+          val = val.toLocaleDateString();
+        }
+        tbody += '<td>' + escapeHtml(String(val)) + '</td>';
+      }
+      tbody += '</tr>';
+    });
+    $table.querySelector('tbody').innerHTML = tbody;
+
+    var total = dataRows.length;
+    $rowCount.textContent = total + ' data row' + (total !== 1 ? 's' : '') +
+      (truncated ? ' (showing first ' + maxPreview + ')' : '');
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ── Export ──
+  function exportAs(format) {
+    if (!workbook) return;
+
+    var baseName = stripExt(sourceFileName);
+    var opts = {};
+    var ext, bookType, mime;
+
+    switch (format) {
+      case 'csv':
+        bookType = 'csv';
+        ext = '.csv';
+        mime = 'text/csv;charset=utf-8';
+        var delim = document.getElementById('csvDelimiter').value;
+        opts.FS = delim;
+        break;
+      case 'tsv':
+        bookType = 'csv';
+        ext = '.tsv';
+        mime = 'text/tab-separated-values;charset=utf-8';
+        opts.FS = '\t';
+        break;
+      case 'xlsx':
+        bookType = 'xlsx';
+        ext = '.xlsx';
+        mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        break;
+      case 'ods':
+        bookType = 'ods';
+        ext = '.ods';
+        mime = 'application/vnd.oasis.opendocument.spreadsheet';
+        break;
+      default:
+        return;
+    }
+
+    try {
+      var wbOut;
+      if (format === 'csv' || format === 'tsv') {
+        // For CSV/TSV export only the current sheet
+        var sheetName = workbook.SheetNames[currentSheet];
+        var ws = workbook.Sheets[sheetName];
+        var csvStr = XLSX.utils.sheet_to_csv(ws, opts);
+        var blob = new Blob(['\ufeff' + csvStr], { type: mime });
+        downloadBlob(blob, baseName + ext);
+      } else {
+        // For XLSX/ODS export the full workbook
+        wbOut = XLSX.write(workbook, {
+          bookType: bookType,
+          type: 'array'
+        });
+        var blob2 = new Blob([wbOut], { type: mime });
+        downloadBlob(blob2, baseName + ext);
+      }
+      toast('Exported ' + baseName + ext, 'success');
+    } catch (err) {
+      toast('Export failed: ' + err.message, 'error');
+      console.error(err);
+    }
+  }
+
+  function downloadBlob(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function clearFile() {
+    workbook = null;
+    currentSheet = 0;
+    sourceFileName = '';
+    sourceExt = '';
+    $fileInput.value = '';
+    $drop.style.display = '';
+    $fileInfo.classList.remove('visible');
+    $preview.classList.remove('visible');
+    $export.classList.remove('visible');
+    $csvOptions.classList.remove('visible');
+    $table.querySelector('thead').innerHTML = '';
+    $table.querySelector('tbody').innerHTML = '';
+  }
+
+  // ── Events ──
+
+  // Drop zone
+  $drop.addEventListener('click', function() { $fileInput.click(); });
+  $fileInput.addEventListener('change', function(e) {
+    if (e.target.files.length) loadFile(e.target.files[0]);
+  });
+
+  ['dragenter', 'dragover'].forEach(function(ev) {
+    $drop.addEventListener(ev, function(e) {
+      e.preventDefault(); e.stopPropagation();
+      $drop.classList.add('drag-over');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function(ev) {
+    $drop.addEventListener(ev, function(e) {
+      e.preventDefault(); e.stopPropagation();
+      $drop.classList.remove('drag-over');
+    });
+  });
+  $drop.addEventListener('drop', function(e) {
+    var files = e.dataTransfer.files;
+    if (files.length) loadFile(files[0]);
+  });
+
+  // Also handle drag on the whole page when a file is loaded (re-drop)
+  document.addEventListener('dragover', function(e) { e.preventDefault(); });
+  document.addEventListener('drop', function(e) {
+    e.preventDefault();
+    var files = e.dataTransfer.files;
+    if (files.length) {
+      clearFile();
+      setTimeout(function() { loadFile(files[0]); }, 50);
+    }
+  });
+
+  // Clear
+  $btnClear.addEventListener('click', clearFile);
+
+  // Export cards
+  document.querySelectorAll('.export-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      var fmt = card.getAttribute('data-format');
+      if (fmt === 'csv') {
+        $csvOptions.classList.toggle('visible');
+      } else {
+        $csvOptions.classList.remove('visible');
+        exportAs(fmt);
+      }
+      if (fmt === 'csv') {
+        // If already visible, export
+        if ($csvOptions.classList.contains('visible')) {
+          // Show options first time, next click exports
+        } else {
+          exportAs('csv');
+        }
+      }
+    });
+  });
+
+  // CSV export on delimiter change (auto-export)
+  document.getElementById('csvDelimiter').addEventListener('change', function() {
+    exportAs('csv');
+  });
+
+  // Fix: make CSV card do a direct export after first click
+  var csvCard = document.querySelector('[data-format="csv"]');
+  var csvClickCount = 0;
+  csvCard.removeEventListener('click', csvCard.onclick);
+  csvCard.addEventListener('click', function(e) {
+    e.stopPropagation();
+    csvClickCount++;
+    if (csvClickCount === 1) {
+      $csvOptions.classList.add('visible');
+    } else {
+      exportAs('csv');
+    }
+  });
+
+  // Reset csv click count on clear
+  var origClear = clearFile;
+  clearFile = function() {
+    csvClickCount = 0;
+    origClear();
+  };
+
+  // Keyboard: paste
+  document.addEventListener('paste', function(e) {
+    var text = (e.clipboardData || window.clipboardData).getData('text');
+    if (text && text.trim()) {
+      try {
+        var wb = XLSX.read(text, { type: 'string' });
+        workbook = wb;
+        currentSheet = 0;
+        sourceFileName = 'pasted-data.csv';
+        sourceExt = 'csv';
+
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+        var rows = range.e.r - range.s.r + 1;
+        var cols = range.e.c - range.s.c + 1;
+
+        $fileBadge.textContent = 'CSV';
+        $fileBadge.className = 'file-badge csv';
+        $fileName.textContent = 'Pasted data';
+        $fileStats.textContent = rows + ' rows · ' + cols + ' cols';
+
+        $drop.style.display = 'none';
+        $fileInfo.classList.add('visible');
+        $preview.classList.add('visible');
+        $export.classList.add('visible');
+
+        buildSheetTabs();
+        renderPreview();
+        toast('Loaded pasted data', 'success');
+      } catch (err) {
+        // Not valid spreadsheet data, ignore
+      }
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

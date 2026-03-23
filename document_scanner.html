@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>Document Scanner</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',system-ui,sans-serif;background:#000;color:#fff;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#app{height:100%;display:flex;flex-direction:column}
+.screen{display:none;flex-direction:column;height:100%;position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
+.screen.active{display:flex}
+
+/* Capture */
+#capture-screen{justify-content:center;align-items:center;padding:24px;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.capture-inner{display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;max-width:320px}
+.capture-icon{width:80px;height:80px;border-radius:24px;background:#1c1c1e;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.capture-icon svg{width:40px;height:40px;fill:#007AFF}
+.capture-title{font-size:28px;font-weight:700;letter-spacing:-0.5px}
+.capture-sub{font-size:15px;color:#8e8e93;text-align:center;margin-bottom:12px}
+.btn{border:none;border-radius:12px;font-size:17px;font-weight:600;cursor:pointer;padding:16px 24px;width:100%;text-align:center;transition:opacity .15s}
+.btn:active{opacity:.7}
+.btn-primary{background:#007AFF;color:#fff}
+.btn-secondary{background:#2c2c2e;color:#fff}
+.btn-sm{padding:10px 16px;font-size:15px;width:auto;border-radius:8px}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#1c1c1e;min-height:48px;flex-shrink:0;gap:8px}
+.toolbar-title{font-weight:600;font-size:17px;flex:1;text-align:center}
+.toolbar-btn{background:none;border:none;color:#007AFF;font-size:16px;cursor:pointer;padding:6px 8px;white-space:nowrap}
+
+/* Canvas container */
+.canvas-container{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000;position:relative;min-height:0}
+.canvas-container canvas{touch-action:none;display:block}
+
+/* Bottom bar */
+.bottom-bar{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));background:#1c1c1e;flex-shrink:0}
+.btn-full{width:100%}
+
+/* Options bar */
+.options-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1c1c1e;border-top:1px solid #333;flex-shrink:0;gap:12px}
+.seg-ctrl{display:flex;background:#333;border-radius:8px;padding:2px;flex-shrink:0}
+.seg-btn{padding:7px 13px;border:none;border-radius:6px;background:transparent;color:#999;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s}
+.seg-btn.active{background:#555;color:#fff}
+#format-select{padding:8px 12px;border-radius:8px;background:#333;color:#fff;border:none;font-size:14px;font-weight:500;-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%23999' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+
+/* Pages strip */
+#pages-strip{display:none;flex-direction:row;gap:8px;padding:8px 16px;background:#1c1c1e;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;border-bottom:1px solid #333}
+#pages-strip.visible{display:flex}
+.page-thumb-wrap{position:relative;flex-shrink:0}
+.page-thumb{width:44px;height:58px;border-radius:4px;border:2px solid transparent;object-fit:cover;cursor:pointer;background:#333;display:block}
+.page-thumb.active{border-color:#007AFF}
+.page-del{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff3b30;color:#fff;border:2px solid #1c1c1e;font-size:11px;line-height:16px;text-align:center;cursor:pointer;font-weight:700;display:none}
+.page-thumb-wrap:hover .page-del,.page-thumb-wrap .page-del.show{display:block}
+
+/* Loading */
+#loading{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+#loading.active{display:flex}
+.spinner{width:36px;height:36px;border:3px solid #444;border-top-color:#007AFF;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading span{font-size:15px;color:#ccc}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Capture Screen -->
+  <div id="capture-screen" class="screen active">
+    <div class="capture-inner">
+      <div class="capture-icon">
+        <svg viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/></svg>
+      </div>
+      <div class="capture-title">Document Scanner</div>
+      <div class="capture-sub">Scan documents with your camera and save as PDF or image</div>
+      <button class="btn btn-primary" id="camera-btn">Take Photo</button>
+      <button class="btn btn-secondary" id="upload-btn">Upload Image</button>
+      <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+      <input type="file" id="upload-input" accept="image/*" hidden>
+    </div>
+  </div>
+
+  <!-- Crop Screen -->
+  <div id="crop-screen" class="screen">
+    <div class="toolbar">
+      <button class="toolbar-btn" id="crop-cancel">Cancel</button>
+      <span class="toolbar-title">Adjust Corners</span>
+      <button class="toolbar-btn" id="crop-reset">Reset</button>
+    </div>
+    <div class="canvas-container" id="crop-container">
+      <canvas id="crop-canvas"></canvas>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn btn-primary btn-full" id="scan-btn">Scan</button>
+    </div>
+  </div>
+
+  <!-- Preview Screen -->
+  <div id="preview-screen" class="screen">
+    <div class="toolbar">
+      <button class="toolbar-btn" id="preview-new">New</button>
+      <span class="toolbar-title" id="preview-title">Preview</span>
+      <button class="toolbar-btn" id="add-page-btn">+ Page</button>
+    </div>
+    <div id="pages-strip"></div>
+    <div class="canvas-container" id="preview-container">
+      <canvas id="preview-canvas"></canvas>
+    </div>
+    <div class="options-bar">
+      <div class="seg-ctrl" id="color-mode">
+        <button class="seg-btn active" data-mode="bw">B&W</button>
+        <button class="seg-btn" data-mode="gray">Gray</button>
+        <button class="seg-btn" data-mode="color">Color</button>
+      </div>
+      <select id="format-select">
+        <option value="pdf" selected>PDF</option>
+        <option value="jpg">JPG</option>
+        <option value="png">PNG</option>
+      </select>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn btn-primary btn-full" id="download-btn">Download</button>
+    </div>
+  </div>
+
+  <div id="loading"><div class="spinner"></div><span>Processing...</span></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+'use strict';
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+function gaussElim(A, b) {
+  const n = A.length;
+  const M = A.map((r, i) => [...r, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let mx = Math.abs(M[c][c]), mr = c;
+    for (let r = c + 1; r < n; r++) { if (Math.abs(M[r][c]) > mx) { mx = Math.abs(M[r][c]); mr = r; } }
+    [M[c], M[mr]] = [M[mr], M[c]];
+    for (let r = c + 1; r < n; r++) {
+      const f = M[r][c] / M[c][c];
+      for (let j = c; j <= n; j++) M[r][j] -= f * M[c][j];
+    }
+  }
+  const x = new Array(n);
+  for (let i = n - 1; i >= 0; i--) {
+    x[i] = M[i][n];
+    for (let j = i + 1; j < n; j++) x[i] -= M[i][j] * x[j];
+    x[i] /= M[i][i];
+  }
+  return x;
+}
+
+function computeHomography(src, dst) {
+  // Maps src coords → dst coords. For inverse warp: src=output rect, dst=input quad
+  const A = [], b = [];
+  for (let i = 0; i < 4; i++) {
+    const sx = src[i].x, sy = src[i].y, dx = dst[i].x, dy = dst[i].y;
+    A.push([sx, sy, 1, 0, 0, 0, -dx * sx, -dx * sy]); b.push(dx);
+    A.push([0, 0, 0, sx, sy, 1, -dy * sx, -dy * sy]); b.push(dy);
+  }
+  const h = gaussElim(A, b);
+  return [...h, 1]; // 3×3 row-major: h0..h8
+}
+
+function applyH(H, x, y) {
+  const w = H[6] * x + H[7] * y + H[8];
+  return [(H[0] * x + H[1] * y + H[2]) / w, (H[3] * x + H[4] * y + H[5]) / w];
+}
+
+// ── Perspective Warp ─────────────────────────────────────────────────────────
+
+function warpPerspective(srcCanvas, corners) {
+  // corners: TL, TR, BR, BL in source image coords
+  const outW = Math.round(Math.max(dist(corners[0], corners[1]), dist(corners[3], corners[2])));
+  const outH = Math.round(Math.max(dist(corners[0], corners[3]), dist(corners[1], corners[2])));
+  const w = Math.max(100, Math.min(4000, outW));
+  const h = Math.max(100, Math.min(4000, outH));
+
+  const dstRect = [{x:0,y:0},{x:w-1,y:0},{x:w-1,y:h-1},{x:0,y:h-1}];
+  const H = computeHomography(dstRect, corners);
+
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const octx = out.getContext('2d');
+  const srcCtx = srcCanvas.getContext('2d');
+  const srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+  const sd = srcData.data, sw = srcCanvas.width, sh = srcCanvas.height;
+  const outImg = octx.createImageData(w, h);
+  const od = outImg.data;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const [sx, sy] = applyH(H, x, y);
+      const x0 = Math.floor(sx), y0 = Math.floor(sy);
+      const x1 = x0 + 1, y1 = y0 + 1;
+      if (x0 < 0 || x1 >= sw || y0 < 0 || y1 >= sh) continue;
+      const fx = sx - x0, fy = sy - y0;
+      const idx = (y * w + x) * 4;
+      const i00 = (y0 * sw + x0) * 4, i10 = (y0 * sw + x1) * 4;
+      const i01 = (y1 * sw + x0) * 4, i11 = (y1 * sw + x1) * 4;
+      for (let c = 0; c < 4; c++) {
+        od[idx + c] = sd[i00+c]*(1-fx)*(1-fy) + sd[i10+c]*fx*(1-fy) + sd[i01+c]*(1-fx)*fy + sd[i11+c]*fx*fy;
+      }
+    }
+  }
+  octx.putImageData(outImg, 0, 0);
+  return out;
+}
+
+// ── Image Processing ─────────────────────────────────────────────────────────
+
+function adaptiveThreshold(canvas) {
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imgData.data, w = canvas.width, h = canvas.height;
+  const gray = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
+
+  // Integral image
+  const integ = new Float64Array(w * h);
+  for (let y = 0; y < h; y++) {
+    let rs = 0;
+    for (let x = 0; x < w; x++) {
+      rs += gray[y * w + x];
+      integ[y * w + x] = rs + (y > 0 ? integ[(y-1) * w + x] : 0);
+    }
+  }
+
+  let bs = Math.round(w / 12);
+  if (bs < 15) bs = 15;
+  if (bs > 151) bs = 151;
+  if (bs % 2 === 0) bs++;
+  const half = (bs - 1) >> 1;
+  const C = 12;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const x1 = Math.max(0, x - half), y1 = Math.max(0, y - half);
+      const x2 = Math.min(w - 1, x + half), y2 = Math.min(h - 1, y + half);
+      const cnt = (x2 - x1 + 1) * (y2 - y1 + 1);
+      let s = integ[y2 * w + x2];
+      if (x1 > 0) s -= integ[y2 * w + (x1 - 1)];
+      if (y1 > 0) s -= integ[(y1 - 1) * w + x2];
+      if (x1 > 0 && y1 > 0) s += integ[(y1 - 1) * w + (x1 - 1)];
+      const val = gray[y * w + x] > (s / cnt) - C ? 255 : 0;
+      const idx = (y * w + x) * 4;
+      d[idx] = d[idx+1] = d[idx+2] = val;
+      d[idx+3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function toGrayscaleEnhanced(canvas) {
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imgData.data;
+  let mn = 255, mx = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const g = Math.round(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
+    if (g < mn) mn = g;
+    if (g > mx) mx = g;
+  }
+  const range = mx - mn || 1;
+  for (let i = 0; i < d.length; i += 4) {
+    let g = Math.round(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
+    g = Math.round(((g - mn) / range) * 255);
+    // Slight S-curve for contrast
+    let t = g / 255;
+    t = t * t * (3 - 2 * t); // smoothstep
+    g = Math.round(t * 255);
+    d[i] = d[i+1] = d[i+2] = g;
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function enhanceColor(canvas) {
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imgData.data;
+  // Auto-levels per channel
+  for (let ch = 0; ch < 3; ch++) {
+    let mn = 255, mx = 0;
+    for (let i = ch; i < d.length; i += 4) { if (d[i] < mn) mn = d[i]; if (d[i] > mx) mx = d[i]; }
+    const r = mx - mn || 1;
+    for (let i = ch; i < d.length; i += 4) d[i] = Math.round(((d[i] - mn) / r) * 255);
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function applyColorMode(canvas, mode) {
+  if (mode === 'bw') adaptiveThreshold(canvas);
+  else if (mode === 'gray') toGrayscaleEnhanced(canvas);
+  else enhanceColor(canvas);
+}
+
+// ── App State ────────────────────────────────────────────────────────────────
+
+const state = {
+  pages: [],           // { sourceCanvas, corners, processedCanvases:{bw,gray,color} }
+  currentPageIdx: 0,
+  sourceCanvas: null,  // current image as canvas (≤ MAX_DIM)
+  imageCorners: [],    // 4 corners in sourceCanvas coords
+  displayScale: 1,
+  activeCorner: -1,
+  pointerOffset: {x:0, y:0},
+  colorMode: 'bw',
+  format: 'pdf',
+};
+
+const MAX_DIM = 3000;
+
+// ── DOM Refs ─────────────────────────────────────────────────────────────────
+
+const $ = id => document.getElementById(id);
+const screens = { capture: $('capture-screen'), crop: $('crop-screen'), preview: $('preview-screen') };
+const cropCanvas = $('crop-canvas');
+const cropCtx = cropCanvas.getContext('2d');
+const previewCanvas = $('preview-canvas');
+const previewCtx = previewCanvas.getContext('2d');
+const loadingEl = $('loading');
+const pagesStrip = $('pages-strip');
+
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[name].classList.add('active');
+}
+
+function showLoading(show) { loadingEl.classList.toggle('active', show); }
+
+// ── Image Loading ────────────────────────────────────────────────────────────
+
+function loadImageToCanvas(img) {
+  let w = img.naturalWidth, h = img.naturalHeight;
+  if (Math.max(w, h) > MAX_DIM) {
+    const s = MAX_DIM / Math.max(w, h);
+    w = Math.round(w * s); h = Math.round(h * s);
+  }
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(img, 0, 0, w, h);
+  return c;
+}
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const img = new Image();
+  img.onload = () => {
+    state.sourceCanvas = loadImageToCanvas(img);
+    const w = state.sourceCanvas.width, h = state.sourceCanvas.height;
+    const ins = 0.05;
+    state.imageCorners = [
+      {x: w*ins, y: h*ins}, {x: w*(1-ins), y: h*ins},
+      {x: w*(1-ins), y: h*(1-ins)}, {x: w*ins, y: h*(1-ins)}
+    ];
+    showScreen('crop');
+    requestAnimationFrame(() => setupCropCanvas());
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+// ── Crop Canvas ──────────────────────────────────────────────────────────────
+
+function setupCropCanvas() {
+  const container = $('crop-container');
+  const cw = container.clientWidth;
+  const ch = container.clientHeight;
+  const sw = state.sourceCanvas.width, sh = state.sourceCanvas.height;
+  const scale = Math.min(cw / sw, ch / sh, 1);
+  const dw = Math.round(sw * scale), dh = Math.round(sh * scale);
+  cropCanvas.width = dw; cropCanvas.height = dh;
+  cropCanvas.style.width = dw + 'px';
+  cropCanvas.style.height = dh + 'px';
+  state.displayScale = scale;
+  drawCropOverlay();
+}
+
+function imgToCanvas(ix, iy) { const s = state.displayScale; return {x: ix*s, y: iy*s}; }
+function canvasToImg(cx, cy) { const s = state.displayScale; return {x: cx/s, y: cy/s}; }
+
+function drawCropOverlay() {
+  const dw = cropCanvas.width, dh = cropCanvas.height;
+  const ctx = cropCtx;
+  ctx.clearRect(0, 0, dw, dh);
+
+  // Image
+  ctx.drawImage(state.sourceCanvas, 0, 0, dw, dh);
+
+  // Dark overlay with cutout
+  const dc = state.imageCorners.map(c => imgToCanvas(c.x, c.y));
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, dw, dh);
+  ctx.moveTo(dc[0].x, dc[0].y);
+  ctx.lineTo(dc[3].x, dc[3].y);
+  ctx.lineTo(dc[2].x, dc[2].y);
+  ctx.lineTo(dc[1].x, dc[1].y);
+  ctx.closePath();
+  ctx.clip('evenodd');
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0, 0, dw, dh);
+  ctx.restore();
+
+  // Edge lines
+  ctx.beginPath();
+  ctx.moveTo(dc[0].x, dc[0].y);
+  for (let i = 1; i <= 4; i++) ctx.lineTo(dc[i%4].x, dc[i%4].y);
+  ctx.strokeStyle = '#007AFF';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Midpoint lines (subtle grid)
+  ctx.strokeStyle = 'rgba(0,122,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const mid = (a, b) => ({x:(a.x+b.x)/2, y:(a.y+b.y)/2});
+  const mt = mid(dc[0], dc[1]), mb = mid(dc[3], dc[2]);
+  const ml = mid(dc[0], dc[3]), mr = mid(dc[1], dc[2]);
+  ctx.moveTo(mt.x, mt.y); ctx.lineTo(mb.x, mb.y);
+  ctx.moveTo(ml.x, ml.y); ctx.lineTo(mr.x, mr.y);
+  ctx.stroke();
+
+  // Corner handles
+  const HANDLE_R = 12;
+  dc.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, HANDLE_R, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fill();
+    ctx.strokeStyle = '#007AFF';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  });
+
+  // Magnifier when dragging
+  if (state.activeCorner >= 0) {
+    drawMagnifier(ctx, dc[state.activeCorner], state.imageCorners[state.activeCorner], dw, dh);
+  }
+}
+
+function drawMagnifier(ctx, canvasPos, imgPos, cw, ch) {
+  const R = 55, ZOOM = 2.5;
+  let mx = canvasPos.x, my = canvasPos.y - R - 50;
+  if (my - R < 0) my = canvasPos.y + R + 50;
+  mx = Math.max(R + 4, Math.min(cw - R - 4, mx));
+  my = Math.max(R + 4, Math.min(ch - R - 4, my));
+
+  ctx.save();
+  // Shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(mx, my, R + 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#1c1c1e';
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Clipped zoomed image
+  ctx.beginPath();
+  ctx.arc(mx, my, R, 0, Math.PI * 2);
+  ctx.clip();
+  const srcSize = R * 2 / (state.displayScale * ZOOM);
+  ctx.drawImage(state.sourceCanvas,
+    imgPos.x - srcSize/2, imgPos.y - srcSize/2, srcSize, srcSize,
+    mx - R, my - R, R*2, R*2
+  );
+  ctx.restore();
+
+  // Border
+  ctx.beginPath();
+  ctx.arc(mx, my, R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Crosshair
+  ctx.strokeStyle = '#007AFF';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(mx - 8, my); ctx.lineTo(mx + 8, my);
+  ctx.moveTo(mx, my - 8); ctx.lineTo(mx, my + 8);
+  ctx.stroke();
+}
+
+// ── Crop Interaction ─────────────────────────────────────────────────────────
+
+const TOUCH_R = 35;
+
+function getCropCoords(e) {
+  const r = cropCanvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+
+function onPointerDown(e) {
+  e.preventDefault();
+  const p = getCropCoords(e);
+  let minD = Infinity, minI = -1;
+  state.imageCorners.forEach((c, i) => {
+    const dc = imgToCanvas(c.x, c.y);
+    const d = Math.hypot(p.x - dc.x, p.y - dc.y);
+    if (d < minD && d < TOUCH_R) { minD = d; minI = i; }
+  });
+  if (minI >= 0) {
+    state.activeCorner = minI;
+    const dc = imgToCanvas(state.imageCorners[minI].x, state.imageCorners[minI].y);
+    state.pointerOffset = { x: dc.x - p.x, y: dc.y - p.y };
+    if (navigator.vibrate) navigator.vibrate(10);
+  }
+}
+
+function onPointerMove(e) {
+  if (state.activeCorner < 0) return;
+  e.preventDefault();
+  const p = getCropCoords(e);
+  const cx = p.x + state.pointerOffset.x;
+  const cy = p.y + state.pointerOffset.y;
+  const ic = canvasToImg(cx, cy);
+  ic.x = Math.max(0, Math.min(state.sourceCanvas.width, ic.x));
+  ic.y = Math.max(0, Math.min(state.sourceCanvas.height, ic.y));
+  state.imageCorners[state.activeCorner] = ic;
+  drawCropOverlay();
+}
+
+function onPointerEnd() { state.activeCorner = -1; drawCropOverlay(); }
+
+// Use touch events for reliable mobile handling
+cropCanvas.addEventListener('touchstart', onPointerDown, { passive: false });
+cropCanvas.addEventListener('touchmove', onPointerMove, { passive: false });
+cropCanvas.addEventListener('touchend', onPointerEnd);
+cropCanvas.addEventListener('touchcancel', onPointerEnd);
+// Mouse fallback for desktop
+cropCanvas.addEventListener('mousedown', onPointerDown);
+window.addEventListener('mousemove', onPointerMove);
+window.addEventListener('mouseup', onPointerEnd);
+
+// ── Processing ───────────────────────────────────────────────────────────────
+
+function processCurrentImage() {
+  const warped = warpPerspective(state.sourceCanvas, state.imageCorners);
+  // Generate all three color modes
+  const modes = {};
+  ['bw', 'gray', 'color'].forEach(mode => {
+    const c = document.createElement('canvas');
+    c.width = warped.width; c.height = warped.height;
+    c.getContext('2d').drawImage(warped, 0, 0);
+    applyColorMode(c, mode);
+    modes[mode] = c;
+  });
+  return {
+    sourceCanvas: state.sourceCanvas,
+    corners: state.imageCorners.map(c => ({...c})),
+    processed: modes,
+  };
+}
+
+function showPreview() {
+  const page = state.pages[state.currentPageIdx];
+  if (!page) return;
+  const canvas = page.processed[state.colorMode];
+  const container = $('preview-container');
+  const cw = container.clientWidth, ch = container.clientHeight;
+  const scale = Math.min(cw / canvas.width, ch / canvas.height, 1);
+  const dw = Math.round(canvas.width * scale), dh = Math.round(canvas.height * scale);
+  previewCanvas.width = dw; previewCanvas.height = dh;
+  previewCanvas.style.width = dw + 'px';
+  previewCanvas.style.height = dh + 'px';
+  previewCtx.drawImage(canvas, 0, 0, dw, dh);
+  updatePagesStrip();
+  $('preview-title').textContent = state.pages.length > 1
+    ? `Page ${state.currentPageIdx + 1} of ${state.pages.length}`
+    : 'Preview';
+}
+
+function updatePagesStrip() {
+  pagesStrip.innerHTML = '';
+  if (state.pages.length <= 1) { pagesStrip.classList.remove('visible'); return; }
+  pagesStrip.classList.add('visible');
+  state.pages.forEach((page, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'page-thumb-wrap';
+    const img = document.createElement('canvas');
+    img.className = 'page-thumb' + (i === state.currentPageIdx ? ' active' : '');
+    img.width = 44; img.height = 58;
+    const src = page.processed[state.colorMode];
+    const s = Math.min(44/src.width, 58/src.height);
+    const tw = src.width*s, th = src.height*s;
+    img.getContext('2d').drawImage(src, (44-tw)/2, (58-th)/2, tw, th);
+    img.addEventListener('click', () => { state.currentPageIdx = i; showPreview(); });
+    wrap.appendChild(img);
+
+    const del = document.createElement('button');
+    del.className = 'page-del show';
+    del.textContent = '\u00d7';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.pages.splice(i, 1);
+      if (state.pages.length === 0) { showScreen('capture'); return; }
+      state.currentPageIdx = Math.min(state.currentPageIdx, state.pages.length - 1);
+      showPreview();
+    });
+    wrap.appendChild(del);
+    pagesStrip.appendChild(wrap);
+  });
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+
+function getFilename(ext) {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `scan-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${ext}`;
+}
+
+async function downloadBlob(blob, filename) {
+  // Try Web Share API first (great on iOS)
+  if (navigator.canShare) {
+    try {
+      const file = new File([blob], filename, { type: blob.type });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return;
+      }
+    } catch (e) { /* cancelled or failed, fall through */ }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+async function doDownload() {
+  const fmt = $('format-select').value;
+  showLoading(true);
+  await new Promise(r => setTimeout(r, 50)); // let UI update
+
+  try {
+    if (fmt === 'pdf') {
+      if (!window.jspdf) throw new Error('PDF library not loaded. Check your connection.');
+      const { jsPDF } = window.jspdf;
+      const first = state.pages[0].processed[state.colorMode];
+      const doc = new jsPDF({
+        orientation: first.width > first.height ? 'l' : 'p',
+        unit: 'pt',
+        format: [first.width * 0.75, first.height * 0.75], // 96dpi → 72pt
+      });
+      state.pages.forEach((page, i) => {
+        const c = page.processed[state.colorMode];
+        const pw = c.width * 0.75, ph = c.height * 0.75;
+        if (i > 0) doc.addPage([pw, ph], c.width > c.height ? 'l' : 'p');
+        doc.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pw, ph, undefined, 'FAST');
+      });
+      const blob = doc.output('blob');
+      await downloadBlob(blob, getFilename('pdf'));
+    } else {
+      const page = state.pages[state.currentPageIdx];
+      const c = page.processed[state.colorMode];
+      const mime = fmt === 'png' ? 'image/png' : 'image/jpeg';
+      const quality = fmt === 'png' ? undefined : 0.92;
+      const dataUrl = c.toDataURL(mime, quality);
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      await downloadBlob(blob, getFilename(fmt));
+    }
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+  }
+  showLoading(false);
+}
+
+// ── Event Wiring ─────────────────────────────────────────────────────────────
+
+$('camera-btn').addEventListener('click', () => $('camera-input').click());
+$('upload-btn').addEventListener('click', () => $('upload-input').click());
+$('camera-input').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
+$('upload-input').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
+
+$('crop-cancel').addEventListener('click', () => showScreen('capture'));
+$('crop-reset').addEventListener('click', () => {
+  const w = state.sourceCanvas.width, h = state.sourceCanvas.height, ins = 0.05;
+  state.imageCorners = [
+    {x:w*ins,y:h*ins},{x:w*(1-ins),y:h*ins},{x:w*(1-ins),y:h*(1-ins)},{x:w*ins,y:h*(1-ins)}
+  ];
+  drawCropOverlay();
+});
+
+$('scan-btn').addEventListener('click', async () => {
+  showLoading(true);
+  await new Promise(r => setTimeout(r, 50));
+  const page = processCurrentImage();
+  state.pages.push(page);
+  state.currentPageIdx = state.pages.length - 1;
+  showLoading(false);
+  showScreen('preview');
+  requestAnimationFrame(() => showPreview());
+});
+
+$('preview-new').addEventListener('click', () => {
+  state.pages = [];
+  state.currentPageIdx = 0;
+  showScreen('capture');
+});
+
+$('add-page-btn').addEventListener('click', () => showScreen('capture'));
+
+$('download-btn').addEventListener('click', doDownload);
+
+// Color mode
+$('color-mode').addEventListener('click', e => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  $('color-mode').querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.colorMode = btn.dataset.mode;
+  showPreview();
+});
+
+// Format select
+$('format-select').addEventListener('change', e => { state.format = e.target.value; });
+
+// Resize handling
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (screens.crop.classList.contains('active') && state.sourceCanvas) {
+      setupCropCanvas();
+    }
+    if (screens.preview.classList.contains('active') && state.pages.length) {
+      showPreview();
+    }
+  }, 150);
+});
+</script>
+</body>
+</html>

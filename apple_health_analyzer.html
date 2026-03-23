@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apple Health Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #08090d;
+    --bg-secondary: #10121a;
+    --bg-card: #161822;
+    --bg-card-hover: #1c1f2e;
+    --border: #252838;
+    --border-active: #3a3f5a;
+    --text-primary: #e8eaf0;
+    --text-secondary: #8b8fa8;
+    --text-muted: #555872;
+    --accent-weight: #00d4aa;
+    --accent-training: #ff6b35;
+    --accent-steps: #4ecdc4;
+    --accent-correlation: #a855f7;
+    --accent-danger: #ef4444;
+    --accent-weight-dim: rgba(0,212,170,0.15);
+    --accent-training-dim: rgba(255,107,53,0.15);
+    --accent-steps-dim: rgba(78,205,196,0.15);
+    --accent-correlation-dim: rgba(168,85,247,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* Upload Screen */
+  #upload-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+    position: relative;
+  }
+
+  #upload-screen::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+      radial-gradient(ellipse 600px 400px at 30% 20%, rgba(0,212,170,0.04), transparent),
+      radial-gradient(ellipse 500px 500px at 70% 70%, rgba(168,85,247,0.03), transparent);
+    pointer-events: none;
+  }
+
+  .upload-brand {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+
+  .upload-title {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .dropzone {
+    width: 100%;
+    max-width: 520px;
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--bg-secondary);
+    position: relative;
+    z-index: 1;
+  }
+
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent-weight);
+    background: var(--accent-weight-dim);
+  }
+
+  .dropzone-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.6;
+  }
+
+  .dropzone-text { color: var(--text-secondary); font-size: 0.95rem; }
+  .dropzone-text strong { color: var(--text-primary); }
+
+  #progress-container {
+    display: none;
+    width: 100%;
+    max-width: 520px;
+    margin-top: 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .progress-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-card);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-weight), var(--accent-steps));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  /* Dashboard */
+  #dashboard {
+    display: none;
+    min-height: 100vh;
+  }
+
+  /* Top Bar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .topbar-brand {
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  .topbar-stats {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+  }
+
+  .topbar-stats span strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .topbar-reload {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .topbar-reload:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+  }
+
+  /* Tabs */
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    padding: 0 1.5rem;
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    padding: 0.85rem 1.25rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .tab-btn:hover { color: var(--text-secondary); }
+
+  .tab-btn.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent-weight);
+  }
+
+  .tab-btn[data-tab="weight"].active { border-bottom-color: var(--accent-weight); }
+  .tab-btn[data-tab="training"].active { border-bottom-color: var(--accent-training); }
+  .tab-btn[data-tab="steps"].active { border-bottom-color: var(--accent-steps); }
+  .tab-btn[data-tab="correlation"].active { border-bottom-color: var(--accent-correlation); }
+
+  .tab-indicator {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+
+  /* Tab Content */
+  .tab-content { display: none; padding: 1.5rem; }
+  .tab-content.active { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .card-subtitle {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+  }
+
+  .stat-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.35rem;
+  }
+
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.35rem;
+    font-weight: 600;
+  }
+
+  .stat-detail {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.2rem;
+  }
+
+  .stat-positive { color: var(--accent-weight); }
+  .stat-negative { color: var(--accent-danger); }
+
+  /* Chart containers */
+  .chart-container {
+    position: relative;
+    width: 100%;
+    height: 320px;
+  }
+
+  .chart-container-tall {
+    height: 400px;
+  }
+
+  /* Heatmap */
+  .heatmap-wrapper {
+    overflow-x: auto;
+    padding: 0.5rem 0;
+  }
+
+  .heatmap-grid {
+    display: grid;
+    gap: 2px;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 14px);
+  }
+
+  .heatmap-cell {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: var(--bg-secondary);
+    transition: background 0.2s;
+  }
+
+  .heatmap-cell:hover {
+    outline: 1px solid var(--text-muted);
+    cursor: crosshair;
+  }
+
+  .heatmap-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    padding: 0 2px;
+  }
+
+  .heatmap-day-labels {
+    display: grid;
+    grid-template-rows: repeat(7, 14px);
+    gap: 2px;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-right: 6px;
+    align-items: center;
+  }
+
+  .heatmap-row {
+    display: flex;
+    align-items: start;
+  }
+
+  .heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+  }
+
+  .heatmap-legend-cell {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  /* Steps hourly heatmap */
+  .hourly-heatmap {
+    display: grid;
+    grid-template-columns: auto repeat(24, 1fr);
+    gap: 2px;
+    font-size: 0.65rem;
+  }
+
+  .hourly-heatmap-cell {
+    aspect-ratio: 1;
+    border-radius: 3px;
+    min-width: 16px;
+    transition: background 0.2s;
+  }
+
+  .hourly-heatmap-cell:hover {
+    outline: 1px solid var(--text-muted);
+    cursor: crosshair;
+  }
+
+  .hourly-label {
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 6px;
+    font-size: 0.68rem;
+  }
+
+  /* Controls */
+  .controls-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+
+  select, input[type="date"] {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.45rem 0.75rem;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  select:hover, input[type="date"]:hover {
+    border-color: var(--border-active);
+  }
+
+  select:focus, input[type="date"]:focus {
+    border-color: var(--accent-weight);
+  }
+
+  label.control-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: var(--bg-card);
+    border: 1px solid var(--border-active);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.78rem;
+    pointer-events: none;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+
+  .tooltip-title {
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+  }
+
+  .tooltip-value {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-steps);
+  }
+
+  /* Empty states */
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+  }
+
+  .empty-state-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .topbar-stats { display: none; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .chart-container { height: 250px; }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-primary); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-active); }
+
+  /* Animation */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.4s ease forwards;
+  }
+
+  .delay-1 { animation-delay: 0.05s; opacity: 0; }
+  .delay-2 { animation-delay: 0.1s; opacity: 0; }
+  .delay-3 { animation-delay: 0.15s; opacity: 0; }
+  .delay-4 { animation-delay: 0.2s; opacity: 0; }
+</style>
+</head>
+<body>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-title" id="tooltip-title"></div>
+  <div class="tooltip-value" id="tooltip-value"></div>
+</div>
+
+<!-- Upload Screen -->
+<div id="upload-screen">
+  <div class="upload-brand">APPLE HEALTH EXPLORER</div>
+  <h1 class="upload-title">Apple Health Explorer</h1>
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">📊</div>
+    <div class="dropzone-text">
+      <strong>Drop export.zip or export.xml</strong>
+    </div>
+    <input type="file" id="file-input" accept=".zip,.xml" style="display:none">
+  </div>
+  <div id="progress-container">
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div class="progress-text" id="progress-text">Reading file...</div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="topbar">
+    <div class="topbar-brand">⚡ Apple Health Explorer</div>
+    <div class="topbar-stats" id="topbar-stats"></div>
+    <button class="topbar-reload" onclick="location.reload()">↻ New File</button>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="weight" onclick="switchTab('weight')">
+      <span class="tab-indicator" style="background:var(--accent-weight)"></span>Weight
+    </button>
+    <button class="tab-btn" data-tab="training" onclick="switchTab('training')">
+      <span class="tab-indicator" style="background:var(--accent-training)"></span>Training
+    </button>
+    <button class="tab-btn" data-tab="steps" onclick="switchTab('steps')">
+      <span class="tab-indicator" style="background:var(--accent-steps)"></span>Steps &amp; Activity
+    </button>
+    <button class="tab-btn" data-tab="correlation" onclick="switchTab('correlation')">
+      <span class="tab-indicator" style="background:var(--accent-correlation)"></span>Correlations
+    </button>
+  </div>
+
+  <!-- Weight Tab -->
+  <div class="tab-content active" id="tab-weight">
+    <div class="stats-grid" id="weight-stats"></div>
+    <div class="card fade-in delay-1">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Weight Over Time</div>
+          <div class="card-subtitle">Raw data with 7-day and 30-day moving averages</div>
+        </div>
+        <div class="controls-row" style="margin-bottom:0">
+          <select id="weight-range" onchange="renderWeightChart()">
+            <option value="90">Last 3 months</option>
+            <option value="180">Last 6 months</option>
+            <option value="365" selected>Last year</option>
+            <option value="0">All time</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-container chart-container-tall">
+        <canvas id="weight-chart"></canvas>
+      </div>
+    </div>
+    <div class="card fade-in delay-2">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Weekly Rate of Change</div>
+          <div class="card-subtitle">Weight change per week based on 7-day moving average</div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="weight-rate-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Training Tab -->
+  <div class="tab-content" id="tab-training">
+    <div class="stats-grid" id="training-stats"></div>
+    <div class="card fade-in delay-1">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Workout Consistency</div>
+          <div class="card-subtitle">Last 12 months — darker = longer session</div>
+        </div>
+        <div class="heatmap-legend">
+          <span>Less</span>
+          <div class="heatmap-legend-cell" style="background:var(--bg-secondary)"></div>
+          <div class="heatmap-legend-cell" style="background:rgba(255,107,53,0.2)"></div>
+          <div class="heatmap-legend-cell" style="background:rgba(255,107,53,0.45)"></div>
+          <div class="heatmap-legend-cell" style="background:rgba(255,107,53,0.7)"></div>
+          <div class="heatmap-legend-cell" style="background:rgba(255,107,53,1)"></div>
+          <span>More</span>
+        </div>
+      </div>
+      <div class="heatmap-row">
+        <div class="heatmap-day-labels">
+          <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+        </div>
+        <div class="heatmap-wrapper" style="flex:1">
+          <div class="heatmap-grid" id="training-heatmap"></div>
+          <div class="heatmap-labels" id="training-heatmap-labels"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card fade-in delay-2">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Workout Duration & Calories</div>
+          <div class="card-subtitle">Per-session stats over time</div>
+        </div>
+        <div class="controls-row" style="margin-bottom:0">
+          <select id="training-type-filter" onchange="renderTrainingChart()">
+            <option value="all">All types</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-container chart-container-tall">
+        <canvas id="training-chart"></canvas>
+      </div>
+    </div>
+    <div class="card fade-in delay-3">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Workout Breakdown</div>
+          <div class="card-subtitle">Distribution by type</div>
+        </div>
+      </div>
+      <div class="chart-container" style="max-width:400px;margin:0 auto">
+        <canvas id="training-pie-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Steps Tab -->
+  <div class="tab-content" id="tab-steps">
+    <div class="stats-grid" id="steps-stats"></div>
+    <div class="card fade-in delay-1">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Daily Steps</div>
+          <div class="card-subtitle">With 7-day and 30-day moving averages</div>
+        </div>
+        <div class="controls-row" style="margin-bottom:0">
+          <select id="steps-range" onchange="renderStepsChart()">
+            <option value="90">Last 3 months</option>
+            <option value="180" selected>Last 6 months</option>
+            <option value="365">Last year</option>
+            <option value="0">All time</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-container chart-container-tall">
+        <canvas id="steps-chart"></canvas>
+      </div>
+    </div>
+    <div class="card fade-in delay-2">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Daily Step Heatmap</div>
+          <div class="card-subtitle">Last 12 months — contribution-style grid</div>
+        </div>
+        <div class="heatmap-legend">
+          <span>Less</span>
+          <div class="heatmap-legend-cell" style="background:var(--bg-secondary)"></div>
+          <div class="heatmap-legend-cell" style="background:rgba(78,205,196,0.2)"></div>
+          <div class="heatmap-legend-cell" style="background:rgba(78,205,196,0.45)"></div>
+          <div class="heatmap-legend-cell" style="background:rgba(78,205,196,0.7)"></div>
+          <div class="heatmap-legend-cell" style="background:rgba(78,205,196,1)"></div>
+          <span>More</span>
+        </div>
+      </div>
+      <div class="heatmap-row">
+        <div class="heatmap-day-labels">
+          <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+        </div>
+        <div class="heatmap-wrapper" style="flex:1">
+          <div class="heatmap-grid" id="steps-heatmap"></div>
+          <div class="heatmap-labels" id="steps-heatmap-labels"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card fade-in delay-3">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Day of Week Pattern</div>
+          <div class="card-subtitle">Average steps by day</div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="steps-dow-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Correlation Tab -->
+  <div class="tab-content" id="tab-correlation">
+    <div class="card fade-in">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Metric Correlation Explorer</div>
+          <div class="card-subtitle">Scatter plot any two metrics to find patterns</div>
+        </div>
+      </div>
+      <div class="controls-row">
+        <label class="control-label">
+          X-Axis:
+          <select id="corr-x" onchange="renderCorrelation()"></select>
+        </label>
+        <label class="control-label">
+          Y-Axis:
+          <select id="corr-y" onchange="renderCorrelation()"></select>
+        </label>
+        <label class="control-label">
+          Period:
+          <select id="corr-range" onchange="renderCorrelation()">
+            <option value="90">3 months</option>
+            <option value="180">6 months</option>
+            <option value="365" selected>1 year</option>
+            <option value="0">All time</option>
+          </select>
+        </label>
+      </div>
+      <div id="corr-stats" class="stats-grid" style="margin-bottom:1rem"></div>
+      <div class="chart-container chart-container-tall">
+        <canvas id="correlation-chart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== DATA STORE =====
+const DATA = {
+  weight: [],       // { date, value }
+  steps: [],        // { date, value }
+  stepsHourly: [],  // { date, hour, value }
+  workouts: [],     // { date, type, duration, calories }
+  activeEnergy: [], // { date, value }
+  restingHR: [],    // { date, value }
+  hrv: [],          // { date, value }
+  distance: [],     // { date, value }
+  flights: [],      // { date, value }
+  vo2max: [],       // { date, value }
+};
+
+const CHARTS = {};
+const FRIENDLY_TYPES = {
+  HKWorkoutActivityTypeTraditionalStrengthTraining: 'Strength Training',
+  HKWorkoutActivityTypeRunning: 'Running',
+  HKWorkoutActivityTypeWalking: 'Walking',
+  HKWorkoutActivityTypeCycling: 'Cycling',
+  HKWorkoutActivityTypeFunctionalStrengthTraining: 'Functional Strength',
+  HKWorkoutActivityTypeHIIT: 'HIIT',
+  HKWorkoutActivityTypeYoga: 'Yoga',
+  HKWorkoutActivityTypeSwimming: 'Swimming',
+  HKWorkoutActivityTypeElliptical: 'Elliptical',
+  HKWorkoutActivityTypeCoreTraining: 'Core Training',
+  HKWorkoutActivityTypeStairClimbing: 'Stair Climbing',
+  HKWorkoutActivityTypeCooldown: 'Cooldown',
+  HKWorkoutActivityTypeMixedCardio: 'Mixed Cardio',
+  HKWorkoutActivityTypePilates: 'Pilates',
+  HKWorkoutActivityTypeRowing: 'Rowing',
+};
+
+function friendlyWorkoutType(raw) {
+  return FRIENDLY_TYPES[raw] || raw.replace('HKWorkoutActivityType', '');
+}
+
+// ===== FILE HANDLING =====
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+async function handleFile(file) {
+  const progress = document.getElementById('progress-container');
+  const fill = document.getElementById('progress-fill');
+  const text = document.getElementById('progress-text');
+  progress.style.display = 'block';
+  fill.style.width = '10%';
+  text.textContent = 'Reading file...';
+
+  try {
+    let xmlText;
+    if (file.name.endsWith('.zip')) {
+      text.textContent = 'Extracting ZIP...';
+      fill.style.width = '20%';
+      const zip = await JSZip.loadAsync(file);
+      const xmlFile = zip.file(/export\.xml$/i)[0] || zip.file(/\.xml$/i)[0];
+      if (!xmlFile) throw new Error('No export.xml found in ZIP');
+      text.textContent = 'Decompressing XML...';
+      fill.style.width = '40%';
+      xmlText = await xmlFile.async('string');
+    } else {
+      xmlText = await file.text();
+    }
+
+    fill.style.width = '60%';
+    text.textContent = 'Parsing health records...';
+    await new Promise(r => setTimeout(r, 50));
+
+    parseXML(xmlText);
+
+    fill.style.width = '90%';
+    text.textContent = 'Building dashboard...';
+    await new Promise(r => setTimeout(r, 50));
+
+    buildDashboard();
+
+    fill.style.width = '100%';
+    text.textContent = 'Done!';
+
+    setTimeout(() => {
+      document.getElementById('upload-screen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+    }, 300);
+  } catch (err) {
+    text.textContent = '❌ Error: ' + err.message;
+    fill.style.width = '0%';
+    console.error(err);
+  }
+}
+
+// ===== XML PARSING =====
+function parseXML(xml) {
+  // Parse Record elements using regex for performance on large files
+  const recordRegex = /<Record\s+([^>]+?)\/>/g;
+  const workoutRegex = /<Workout\s+([^>]+?)(?:\/>|>[\s\S]*?<\/Workout>)/g;
+
+  let match;
+  const dailySteps = {};
+  const hourlySteps = {};
+  const dailyActiveEnergy = {};
+  const dailyDistance = {};
+  const dailyFlights = {};
+
+  // Parse Records
+  while ((match = recordRegex.exec(xml)) !== null) {
+    const attrs = parseAttrs(match[1]);
+    const type = attrs.type;
+    const value = parseFloat(attrs.value);
+    const dateStr = attrs.startDate;
+    if (!dateStr || isNaN(value)) continue;
+
+    const date = parseHealthDate(dateStr);
+    if (!date) continue;
+    const dayKey = toDateKey(date);
+
+    switch (type) {
+      case 'HKQuantityTypeIdentifierBodyMass':
+        DATA.weight.push({ date: new Date(dayKey), value });
+        break;
+      case 'HKQuantityTypeIdentifierStepCount':
+        dailySteps[dayKey] = (dailySteps[dayKey] || 0) + value;
+        const hr = date.getHours();
+        const hKey = dayKey + '-' + hr;
+        hourlySteps[hKey] = (hourlySteps[hKey] || 0) + value;
+        break;
+      case 'HKQuantityTypeIdentifierActiveEnergyBurned':
+        dailyActiveEnergy[dayKey] = (dailyActiveEnergy[dayKey] || 0) + value;
+        break;
+      case 'HKQuantityTypeIdentifierDistanceWalkingRunning':
+        dailyDistance[dayKey] = (dailyDistance[dayKey] || 0) + value;
+        break;
+      case 'HKQuantityTypeIdentifierFlightsClimbed':
+        dailyFlights[dayKey] = (dailyFlights[dayKey] || 0) + value;
+        break;
+      case 'HKQuantityTypeIdentifierRestingHeartRate':
+        DATA.restingHR.push({ date: new Date(dayKey), value });
+        break;
+      case 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN':
+        DATA.hrv.push({ date: new Date(dayKey), value });
+        break;
+      case 'HKQuantityTypeIdentifierVO2Max':
+        DATA.vo2max.push({ date: new Date(dayKey), value });
+        break;
+    }
+  }
+
+  // Parse Workouts
+  while ((match = workoutRegex.exec(xml)) !== null) {
+    const attrs = parseAttrs(match[1]);
+    const type = attrs.workoutActivityType;
+    const duration = parseFloat(attrs.duration) || 0;
+    const calories = parseFloat(attrs.totalEnergyBurned) || 0;
+    const dateStr = attrs.startDate;
+    if (!dateStr) continue;
+    const date = parseHealthDate(dateStr);
+    if (!date) continue;
+    DATA.workouts.push({
+      date: new Date(toDateKey(date)),
+      type: friendlyWorkoutType(type || 'Unknown'),
+      duration: Math.round(duration),
+      calories: Math.round(calories)
+    });
+  }
+
+  // Flatten aggregated daily data
+  for (const [key, val] of Object.entries(dailySteps)) {
+    DATA.steps.push({ date: new Date(key), value: Math.round(val) });
+  }
+  for (const [key, val] of Object.entries(hourlySteps)) {
+    const parts = key.split('-');
+    const day = parts.slice(0, 3).join('-');
+    const hour = parseInt(parts[3]);
+    DATA.stepsHourly.push({ date: new Date(day), hour, value: Math.round(val) });
+  }
+  for (const [key, val] of Object.entries(dailyActiveEnergy)) {
+    DATA.activeEnergy.push({ date: new Date(key), value: Math.round(val) });
+  }
+  for (const [key, val] of Object.entries(dailyDistance)) {
+    DATA.distance.push({ date: new Date(key), value: Math.round(val * 100) / 100 });
+  }
+  for (const [key, val] of Object.entries(dailyFlights)) {
+    DATA.flights.push({ date: new Date(key), value: Math.round(val) });
+  }
+
+  // Sort everything
+  for (const key of Object.keys(DATA)) {
+    if (Array.isArray(DATA[key])) {
+      DATA[key].sort((a, b) => a.date - b.date);
+    }
+  }
+
+  // Dedupe weight to daily average
+  DATA.weight = dedupeDaily(DATA.weight);
+  DATA.restingHR = dedupeDaily(DATA.restingHR);
+  DATA.hrv = dedupeDaily(DATA.hrv);
+  DATA.vo2max = dedupeDaily(DATA.vo2max);
+}
+
+function parseAttrs(str) {
+  const attrs = {};
+  const re = /(\w+)="([^"]*)"/g;
+  let m;
+  while ((m = re.exec(str)) !== null) {
+    attrs[m[1]] = m[2];
+  }
+  return attrs;
+}
+
+function parseHealthDate(str) {
+  // Apple Health dates: "2024-01-15 08:30:00 -0500" or "2024-01-15 08:30:00 +0200"
+  try {
+    // Replace first space with T, handle timezone offset
+    const m = str.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+([+-]\d{4})/);
+    if (m) {
+      return new Date(`${m[1]}T${m[2]}${m[3].slice(0,3)}:${m[3].slice(3)}`);
+    }
+    return new Date(str);
+  } catch { return null; }
+}
+
+function toDateKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function dedupeDaily(arr) {
+  const map = {};
+  for (const item of arr) {
+    const key = toDateKey(item.date);
+    if (!map[key]) map[key] = { values: [], date: new Date(key) };
+    map[key].values.push(item.value);
+  }
+  return Object.values(map)
+    .map(g => ({ date: g.date, value: g.values.reduce((a, b) => a + b, 0) / g.values.length }))
+    .sort((a, b) => a.date - b.date);
+}
+
+// ===== UTILITY =====
+function movingAvg(data, window) {
+  const result = [];
+  for (let i = 0; i < data.length; i++) {
+    const start = Math.max(0, i - window + 1);
+    const slice = data.slice(start, i + 1);
+    const avg = slice.reduce((s, d) => s + d.value, 0) / slice.length;
+    result.push({ date: data[i].date, value: Math.round(avg * 100) / 100 });
+  }
+  return result;
+}
+
+function filterByRange(data, days) {
+  if (!days) return data;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return data.filter(d => d.date >= cutoff);
+}
+
+function formatNum(n) {
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return Math.round(n * 100) / 100;
+}
+
+// ===== CHART DEFAULTS =====
+Chart.defaults.color = '#8b8fa8';
+Chart.defaults.borderColor = '#252838';
+Chart.defaults.font.family = "'Outfit', sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+Chart.defaults.plugins.legend.labels.padding = 16;
+
+const CHART_GRID = {
+  color: 'rgba(37,40,56,0.7)',
+  drawBorder: false,
+};
+
+// ===== BUILD DASHBOARD =====
+function buildDashboard() {
+  // Topbar stats
+  const totalRecords = DATA.weight.length + DATA.steps.length + DATA.workouts.length +
+    DATA.activeEnergy.length + DATA.restingHR.length + DATA.hrv.length;
+  const dates = [...DATA.steps.map(d => d.date), ...DATA.weight.map(d => d.date), ...DATA.workouts.map(d => d.date)];
+  const minDate = dates.length ? new Date(Math.min(...dates)) : new Date();
+  const maxDate = dates.length ? new Date(Math.max(...dates)) : new Date();
+
+  document.getElementById('topbar-stats').innerHTML = `
+    <span><strong>${totalRecords.toLocaleString()}</strong> data points</span>
+    <span><strong>${DATA.workouts.length}</strong> workouts</span>
+    <span class="mono" style="font-size:0.72rem">${minDate.toLocaleDateString()} → ${maxDate.toLocaleDateString()}</span>
+  `;
+
+  renderWeightTab();
+  renderTrainingTab();
+  renderStepsTab();
+  initCorrelation();
+}
+
+// ===== WEIGHT TAB =====
+function renderWeightTab() {
+  if (!DATA.weight.length) {
+    document.getElementById('weight-stats').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚖️</div>No weight data found</div>';
+    return;
+  }
+
+  const latest = DATA.weight[DATA.weight.length - 1];
+  const earliest = DATA.weight[0];
+  const ma7 = movingAvg(DATA.weight, 7);
+  const ma30 = movingAvg(DATA.weight, 30);
+  const min = Math.min(...DATA.weight.map(d => d.value));
+  const max = Math.max(...DATA.weight.map(d => d.value));
+  const totalChange = latest.value - earliest.value;
+  const last30 = DATA.weight.filter(d => d.date >= new Date(Date.now() - 30 * 86400000));
+  const change30 = last30.length >= 2 ? last30[last30.length - 1].value - last30[0].value : 0;
+
+  document.getElementById('weight-stats').innerHTML = `
+    <div class="stat-card fade-in delay-1">
+      <div class="stat-label">Current</div>
+      <div class="stat-value mono" style="color:var(--accent-weight)">${latest.value.toFixed(1)} <small style="font-size:0.7em;color:var(--text-muted)">kg</small></div>
+      <div class="stat-detail">${latest.date.toLocaleDateString()}</div>
+    </div>
+    <div class="stat-card fade-in delay-2">
+      <div class="stat-label">30-Day Change</div>
+      <div class="stat-value mono ${change30 <= 0 ? 'stat-positive' : 'stat-negative'}">${change30 > 0 ? '+' : ''}${change30.toFixed(1)} kg</div>
+      <div class="stat-detail">${(change30 / (30 / 7)).toFixed(2)} kg/week</div>
+    </div>
+    <div class="stat-card fade-in delay-3">
+      <div class="stat-label">Total Change</div>
+      <div class="stat-value mono ${totalChange <= 0 ? 'stat-positive' : 'stat-negative'}">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(1)} kg</div>
+      <div class="stat-detail">Since ${earliest.date.toLocaleDateString()}</div>
+    </div>
+    <div class="stat-card fade-in delay-4">
+      <div class="stat-label">Range</div>
+      <div class="stat-value mono">${min.toFixed(1)}–${max.toFixed(1)}</div>
+      <div class="stat-detail">${DATA.weight.length} measurements</div>
+    </div>
+  `;
+
+  renderWeightChart();
+}
+
+function renderWeightChart() {
+  const range = parseInt(document.getElementById('weight-range').value);
+  const raw = filterByRange(DATA.weight, range);
+  const ma7 = movingAvg(raw, 7);
+  const ma30 = movingAvg(raw, 30);
+
+  if (CHARTS.weight) CHARTS.weight.destroy();
+  CHARTS.weight = new Chart(document.getElementById('weight-chart'), {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Raw',
+          data: raw.map(d => ({ x: d.date, y: d.value })),
+          borderColor: 'rgba(0,212,170,0.25)',
+          backgroundColor: 'rgba(0,212,170,0.03)',
+          pointRadius: raw.length > 200 ? 0 : 2,
+          pointHoverRadius: 4,
+          borderWidth: 1,
+          fill: true,
+          tension: 0,
+          order: 3,
+        },
+        {
+          label: '7-day MA',
+          data: ma7.map(d => ({ x: d.date, y: d.value })),
+          borderColor: 'rgba(0,212,170,0.8)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.3,
+          order: 2,
+        },
+        {
+          label: '30-day MA',
+          data: ma30.map(d => ({ x: d.date, y: d.value })),
+          borderColor: '#ffffff',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.3,
+          order: 1,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: range <= 90 ? 'week' : 'month' },
+          grid: CHART_GRID,
+        },
+        y: {
+          grid: CHART_GRID,
+          ticks: {
+            callback: v => v.toFixed(1) + ' kg',
+          }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + ' kg'
+          }
+        }
+      }
+    }
+  });
+
+  // Rate of change chart
+  if (ma7.length > 7) {
+    const weeklyRate = [];
+    for (let i = 7; i < ma7.length; i++) {
+      weeklyRate.push({
+        date: ma7[i].date,
+        value: Math.round((ma7[i].value - ma7[i - 7].value) * 100) / 100
+      });
+    }
+
+    if (CHARTS.weightRate) CHARTS.weightRate.destroy();
+    const filtered = filterByRange(weeklyRate, range);
+    CHARTS.weightRate = new Chart(document.getElementById('weight-rate-chart'), {
+      type: 'bar',
+      data: {
+        labels: filtered.map(d => d.date),
+        datasets: [{
+          label: 'Weekly change (kg)',
+          data: filtered.map(d => d.value),
+          backgroundColor: filtered.map(d => d.value < 0 ? 'rgba(0,212,170,0.6)' : 'rgba(239,68,68,0.6)'),
+          borderRadius: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: range <= 90 ? 'week' : 'month' },
+            grid: CHART_GRID,
+          },
+          y: {
+            grid: CHART_GRID,
+            ticks: { callback: v => v.toFixed(1) + ' kg' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => (ctx.parsed.y > 0 ? '+' : '') + ctx.parsed.y.toFixed(2) + ' kg/week'
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+// ===== TRAINING TAB =====
+function renderTrainingTab() {
+  if (!DATA.workouts.length) {
+    document.getElementById('training-stats').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏋️</div>No workout data found</div>';
+    return;
+  }
+
+  const totalSessions = DATA.workouts.length;
+  const totalMinutes = DATA.workouts.reduce((s, w) => s + w.duration, 0);
+  const totalCals = DATA.workouts.reduce((s, w) => s + w.calories, 0);
+  const avgDuration = totalMinutes / totalSessions;
+  const types = [...new Set(DATA.workouts.map(w => w.type))];
+
+  // Streak & consistency
+  const last90 = DATA.workouts.filter(w => w.date >= new Date(Date.now() - 90 * 86400000));
+  const weeksIn90 = 90 / 7;
+  const perWeek = (last90.length / weeksIn90).toFixed(1);
+
+  document.getElementById('training-stats').innerHTML = `
+    <div class="stat-card fade-in delay-1">
+      <div class="stat-label">Total Sessions</div>
+      <div class="stat-value mono" style="color:var(--accent-training)">${totalSessions}</div>
+      <div class="stat-detail">${types.length} workout types</div>
+    </div>
+    <div class="stat-card fade-in delay-2">
+      <div class="stat-label">Total Time</div>
+      <div class="stat-value mono">${Math.round(totalMinutes / 60)}h ${totalMinutes % 60}m</div>
+      <div class="stat-detail">Avg ${Math.round(avgDuration)} min/session</div>
+    </div>
+    <div class="stat-card fade-in delay-3">
+      <div class="stat-label">Total Calories</div>
+      <div class="stat-value mono">${formatNum(totalCals)}</div>
+      <div class="stat-detail">Avg ${Math.round(totalCals / totalSessions)}/session</div>
+    </div>
+    <div class="stat-card fade-in delay-4">
+      <div class="stat-label">Frequency (90d)</div>
+      <div class="stat-value mono">${perWeek}<small style="font-size:0.6em;color:var(--text-muted)">/week</small></div>
+      <div class="stat-detail">${last90.length} sessions in 90 days</div>
+    </div>
+  `;
+
+  // Populate filter
+  const select = document.getElementById('training-type-filter');
+  select.innerHTML = '<option value="all">All types</option>';
+  types.sort().forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    select.appendChild(opt);
+  });
+
+  renderTrainingHeatmap();
+  renderTrainingChart();
+  renderTrainingPie();
+}
+
+function renderTrainingHeatmap() {
+  const container = document.getElementById('training-heatmap');
+  const labelsEl = document.getElementById('training-heatmap-labels');
+  container.innerHTML = '';
+  labelsEl.innerHTML = '';
+
+  const workoutMap = {};
+  DATA.workouts.forEach(w => {
+    const key = toDateKey(w.date);
+    workoutMap[key] = (workoutMap[key] || 0) + w.duration;
+  });
+
+  const maxDur = Math.max(...Object.values(workoutMap), 1);
+  const today = new Date();
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - 364);
+  // Align to Sunday
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+
+  const months = [];
+  let lastMonth = -1;
+
+  for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+    const key = toDateKey(d);
+    const dur = workoutMap[key] || 0;
+    const intensity = dur / maxDur;
+    const cell = document.createElement('div');
+    cell.className = 'heatmap-cell';
+    if (dur > 0) {
+      const alpha = 0.15 + intensity * 0.85;
+      cell.style.background = `rgba(255,107,53,${alpha})`;
+    }
+    cell.title = `${key}: ${dur ? dur + ' min' : 'Rest day'}`;
+    cell.addEventListener('mouseenter', e => showTooltip(e, key, dur ? dur + ' min' : 'Rest day'));
+    cell.addEventListener('mouseleave', hideTooltip);
+    container.appendChild(cell);
+
+    if (d.getMonth() !== lastMonth && d.getDay() === 0) {
+      months.push({ month: d.toLocaleString('default', { month: 'short' }), index: Math.floor((d - startDate) / 86400000 / 7) });
+      lastMonth = d.getMonth();
+    }
+  }
+
+  const totalWeeks = Math.ceil((today - startDate) / 86400000 / 7);
+  months.forEach(m => {
+    const span = document.createElement('span');
+    span.textContent = m.month;
+    span.style.position = 'absolute';
+    span.style.left = (m.index / totalWeeks * 100) + '%';
+    labelsEl.appendChild(span);
+  });
+  labelsEl.style.position = 'relative';
+}
+
+function renderTrainingChart() {
+  const filter = document.getElementById('training-type-filter').value;
+  let data = filter === 'all' ? DATA.workouts : DATA.workouts.filter(w => w.type === filter);
+
+  if (CHARTS.training) CHARTS.training.destroy();
+  CHARTS.training = new Chart(document.getElementById('training-chart'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.date),
+      datasets: [
+        {
+          label: 'Duration (min)',
+          data: data.map(d => d.duration),
+          backgroundColor: 'rgba(255,107,53,0.7)',
+          borderRadius: 3,
+          yAxisID: 'y',
+          order: 2,
+        },
+        {
+          label: 'Calories',
+          data: data.map(d => d.calories),
+          type: 'line',
+          borderColor: 'rgba(168,85,247,0.7)',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          tension: 0.3,
+          yAxisID: 'y1',
+          order: 1,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'month' },
+          grid: CHART_GRID,
+        },
+        y: {
+          position: 'left',
+          grid: CHART_GRID,
+          title: { display: true, text: 'Duration (min)' }
+        },
+        y1: {
+          position: 'right',
+          grid: { display: false },
+          title: { display: true, text: 'Calories' }
+        }
+      }
+    }
+  });
+}
+
+function renderTrainingPie() {
+  const typeCounts = {};
+  DATA.workouts.forEach(w => { typeCounts[w.type] = (typeCounts[w.type] || 0) + 1; });
+  const sorted = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]);
+  const colors = ['#ff6b35', '#a855f7', '#4ecdc4', '#00d4aa', '#ef4444', '#f59e0b', '#3b82f6', '#ec4899', '#6366f1', '#14b8a6'];
+
+  if (CHARTS.trainingPie) CHARTS.trainingPie.destroy();
+  CHARTS.trainingPie = new Chart(document.getElementById('training-pie-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: sorted.map(s => s[0]),
+      datasets: [{
+        data: sorted.map(s => s[1]),
+        backgroundColor: sorted.map((_, i) => colors[i % colors.length]),
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { padding: 12, font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed} sessions (${Math.round(ctx.parsed / DATA.workouts.length * 100)}%)`
+          }
+        }
+      }
+    }
+  });
+}
+
+// ===== STEPS TAB =====
+function renderStepsTab() {
+  if (!DATA.steps.length) {
+    document.getElementById('steps-stats').innerHTML = '<div class="empty-state"><div class="empty-state-icon">👟</div>No step data found</div>';
+    return;
+  }
+
+  const last30 = DATA.steps.filter(d => d.date >= new Date(Date.now() - 30 * 86400000));
+  const avg30 = last30.length ? Math.round(last30.reduce((s, d) => s + d.value, 0) / last30.length) : 0;
+  const allAvg = Math.round(DATA.steps.reduce((s, d) => s + d.value, 0) / DATA.steps.length);
+  const best = Math.max(...DATA.steps.map(d => d.value));
+  const bestDate = DATA.steps.find(d => d.value === best);
+  const totalSteps = DATA.steps.reduce((s, d) => s + d.value, 0);
+
+  document.getElementById('steps-stats').innerHTML = `
+    <div class="stat-card fade-in delay-1">
+      <div class="stat-label">30-Day Average</div>
+      <div class="stat-value mono" style="color:var(--accent-steps)">${formatNum(avg30)}</div>
+      <div class="stat-detail">steps/day</div>
+    </div>
+    <div class="stat-card fade-in delay-2">
+      <div class="stat-label">All-Time Average</div>
+      <div class="stat-value mono">${formatNum(allAvg)}</div>
+      <div class="stat-detail">${DATA.steps.length} days tracked</div>
+    </div>
+    <div class="stat-card fade-in delay-3">
+      <div class="stat-label">Personal Best</div>
+      <div class="stat-value mono">${formatNum(best)}</div>
+      <div class="stat-detail">${bestDate ? bestDate.date.toLocaleDateString() : ''}</div>
+    </div>
+    <div class="stat-card fade-in delay-4">
+      <div class="stat-label">Total Steps</div>
+      <div class="stat-value mono">${(totalSteps / 1e6).toFixed(1)}M</div>
+      <div class="stat-detail">≈ ${Math.round(totalSteps * 0.0008)} km</div>
+    </div>
+  `;
+
+  renderStepsChart();
+  renderStepsHeatmap();
+  renderStepsDOW();
+}
+
+function renderStepsChart() {
+  const range = parseInt(document.getElementById('steps-range').value);
+  const raw = filterByRange(DATA.steps, range);
+  const ma7 = movingAvg(raw, 7);
+  const ma30 = movingAvg(raw, 30);
+
+  if (CHARTS.steps) CHARTS.steps.destroy();
+  CHARTS.steps = new Chart(document.getElementById('steps-chart'), {
+    type: 'bar',
+    data: {
+      labels: raw.map(d => d.date),
+      datasets: [
+        {
+          label: 'Daily Steps',
+          data: raw.map(d => ({ x: d.date, y: d.value })),
+          backgroundColor: 'rgba(78,205,196,0.3)',
+          borderRadius: 1,
+          order: 3,
+          type: 'bar',
+        },
+        {
+          label: '7-day MA',
+          data: ma7.map(d => ({ x: d.date, y: d.value })),
+          borderColor: 'rgba(78,205,196,0.8)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          type: 'line',
+          order: 2,
+        },
+        {
+          label: '30-day MA',
+          data: ma30.map(d => ({ x: d.date, y: d.value })),
+          borderColor: '#ffffff',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.3,
+          type: 'line',
+          order: 1,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: range <= 90 ? 'week' : 'month' },
+          grid: CHART_GRID,
+        },
+        y: {
+          grid: CHART_GRID,
+          ticks: { callback: v => formatNum(v) }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString() + ' steps'
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderStepsHeatmap() {
+  const container = document.getElementById('steps-heatmap');
+  const labelsEl = document.getElementById('steps-heatmap-labels');
+  container.innerHTML = '';
+  labelsEl.innerHTML = '';
+
+  const stepsMap = {};
+  DATA.steps.forEach(s => { stepsMap[toDateKey(s.date)] = s.value; });
+
+  const maxSteps = Math.max(...Object.values(stepsMap), 1);
+  const today = new Date();
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - 364);
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+
+  const months = [];
+  let lastMonth = -1;
+
+  for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+    const key = toDateKey(d);
+    const steps = stepsMap[key] || 0;
+    const intensity = steps / maxSteps;
+    const cell = document.createElement('div');
+    cell.className = 'heatmap-cell';
+    if (steps > 0) {
+      const alpha = 0.1 + intensity * 0.9;
+      cell.style.background = `rgba(78,205,196,${alpha})`;
+    }
+    cell.addEventListener('mouseenter', e => showTooltip(e, key, steps ? steps.toLocaleString() + ' steps' : 'No data'));
+    cell.addEventListener('mouseleave', hideTooltip);
+    container.appendChild(cell);
+
+    if (d.getMonth() !== lastMonth && d.getDay() === 0) {
+      months.push({ month: d.toLocaleString('default', { month: 'short' }), index: Math.floor((d - startDate) / 86400000 / 7) });
+      lastMonth = d.getMonth();
+    }
+  }
+
+  const totalWeeks = Math.ceil((today - startDate) / 86400000 / 7);
+  months.forEach(m => {
+    const span = document.createElement('span');
+    span.textContent = m.month;
+    span.style.position = 'absolute';
+    span.style.left = (m.index / totalWeeks * 100) + '%';
+    labelsEl.appendChild(span);
+  });
+  labelsEl.style.position = 'relative';
+}
+
+function renderStepsDOW() {
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const daySums = [0, 0, 0, 0, 0, 0, 0];
+  const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+
+  DATA.steps.forEach(d => {
+    const dow = d.date.getDay();
+    daySums[dow] += d.value;
+    dayCounts[dow]++;
+  });
+
+  const dayAvgs = daySums.map((s, i) => dayCounts[i] ? Math.round(s / dayCounts[i]) : 0);
+
+  if (CHARTS.stepsDow) CHARTS.stepsDow.destroy();
+  CHARTS.stepsDow = new Chart(document.getElementById('steps-dow-chart'), {
+    type: 'bar',
+    data: {
+      labels: dayNames,
+      datasets: [{
+        data: dayAvgs,
+        backgroundColor: dayAvgs.map(v => {
+          const max = Math.max(...dayAvgs);
+          const alpha = 0.3 + (v / max) * 0.7;
+          return `rgba(78,205,196,${alpha})`;
+        }),
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          grid: CHART_GRID,
+          ticks: { callback: v => formatNum(v) }
+        },
+        x: { grid: { display: false } }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.parsed.y.toLocaleString() + ' avg steps'
+          }
+        }
+      }
+    }
+  });
+}
+
+// ===== CORRELATION TAB =====
+const METRIC_DEFS = {
+  weight: { label: 'Weight (kg)', color: '#00d4aa' },
+  steps: { label: 'Daily Steps', color: '#4ecdc4' },
+  activeEnergy: { label: 'Active Energy (cal)', color: '#ff6b35' },
+  restingHR: { label: 'Resting HR (bpm)', color: '#ef4444' },
+  hrv: { label: 'HRV (ms)', color: '#a855f7' },
+  distance: { label: 'Distance (km)', color: '#3b82f6' },
+  flights: { label: 'Flights Climbed', color: '#f59e0b' },
+  vo2max: { label: 'VO2 Max', color: '#14b8a6' },
+  workoutDuration: { label: 'Workout Duration (min)', color: '#ec4899' },
+};
+
+function initCorrelation() {
+  const selX = document.getElementById('corr-x');
+  const selY = document.getElementById('corr-y');
+  selX.innerHTML = '';
+  selY.innerHTML = '';
+
+  const available = [];
+  for (const [key, def] of Object.entries(METRIC_DEFS)) {
+    let hasData = false;
+    if (key === 'workoutDuration') hasData = DATA.workouts.length > 0;
+    else hasData = DATA[key] && DATA[key].length > 0;
+    if (hasData) available.push([key, def]);
+  }
+
+  available.forEach(([key, def]) => {
+    selX.innerHTML += `<option value="${key}">${def.label}</option>`;
+    selY.innerHTML += `<option value="${key}">${def.label}</option>`;
+  });
+
+  // Default selections
+  if (available.length >= 2) {
+    selX.value = available.find(a => a[0] === 'steps')?.[0] || available[0][0];
+    selY.value = available.find(a => a[0] === 'weight')?.[0] || available[1][0];
+    renderCorrelation();
+  }
+}
+
+function getMetricData(key) {
+  if (key === 'workoutDuration') {
+    const map = {};
+    DATA.workouts.forEach(w => {
+      const k = toDateKey(w.date);
+      map[k] = (map[k] || 0) + w.duration;
+    });
+    return Object.entries(map).map(([k, v]) => ({ date: new Date(k), value: v })).sort((a, b) => a.date - b.date);
+  }
+  return DATA[key] || [];
+}
+
+function renderCorrelation() {
+  const xKey = document.getElementById('corr-x').value;
+  const yKey = document.getElementById('corr-y').value;
+  const range = parseInt(document.getElementById('corr-range').value);
+
+  let xData = filterByRange(getMetricData(xKey), range);
+  let yData = filterByRange(getMetricData(yKey), range);
+
+  // Join on date
+  const xMap = {};
+  xData.forEach(d => { xMap[toDateKey(d.date)] = d.value; });
+  const yMap = {};
+  yData.forEach(d => { yMap[toDateKey(d.date)] = d.value; });
+
+  const paired = [];
+  for (const key of Object.keys(xMap)) {
+    if (yMap[key] !== undefined) {
+      paired.push({ x: xMap[key], y: yMap[key], date: key });
+    }
+  }
+
+  // Stats
+  const xDef = METRIC_DEFS[xKey];
+  const yDef = METRIC_DEFS[yKey];
+
+  if (paired.length < 3) {
+    document.getElementById('corr-stats').innerHTML = '<div class="empty-state">Not enough overlapping data points to correlate.</div>';
+    return;
+  }
+
+  const r = pearsonR(paired.map(p => p.x), paired.map(p => p.y));
+  const rStrength = Math.abs(r) < 0.2 ? 'Negligible' : Math.abs(r) < 0.4 ? 'Weak' : Math.abs(r) < 0.6 ? 'Moderate' : Math.abs(r) < 0.8 ? 'Strong' : 'Very Strong';
+  const rDir = r > 0 ? 'positive' : 'negative';
+
+  document.getElementById('corr-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Pearson r</div>
+      <div class="stat-value mono" style="color:var(--accent-correlation)">${r.toFixed(3)}</div>
+      <div class="stat-detail">${rStrength} ${rDir} correlation</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Data Points</div>
+      <div class="stat-value mono">${paired.length}</div>
+      <div class="stat-detail">overlapping days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">R²</div>
+      <div class="stat-value mono">${(r * r).toFixed(3)}</div>
+      <div class="stat-detail">${Math.round(r * r * 100)}% variance explained</div>
+    </div>
+  `;
+
+  if (CHARTS.correlation) CHARTS.correlation.destroy();
+  CHARTS.correlation = new Chart(document.getElementById('correlation-chart'), {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: `${xDef.label} vs ${yDef.label}`,
+        data: paired,
+        backgroundColor: 'rgba(168,85,247,0.5)',
+        borderColor: 'rgba(168,85,247,0.8)',
+        pointRadius: 4,
+        pointHoverRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: xDef.label },
+          grid: CHART_GRID,
+        },
+        y: {
+          title: { display: true, text: yDef.label },
+          grid: CHART_GRID,
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const pt = paired[ctx.dataIndex];
+              return `${pt.date}: ${xDef.label}=${formatNum(pt.x)}, ${yDef.label}=${formatNum(pt.y)}`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function pearsonR(x, y) {
+  const n = x.length;
+  const sumX = x.reduce((a, b) => a + b, 0);
+  const sumY = y.reduce((a, b) => a + b, 0);
+  const sumXY = x.reduce((a, b, i) => a + b * y[i], 0);
+  const sumX2 = x.reduce((a, b) => a + b * b, 0);
+  const sumY2 = y.reduce((a, b) => a + b * b, 0);
+  const num = n * sumXY - sumX * sumY;
+  const den = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+  return den === 0 ? 0 : num / den;
+}
+
+// ===== TABS =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+
+  // Resize charts after tab switch
+  setTimeout(() => {
+    Object.values(CHARTS).forEach(c => { if (c && c.resize) c.resize(); });
+  }, 50);
+}
+
+// ===== TOOLTIP =====
+function showTooltip(e, title, value) {
+  const tt = document.getElementById('tooltip');
+  document.getElementById('tooltip-title').textContent = title;
+  document.getElementById('tooltip-value').textContent = value;
+  tt.style.display = 'block';
+  tt.style.left = e.clientX + 12 + 'px';
+  tt.style.top = e.clientY - 8 + 'px';
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').style.display = 'none';
+}
+</script>
+</body>
+</html>

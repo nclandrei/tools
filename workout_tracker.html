@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gym Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e0e;
+    --surface: #171717;
+    --surface-2: #1e1e1e;
+    --surface-3: #262626;
+    --border: #2a2a2a;
+    --border-hover: #3a3a3a;
+    --text: #e8e8e8;
+    --text-mid: #a0a0a0;
+    --text-dim: #606060;
+    --accent: #e8c547;
+    --accent-dim: rgba(232, 197, 71, 0.12);
+    --accent-mid: rgba(232, 197, 71, 0.3);
+    --deload: #5b8a72;
+    --deload-dim: rgba(91, 138, 114, 0.15);
+    --danger: #c45b5b;
+    --danger-dim: rgba(196, 91, 91, 0.12);
+    --radius: 6px;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Instrument Sans', system-ui, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 24px 16px 80px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+
+  header h1 span { color: var(--accent); }
+
+  .header-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .icon-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    transition: all 0.15s;
+  }
+
+  .icon-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--text-mid);
+    background: var(--surface-2);
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 3px;
+    margin-bottom: 28px;
+    border: 1px solid var(--border);
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+  .tab:hover { color: var(--text-mid); }
+
+  .tab.active {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+
+  /* Panel visibility */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Form */
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .form-row {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .form-row.two-col { grid-template-columns: 1fr 1fr; }
+
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+    font-family: var(--mono);
+  }
+
+  .field input, .field select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: var(--accent-mid);
+  }
+
+  .field input::placeholder { color: var(--text-dim); }
+
+  .field select {
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23606060' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+  }
+
+  .field select option {
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .week-toggle {
+    display: flex;
+    gap: 2px;
+    background: var(--bg);
+    border-radius: 4px;
+    padding: 2px;
+    border: 1px solid var(--border);
+  }
+
+  .week-toggle button {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+
+  .week-toggle button.active-working {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .week-toggle button.active-deload {
+    background: var(--deload-dim);
+    color: var(--deload);
+  }
+
+  .btn-log {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-top: 6px;
+    transition: all 0.15s;
+  }
+
+  .btn-log:hover { filter: brightness(1.1); }
+  .btn-log:active { transform: scale(0.99); }
+
+  /* Recent entries */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 32px 0 14px;
+  }
+
+  .entry {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: border-color 0.15s;
+  }
+
+  .entry:hover { border-color: var(--border-hover); }
+
+  .entry-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .entry-exercise {
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .entry-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  .tag-working {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .tag-deload {
+    background: var(--deload-dim);
+    color: var(--deload);
+  }
+
+  .entry-detail {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-mid);
+  }
+
+  .entry-detail strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .entry-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .entry-date {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .btn-delete {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    border-radius: 3px;
+    transition: all 0.15s;
+    line-height: 1;
+    opacity: 0;
+  }
+
+  .entry:hover .btn-delete { opacity: 1; }
+  .btn-delete:hover { color: var(--danger); background: var(--danger-dim); }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+
+  /* Progress panel */
+  .exercise-selector {
+    margin-bottom: 20px;
+  }
+
+  .exercise-selector select {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23606060' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+
+  .exercise-selector select:focus {
+    border-color: var(--accent-mid);
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .chart-card canvas {
+    max-height: 280px;
+  }
+
+  .pr-banner {
+    background: var(--accent-dim);
+    border: 1px solid rgba(232, 197, 71, 0.2);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .pr-banner .pr-value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .pr-banner .pr-unit {
+    font-size: 14px;
+    color: var(--accent);
+    opacity: 0.7;
+  }
+
+  .pr-banner .pr-label {
+    font-size: 12px;
+    color: var(--text-mid);
+    font-family: var(--mono);
+  }
+
+  .pr-banner .pr-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    margin-top: 2px;
+  }
+
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+
+  .history-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .history-table td {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-mid);
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .history-table tr:last-child td { border-bottom: none; }
+
+  .history-table td:first-child { color: var(--text-dim); }
+  .history-table td:nth-child(2) { color: var(--text); font-weight: 500; }
+
+  /* Data panel */
+  .data-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+
+  .data-section h3 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-mid);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+
+  .data-section p {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+
+  .btn-data {
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface-2);
+    color: var(--text-mid);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+
+  .btn-data:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .btn-danger {
+    border-color: rgba(196, 91, 91, 0.3);
+    color: var(--danger);
+  }
+
+  .btn-danger:hover {
+    background: var(--danger-dim);
+    border-color: var(--danger);
+  }
+
+  .data-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 12px;
+    opacity: 0;
+    transition: all 0.25s;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Autocomplete */
+  .field { position: relative; }
+
+  .autocomplete-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--border-hover);
+    border-radius: 4px;
+    margin-top: 2px;
+    z-index: 50;
+    max-height: 160px;
+    overflow-y: auto;
+    display: none;
+  }
+
+  .autocomplete-list.show { display: block; }
+
+  .autocomplete-item {
+    padding: 9px 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .autocomplete-item:hover {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .stat-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-box .stat-val {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-box .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 6px;
+  }
+
+  #importFile { display: none; }
+
+  @media (max-width: 480px) {
+    .app { padding: 16px 12px 80px; }
+    .stats-row { grid-template-columns: 1fr 1fr 1fr; }
+    .stat-box .stat-val { font-size: 16px; }
+    .entry { flex-wrap: wrap; gap: 8px; }
+    .entry-right { margin-left: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1><span>///</span> TRACKER</h1>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="switchTab('log')" title="Log">+</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('log')">Log</button>
+    <button class="tab" onclick="switchTab('progress')">Progress</button>
+    <button class="tab" onclick="switchTab('data')">Data</button>
+  </div>
+
+  <!-- LOG PANEL -->
+  <div id="panel-log" class="panel active">
+    <div class="form-card">
+      <div class="form-row">
+        <div class="field">
+          <label>Exercise</label>
+          <input type="text" id="inputExercise" placeholder="e.g. Squat" autocomplete="off">
+          <div class="autocomplete-list" id="autocompleteList"></div>
+        </div>
+      </div>
+      <div class="form-row two-col">
+        <div class="field">
+          <label>Weight (kg)</label>
+          <input type="number" id="inputWeight" placeholder="0" step="0.5" min="0">
+        </div>
+        <div class="field">
+          <label>Reps</label>
+          <input type="number" id="inputReps" placeholder="0" min="1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Week Type</label>
+          <div class="week-toggle">
+            <button id="btnWorking" class="active-working" onclick="setWeekType('working')">Working</button>
+            <button id="btnDeload" onclick="setWeekType('deload')">Deload</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn-log" onclick="logEntry()">Log Set</button>
+    </div>
+
+    <div class="section-label">Recent</div>
+    <div id="recentEntries"></div>
+  </div>
+
+  <!-- PROGRESS PANEL -->
+  <div id="panel-progress" class="panel">
+    <div class="exercise-selector">
+      <select id="progressExercise" onchange="renderProgress()">
+        <option value="">Select exercise…</option>
+      </select>
+    </div>
+    <div id="progressContent"></div>
+  </div>
+
+  <!-- DATA PANEL -->
+  <div id="panel-data" class="panel">
+    <div class="data-section">
+      <h3>Export</h3>
+      <p>Download all your workout data as a JSON file.</p>
+      <button class="btn-data" onclick="exportData()">↓ Export JSON</button>
+    </div>
+    <div class="data-section">
+      <h3>Import</h3>
+      <p>Restore from a previously exported JSON file. This will merge with your existing data.</p>
+      <input type="file" id="importFile" accept=".json" onchange="importData(event)">
+      <button class="btn-data" onclick="document.getElementById('importFile').click()">↑ Import JSON</button>
+    </div>
+    <div class="data-section">
+      <h3>Clear All Data</h3>
+      <p>Permanently delete all logged workouts. This cannot be undone.</p>
+      <button class="btn-data btn-danger" onclick="clearAll()">✕ Clear Everything</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'gym_tracker_data';
+let weekType = 'working';
+let progressChart = null;
+
+// ── Data layer ──
+function getData() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch { return []; }
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function getExerciseNames() {
+  const data = getData();
+  const names = [...new Set(data.map(e => e.exercise))];
+  names.sort((a, b) => a.localeCompare(b));
+  return names;
+}
+
+// ── Toast ──
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── Tab switching ──
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['log','progress','data'][i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+
+  if (name === 'progress') {
+    populateProgressSelect();
+    renderProgress();
+  }
+  if (name === 'log') renderRecent();
+}
+
+// ── Week type toggle ──
+function setWeekType(type) {
+  weekType = type;
+  const bw = document.getElementById('btnWorking');
+  const bd = document.getElementById('btnDeload');
+  bw.className = type === 'working' ? 'active-working' : '';
+  bd.className = type === 'deload' ? 'active-deload' : '';
+}
+
+// ── Logging ──
+function logEntry() {
+  const exercise = document.getElementById('inputExercise').value.trim();
+  const weight = parseFloat(document.getElementById('inputWeight').value);
+  const reps = parseInt(document.getElementById('inputReps').value);
+
+  if (!exercise) { toast('Enter an exercise name'); return; }
+  if (isNaN(weight) || weight < 0) { toast('Enter a valid weight'); return; }
+  if (isNaN(reps) || reps < 1) { toast('Enter valid reps'); return; }
+
+  const entry = {
+    id: Date.now(),
+    date: new Date().toISOString().split('T')[0],
+    exercise,
+    weight,
+    reps,
+    weekType
+  };
+
+  const data = getData();
+  data.push(entry);
+  saveData(data);
+
+  // Keep exercise + weight for quick re-logging of next set, clear reps
+  document.getElementById('inputReps').value = '';
+
+  toast('Set logged: ' + exercise + ' @ ' + weight + 'kg × ' + reps);
+  renderRecent();
+}
+
+// ── Delete entry ──
+function deleteEntry(id) {
+  let data = getData();
+  data = data.filter(e => e.id !== id);
+  saveData(data);
+  renderRecent();
+  toast('Entry deleted');
+}
+
+function deleteGroup(ids) {
+  const idSet = new Set(ids);
+  let data = getData();
+  data = data.filter(e => !idSet.has(e.id));
+  saveData(data);
+  renderRecent();
+  toast(ids.length + ' set' + (ids.length > 1 ? 's' : '') + ' deleted');
+}
+
+// ── Recent entries ──
+function renderRecent() {
+  const data = getData();
+  const container = document.getElementById('recentEntries');
+
+  if (!data.length) {
+    container.innerHTML = '<div class="empty-state">No entries yet. Log your first set above.</div>';
+    return;
+  }
+
+  const sorted = [...data].sort((a, b) => b.id - a.id);
+
+  // Group consecutive sets by exercise + date
+  const groups = [];
+  sorted.forEach(e => {
+    const last = groups[groups.length - 1];
+    if (last && last.exercise === e.exercise && last.date === e.date && last.weekType === e.weekType) {
+      last.sets.push(e);
+    } else {
+      groups.push({ exercise: e.exercise, date: e.date, weekType: e.weekType, sets: [e] });
+    }
+  });
+
+  container.innerHTML = groups.slice(0, 20).map(g => {
+    const setsStr = g.sets.map(s => s.weight + '×' + s.reps).join(', ');
+    const ids = g.sets.map(s => s.id);
+    return `
+    <div class="entry">
+      <div class="entry-left">
+        <div class="entry-exercise">
+          ${esc(g.exercise)}
+          <span class="entry-tag ${g.weekType === 'deload' ? 'tag-deload' : 'tag-working'}">
+            ${g.weekType === 'deload' ? 'DL' : 'WK'}
+          </span>
+        </div>
+        <div class="entry-detail">
+          ${g.sets.length} set${g.sets.length > 1 ? 's' : ''} — ${setsStr}
+        </div>
+      </div>
+      <div class="entry-right">
+        <span class="entry-date">${formatDate(g.date)}</span>
+        <button class="btn-delete" onclick="deleteGroup([${ids.join(',')}])" title="Delete all sets">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Progress ──
+function populateProgressSelect() {
+  const select = document.getElementById('progressExercise');
+  const current = select.value;
+  const names = getExerciseNames();
+
+  select.innerHTML = '<option value="">Select exercise…</option>' +
+    names.map(n => `<option value="${esc(n)}" ${n === current ? 'selected' : ''}>${esc(n)}</option>`).join('');
+}
+
+function renderProgress() {
+  const exercise = document.getElementById('progressExercise').value;
+  const container = document.getElementById('progressContent');
+
+  if (!exercise) {
+    container.innerHTML = '<div class="empty-state">Pick an exercise to see your progression.</div>';
+    return;
+  }
+
+  const data = getData().filter(e => e.exercise === exercise);
+  if (!data.length) {
+    container.innerHTML = '<div class="empty-state">No data for this exercise.</div>';
+    return;
+  }
+
+  data.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+
+  // Group by date, get best weight per day
+  const byDate = {};
+  data.forEach(e => {
+    const key = e.date;
+    if (!byDate[key] || e.weight > byDate[key].weight) {
+      byDate[key] = e;
+    }
+  });
+
+  const points = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+
+  // PR
+  const pr = points.reduce((best, p) => p.weight > best.weight ? p : best, points[0]);
+
+  // Stats
+  const totalSets = data.length;
+  const totalSessions = points.length;
+  const workingSessions = points.filter(p => p.weekType === 'working').length;
+
+  let html = `
+    <div class="pr-banner">
+      <div>
+        <div class="pr-value">${pr.weight}<span class="pr-unit">kg</span></div>
+      </div>
+      <div>
+        <div class="pr-label">Best weight — ${pr.reps} reps</div>
+        <div class="pr-meta">${formatDate(pr.date)} · ${pr.weekType}</div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-val">${totalSets}</div>
+        <div class="stat-label">Total Sets</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">${totalSessions}</div>
+        <div class="stat-label">Sessions</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">${workingSessions}</div>
+        <div class="stat-label">Working</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <canvas id="progressCanvas"></canvas>
+    </div>
+  `;
+
+  // History table — show individual sets with set number per session
+  const recent = [...data].sort((a, b) => b.id - a.id).slice(0, 20);
+  html += `
+    <div class="section-label" style="margin-top:24px">History</div>
+    <div class="chart-card" style="padding:12px 16px;overflow-x:auto">
+      <table class="history-table">
+        <thead><tr><th>Date</th><th>Weight</th><th>Reps</th><th>Type</th></tr></thead>
+        <tbody>
+          ${recent.map(e => `<tr>
+            <td>${formatDate(e.date)}</td>
+            <td>${e.weight}kg</td>
+            <td>${e.reps}</td>
+            <td><span class="entry-tag ${e.weekType === 'deload' ? 'tag-deload' : 'tag-working'}">${e.weekType === 'deload' ? 'DL' : 'WK'}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.innerHTML = html;
+
+  // Chart
+  renderChart(points);
+}
+
+function renderChart(points) {
+  const ctx = document.getElementById('progressCanvas');
+  if (!ctx) return;
+
+  if (progressChart) progressChart.destroy();
+
+  const labels = points.map(p => formatDate(p.date));
+  const weights = points.map(p => p.weight);
+  const colors = points.map(p =>
+    p.weekType === 'deload' ? 'rgba(91,138,114,1)' : 'rgba(232,197,71,1)'
+  );
+
+  progressChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: weights,
+        borderColor: 'rgba(232,197,71,0.6)',
+        borderWidth: 2,
+        pointBackgroundColor: colors,
+        pointBorderColor: colors,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        fill: false,
+        tension: 0.15,
+        segment: {
+          borderColor: function(ctx2) {
+            const i = ctx2.p1DataIndex;
+            return points[i].weekType === 'deload'
+              ? 'rgba(91,138,114,0.5)'
+              : 'rgba(232,197,71,0.6)';
+          }
+        }
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e1e1e',
+          titleColor: '#a0a0a0',
+          bodyColor: '#e8e8e8',
+          borderColor: '#2a2a2a',
+          borderWidth: 1,
+          titleFont: { family: 'DM Mono', size: 11 },
+          bodyFont: { family: 'DM Mono', size: 13 },
+          padding: 10,
+          displayColors: false,
+          callbacks: {
+            title: (items) => items[0].label,
+            label: (item) => {
+              const p = points[item.dataIndex];
+              return p.weight + 'kg × ' + p.reps + ' reps  [' + (p.weekType === 'deload' ? 'DL' : 'WK') + ']';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: '#606060',
+            font: { family: 'DM Mono', size: 10 },
+            maxRotation: 45
+          },
+          grid: { color: 'rgba(42,42,42,0.5)' }
+        },
+        y: {
+          ticks: {
+            color: '#606060',
+            font: { family: 'DM Mono', size: 11 },
+            callback: v => v + 'kg'
+          },
+          grid: { color: 'rgba(42,42,42,0.5)' }
+        }
+      }
+    }
+  });
+}
+
+// ── Autocomplete ──
+const inputExercise = document.getElementById('inputExercise');
+const autocompleteList = document.getElementById('autocompleteList');
+
+inputExercise.addEventListener('input', function() {
+  const val = this.value.trim().toLowerCase();
+  if (!val) { autocompleteList.classList.remove('show'); return; }
+
+  const names = getExerciseNames().filter(n => n.toLowerCase().includes(val));
+  if (!names.length || (names.length === 1 && names[0].toLowerCase() === val)) {
+    autocompleteList.classList.remove('show');
+    return;
+  }
+
+  autocompleteList.innerHTML = names.slice(0, 6).map(n =>
+    `<div class="autocomplete-item" onmousedown="selectExercise('${esc(n)}')">${esc(n)}</div>`
+  ).join('');
+  autocompleteList.classList.add('show');
+});
+
+inputExercise.addEventListener('blur', () => {
+  setTimeout(() => autocompleteList.classList.remove('show'), 150);
+});
+
+function selectExercise(name) {
+  inputExercise.value = name;
+  autocompleteList.classList.remove('show');
+  document.getElementById('inputWeight').focus();
+}
+
+// ── Export / Import ──
+function exportData() {
+  const data = getData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'gym-tracker-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Data exported');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) { toast('Invalid file format'); return; }
+
+      const existing = getData();
+      const existingIds = new Set(existing.map(e => e.id));
+      const newEntries = imported.filter(e => !existingIds.has(e.id));
+
+      saveData([...existing, ...newEntries]);
+      toast('Imported ' + newEntries.length + ' new entries');
+      renderRecent();
+    } catch {
+      toast('Failed to parse file');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function clearAll() {
+  if (!confirm('Delete ALL workout data? This cannot be undone.')) return;
+  if (!confirm('Are you really sure?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  renderRecent();
+  toast('All data cleared');
+}
+
+// ── Helpers ──
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return d.getDate() + ' ' + months[d.getMonth()];
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ── Keyboard shortcut ──
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && document.activeElement.closest('.form-card')) {
+    logEntry();
+  }
+});
+
+// ── Init ──
+renderRecent();
+</script>
+
+</body>
+</html>

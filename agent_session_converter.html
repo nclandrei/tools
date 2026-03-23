@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Agent Session Converter — Claude Code · Codex · Cursor · Pi · OpenCode</title>
+<meta name="description" content="Convert sessions between AI coding agents: Claude Code, Codex CLI, Cursor, Pi, and OpenCode. Auto-detects format, maps tool names, preserves message chains.">
+<meta property="og:title" content="AI Agent Session Converter">
+<meta property="og:description" content="Convert sessions between Claude Code, Codex CLI, Cursor, Pi, and OpenCode.">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-400-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-500-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-600-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-700-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-400-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-500-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-600-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-700-normal.min.css">
+<style>
+  :root {
+    --bg:#0c0c0e;--surface:#151518;--surface2:#1c1c21;--border:#2a2a32;--border-hover:#3a3a45;
+    --text:#e4e4e8;--text-dim:#8a8a96;--text-muted:#5a5a66;
+    --claude-accent:#d4a27f;--claude-bg:#1a1510;--claude-border:#3d2e1f;
+    --codex-accent:#7fd4a2;--codex-bg:#101a14;--codex-border:#1f3d2a;
+    --cursor-accent:#7fb3d4;--cursor-bg:#10151a;--cursor-border:#1f2e3d;
+    --pi-accent:#d47fb3;--pi-bg:#1a1018;--pi-border:#3d1f34;
+    --opencode-accent:#d4d47f;--opencode-bg:#1a1a10;--opencode-border:#3d3d1f;
+    --user-badge:#6e8fff;--assistant-badge:#c084fc;--tool-badge:#fbbf24;
+    --error:#ef4444;--success:#22c55e;--radius:8px;--radius-lg:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+  .container{max-width:1200px;margin:0 auto;padding:40px 24px}
+  .header{text-align:center;margin-bottom:48px}
+  .header h1{font-family:'JetBrains Mono',monospace;font-size:clamp(14px,3.2vw,22px);font-weight:700;letter-spacing:-0.5px;margin-bottom:8px;white-space:nowrap}
+  .header h1 .sep{opacity:0.2;margin:0 2px}
+  .header p{color:var(--text-dim);font-size:14px}
+  .format-badge{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:0.5px}
+  .format-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .format-badge.claude{background:var(--claude-bg);color:var(--claude-accent);border:1px solid var(--claude-border)}
+  .format-badge.codex{background:var(--codex-bg);color:var(--codex-accent);border:1px solid var(--codex-border)}
+  .format-badge.cursor{background:var(--cursor-bg);color:var(--cursor-accent);border:1px solid var(--cursor-border)}
+  .format-badge.pi{background:var(--pi-bg);color:var(--pi-accent);border:1px solid var(--pi-border)}
+  .format-badge.opencode{background:var(--opencode-bg);color:var(--opencode-accent);border:1px solid var(--opencode-border)}
+  .input-section{margin-bottom:32px}
+  .input-section label,.output-section label{display:block;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+  .drop-zone{position:relative;border:2px dashed var(--border);border-radius:var(--radius-lg);background:var(--surface);transition:all 0.2s ease;cursor:pointer}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--border-hover);background:var(--surface2)}
+  .drop-zone.dragover{border-color:var(--claude-accent);box-shadow:0 0 0 4px rgba(212,162,127,0.1)}
+  .drop-zone-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;gap:8px;min-height:120px}
+  .drop-zone-inner.hidden{display:none}
+  .drop-zone-icon{font-size:28px;opacity:0.3}
+  .drop-zone-text{font-size:14px;color:var(--text-dim)}
+  .drop-zone-hint{font-size:12px;color:var(--text-muted)}
+  .drop-zone textarea{width:100%;min-height:200px;max-height:400px;background:transparent;border:none;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;padding:16px;resize:vertical;outline:none}
+  .drop-zone textarea::placeholder{color:var(--text-muted)}
+  .drop-zone textarea.hidden{display:none}
+  .input-file{display:none}
+  .controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:32px}
+  .controls-left,.controls-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .detect-info{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim)}
+  .detect-info .msg-count{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted)}
+  button{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;padding:0 16px;height:36px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:all 0.15s ease;display:inline-flex;align-items:center;gap:6px;vertical-align:middle}
+  button:hover{background:var(--surface2);border-color:var(--border-hover)}
+  button:active{transform:scale(0.98)}
+  button.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+  button.primary:hover{background:#d0d0d4;border-color:#d0d0d4}
+  button.primary:disabled{opacity:0.3;cursor:not-allowed}
+  button .icon{font-size:14px;line-height:1}
+  select.target-select{font-family:'JetBrains Mono',monospace;font-size:12px;padding:0 12px;height:36px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;outline:none;vertical-align:middle}
+  select.target-select:hover{border-color:var(--border-hover)}
+  .preview-section{margin-bottom:32px}
+  .preview-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .preview-header h2{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px}
+  .preview-toggle{font-size:12px;color:var(--text-muted);cursor:pointer;border:none;background:none;padding:4px 8px;font-family:'JetBrains Mono',monospace}
+  .preview-toggle:hover{color:var(--text-dim)}
+  .preview-list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;max-height:500px;overflow-y:auto}
+  .preview-list::-webkit-scrollbar{width:6px}
+  .preview-list::-webkit-scrollbar-track{background:transparent}
+  .preview-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  .msg-item{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5}
+  .msg-item:last-child{border-bottom:none}
+  .msg-role{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px}
+  .msg-role.user{background:rgba(110,143,255,0.12);color:var(--user-badge)}
+  .msg-role.assistant{background:rgba(192,132,252,0.12);color:var(--assistant-badge)}
+  .msg-role.tool{background:rgba(251,191,36,0.10);color:var(--tool-badge)}
+  .msg-content{flex:1;min-width:0;color:var(--text-dim);white-space:pre-wrap;word-break:break-word;overflow:hidden}
+  .msg-content.truncated{max-height:60px;-webkit-mask-image:linear-gradient(to bottom,black 60%,transparent);mask-image:linear-gradient(to bottom,black 60%,transparent)}
+  .msg-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);flex-shrink:0;margin-top:3px}
+  .output-section{margin-bottom:32px}
+  .output-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);position:relative}
+  .output-box textarea{width:100%;min-height:200px;max-height:400px;background:transparent;border:none;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;padding:16px;resize:vertical;outline:none}
+  .output-actions{display:flex;gap:8px;padding:8px 16px 12px;border-top:1px solid var(--border)}
+  .status{padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:16px;display:none;align-items:center;gap:8px}
+  .status.visible{display:flex}
+  .status.error{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--error)}
+  .status.success{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:var(--success)}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:var(--radius);font-size:13px;font-weight:500;box-shadow:0 8px 32px rgba(0,0,0,0.4);transform:translateY(80px);opacity:0;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);z-index:999}
+  .toast.show{transform:translateY(0);opacity:1}
+  footer{text-align:center;padding:32px 0 16px;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+  footer a{text-decoration:none}footer a:hover{text-decoration:underline}
+  @media(max-width:640px){.container{padding:24px 16px}.controls{flex-direction:column;align-items:stretch}.controls-left,.controls-right{justify-content:center}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1><span style="color:var(--claude-accent)">Claude Code</span><span class="sep">·</span><span style="color:var(--codex-accent)">Codex</span><span class="sep">·</span><span style="color:var(--cursor-accent)">Cursor</span><span class="sep">·</span><span style="color:var(--pi-accent)">Pi</span><span class="sep">·</span><span style="color:var(--opencode-accent)">OpenCode</span></h1>
+    <p>Paste or drop a session file — auto-detects format, converts to any other agent</p>
+  </div>
+  <div id="status" class="status"></div>
+  <div class="input-section">
+    <label>Input Session</label>
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-zone-inner" id="dropPrompt">
+        <div class="drop-zone-icon">⬇</div>
+        <div class="drop-zone-text">Drop a <strong>.jsonl</strong> or <strong>.json</strong> file here, or click to browse</div>
+        <div class="drop-zone-hint">Claude Code · Codex CLI · Cursor · Pi · OpenCode</div>
+      </div>
+      <textarea id="inputArea" class="hidden" placeholder="Or paste your JSONL / JSON content here…" spellcheck="false"></textarea>
+      <input type="file" id="fileInput" class="input-file" accept=".jsonl,.json,.txt">
+    </div>
+  </div>
+  <div class="controls">
+    <div class="controls-left">
+      <div id="detectInfo" class="detect-info" style="display:none"><span id="formatBadge"></span><span id="msgCount" class="msg-count"></span></div>
+    </div>
+    <div class="controls-right">
+      <label style="font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;line-height:36px;margin:0">Convert to:</label>
+      <select id="targetFormat" class="target-select">
+        <option value="claude">Claude Code</option>
+        <option value="codex">Codex CLI</option>
+        <option value="cursor">Cursor</option>
+        <option value="pi">Pi</option>
+        <option value="opencode">OpenCode</option>
+      </select>
+      <button id="btnPaste" title="Paste"><span class="icon">📋</span> Paste</button>
+      <button id="btnClear" title="Clear"><span class="icon">✕</span> Clear</button>
+      <button id="btnConvert" class="primary" disabled><span class="icon">⚡</span> Convert</button>
+    </div>
+  </div>
+  <div id="previewSection" class="preview-section" style="display:none">
+    <div class="preview-header"><h2>Preview (<span id="previewCount">0</span> messages)</h2><button class="preview-toggle" id="btnToggleTruncate">Expand all</button></div>
+    <div class="preview-list" id="previewList"></div>
+  </div>
+  <div id="outputSection" class="output-section" style="display:none">
+    <label>Output — <span id="outputFormatLabel"></span></label>
+    <div class="output-box">
+      <textarea id="outputArea" readonly spellcheck="false"></textarea>
+      <div class="output-actions"><button id="btnCopyOutput"><span class="icon">📋</span> Copy</button><button id="btnDownload"><span class="icon">💾</span> Download</button></div>
+    </div>
+  </div>
+  <footer>Built by <a href="https://nicolaeandrei.com" style="color:var(--claude-accent)">Andrei-Mihai Nicolae</a> · <a href="https://github.com" style="color:var(--text-dim)">Source</a></footer>
+</div>
+<div id="toast" class="toast"></div>
+<script>
+const FORMATS={claude:{label:'Claude Code',cls:'claude',ext:'.jsonl',jsonl:true},codex:{label:'Codex CLI',cls:'codex',ext:'.jsonl',jsonl:true},cursor:{label:'Cursor',cls:'cursor',ext:'.jsonl',jsonl:true},pi:{label:'Pi',cls:'pi',ext:'.jsonl',jsonl:true},opencode:{label:'OpenCode',cls:'opencode',ext:'.json',jsonl:false}};
+let parsedLines=[],rawInput='',detectedFormat=null,extractedMessages=[],convertedOutput='',truncatePreview=true;
+const $=id=>document.getElementById(id);
+const dropZone=$('dropZone'),dropPrompt=$('dropPrompt'),inputArea=$('inputArea'),fileInput=$('fileInput'),statusEl=$('status'),detectInfo=$('detectInfo'),formatBadge=$('formatBadge'),msgCount=$('msgCount'),previewSection=$('previewSection'),previewCount=$('previewCount'),previewList=$('previewList'),outputSection=$('outputSection'),outputFormatLabel=$('outputFormatLabel'),outputArea=$('outputArea'),btnConvert=$('btnConvert'),btnPaste=$('btnPaste'),btnClear=$('btnClear'),btnCopyOutput=$('btnCopyOutput'),btnDownload=$('btnDownload'),btnToggleTruncate=$('btnToggleTruncate'),targetFormat=$('targetFormat'),toastEl=$('toast');
+let toastTimer;function toast(m){toastEl.textContent=m;toastEl.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2500)}
+function showStatus(m,t='error'){statusEl.textContent=m;statusEl.className=`status visible ${t}`}
+function clearStatus(){statusEl.className='status'}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function badge(f){const d=FORMATS[f];return `<span class="format-badge ${d.cls}"><span class="dot"></span>${d.label}</span>`}
+// File/drop/paste
+dropZone.addEventListener('click',e=>{if(e.target===inputArea)return;fileInput.click()});
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover')});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])});
+fileInput.addEventListener('change',()=>{if(fileInput.files[0])loadFile(fileInput.files[0])});
+function loadFile(f){const r=new FileReader();r.onload=()=>{inputArea.classList.remove('hidden');dropPrompt.classList.add('hidden');inputArea.value=r.result;processInput()};r.readAsText(f)}
+let db;inputArea.addEventListener('input',()=>{clearTimeout(db);db=setTimeout(processInput,400)});
+btnPaste.addEventListener('click',async()=>{try{const t=await navigator.clipboard.readText();inputArea.classList.remove('hidden');dropPrompt.classList.add('hidden');inputArea.value=t;processInput();toast('Pasted')}catch{toast('Clipboard access denied')}});
+btnClear.addEventListener('click',()=>{inputArea.value='';inputArea.classList.add('hidden');dropPrompt.classList.remove('hidden');clearAll()});
+// Parsing
+function processInput(){
+  clearStatus();rawInput=inputArea.value.trim();if(!rawInput){clearAll();return}
+  parsedLines=[];
+  // Try single JSON / JSON array
+  if(rawInput[0]==='{'&&!rawInput.includes('\n{')){try{parsedLines=[JSON.parse(rawInput)]}catch{}}
+  if(!parsedLines.length&&rawInput[0]==='['){try{const a=JSON.parse(rawInput);if(Array.isArray(a))parsedLines=a}catch{}}
+  // JSONL fallback
+  if(!parsedLines.length){let err=0;for(const ln of rawInput.split('\n')){const t=ln.trim();if(!t)continue;try{parsedLines.push(JSON.parse(t))}catch{err++}}if(err>0&&parsedLines.length)showStatus(`Parsed ${parsedLines.length} lines (${err} skipped)`,'success')}
+  if(!parsedLines.length){showStatus('No valid JSON found.');clearAll();return}
+  detectedFormat=detectFormat(parsedLines);
+  if(!detectedFormat){showStatus('Could not detect session format.');clearAll();return}
+  extractedMessages=extractMessages(parsedLines,detectedFormat);
+  updateDetectInfo();renderPreview();
+  const opts=targetFormat.options;for(let i=0;i<opts.length;i++)if(opts[i].value!==detectedFormat){targetFormat.selectedIndex=i;break}
+  btnConvert.disabled=extractedMessages.length===0;outputSection.style.display='none';
+}
+function clearAll(){parsedLines=[];detectedFormat=null;extractedMessages=[];convertedOutput='';detectInfo.style.display='none';previewSection.style.display='none';outputSection.style.display='none';btnConvert.disabled=true}
+// Detection
+function detectFormat(lines){
+  const s={claude:0,codex:0,cursor:0,pi:0,opencode:0};
+  for(const o of lines.slice(0,30)){
+    if(o.sessionId&&o.uuid)s.claude+=3;if(o.type==='user'&&o.message?.role==='user'&&o.uuid)s.claude+=3;if(o.type==='assistant'&&o.message?.role==='assistant'&&o.uuid)s.claude+=3;if(o.parentUuid!==undefined&&o.uuid)s.claude+=1;if(o.userType==='external')s.claude+=2;if(o.type==='result'&&o.uuid)s.claude+=2;
+    if(o.type==='session_meta'&&o.payload)s.codex+=5;if(o.type==='event_msg'&&o.payload)s.codex+=3;if(o.type==='response_item'&&o.payload)s.codex+=3;if(o.payload?.type==='user_message')s.codex+=3;if(o.payload?.type==='token_count')s.codex+=2;
+    if(o.session_id&&o.type==='user')s.cursor+=4;if(o.session_id&&o.type==='assistant')s.cursor+=4;if(o.type==='tool_call'&&o.tool_call)s.cursor+=5;if(o.type==='tool_call'&&o.subtype)s.cursor+=3;
+    if(o.type==='session'&&o.id&&o.cwd!==undefined)s.pi+=5;if(o.type==='message'&&o.id&&o.message?.role)s.pi+=4;if(o.type==='message'&&o.message?.provider)s.pi+=3;
+    if(o.session&&o.messages)s.opencode+=6;if(o.id&&o.parts&&o.role)s.opencode+=4;if(o.session?.id&&o.session?.directory)s.opencode+=5;
+  }
+  let best=null,bv=0;for(const[f,v]of Object.entries(s))if(v>bv){bv=v;best=f}
+  return bv>0?best:null;
+}
+// Extraction helpers
+function ct(c){if(!c)return'';if(typeof c==='string')return c;if(Array.isArray(c))return c.map(b=>b.text||b.output||(typeof b.content==='string'?b.content:'')||'').filter(Boolean).join('\n');return''}
+function M(role,content,ts,model,toolName,toolInput){return{role,content,timestamp:ts||null,model:model||null,toolUse:!!toolName,toolName:toolName||null,toolInput:toolInput||null}}
+function extractMessages(l,f){return({claude:exClaude,codex:exCodex,cursor:exCursor,pi:exPi,opencode:exOpencode}[f]||(_=>[]))(l)}
+// Claude Code
+function exClaude(lines){const ms=[];for(const l of lines){if(l.type==='user'&&l.message){const c=typeof l.message.content==='string'?l.message.content:ct(l.message.content);if(c)ms.push(M('user',c,l.timestamp))}else if(l.type==='assistant'&&l.message){const blocks=l.message.content||[],tx=[],tl=[];for(const b of blocks){if(b.type==='text'&&b.text)tx.push(b.text);else if(b.type==='tool_use')tl.push(b)}if(tx.length)ms.push(M('assistant',tx.join('\n'),l.timestamp,l.message.model));for(const t of tl)ms.push(M('tool',`[Tool: ${t.name}] ${JSON.stringify(t.input||{}).slice(0,300)}`,l.timestamp,null,t.name,t.input))}else if(l.type==='result'){const c=typeof l.message?.content==='string'?l.message.content:ct(l.message?.content);if(c)ms.push(M('tool',`[Result] ${c.slice(0,500)}`,l.timestamp))}}return ms}
+// Codex CLI
+function exCodex(lines){const ms=[];for(const l of lines){if(l.type==='event_msg'&&l.payload?.type==='user_message'){ms.push(M('user',l.payload.message||'',l.timestamp))}else if(l.type==='response_item'&&l.payload){const p=l.payload;if(p.type==='function_call'){let inp=p.arguments;if(typeof inp==='string'){try{inp=JSON.parse(inp)}catch{}}ms.push(M('tool',`[Tool: ${p.name}] ${JSON.stringify(inp||{}).slice(0,300)}`,l.timestamp,null,p.name,inp));continue}if(p.type==='function_call_output'){ms.push(M('tool',`[Result] ${(p.output||'').slice(0,500)}`,l.timestamp));continue}const role=p.role||'assistant';const blocks=p.content||[];if(blocks.some(b=>b.type==='input_text'&&b.text?.startsWith('<environment_context>')))continue;const tx=[],tc=[];for(const b of blocks){const t=b.text||b.output||'';if(['text','input_text','output_text'].includes(b.type)){if(t)tx.push(t)}else if(['function_call','computer_call'].includes(b.type))tc.push(b);else if(['function_call_output','computer_call_output'].includes(b.type))ms.push(M('tool',`[Result] ${(t||JSON.stringify(b.output||'')).slice(0,500)}`,l.timestamp));else if(t)tx.push(t)}if(tx.length&&role!=='system')ms.push(M(role==='user'?'user':'assistant',tx.join('\n'),l.timestamp,p.model));for(const c of tc)ms.push(M('tool',`[Tool: ${c.name||c.type}] ${JSON.stringify(c.arguments||c.input||{}).slice(0,300)}`,l.timestamp,null,c.name||c.type,c.arguments||c.input))}}return ms}
+// Cursor
+function exCursor(lines){const ms=[];for(const l of lines){if(l.type==='user'&&l.message?.content){const c=ct(l.message.content);if(c)ms.push(M('user',c,l.timestamp))}else if(l.type==='assistant'&&l.message?.content){const c=ct(l.message.content);if(c)ms.push(M('assistant',c,l.timestamp))}else if(l.type==='tool_call'&&l.tool_call){const tc=l.tool_call;const tk=Object.keys(tc).find(k=>k.endsWith('ToolCall'));if(tk&&l.subtype==='started'){const nm=tk.replace('ToolCall','');const args=tc[tk]?.args||{};ms.push(M('tool',`[Tool: ${nm}] ${JSON.stringify(args).slice(0,300)}`,l.timestamp,null,nm,args))}else if(tk&&l.subtype==='completed'){const r=tc[tk]?.result;if(r?.success)ms.push(M('tool',`[Result] ${JSON.stringify(r.success).slice(0,300)}`,l.timestamp));else if(r)ms.push(M('tool','[Result] Error',l.timestamp))}}}return ms}
+// Pi
+function exPi(lines){const ms=[];for(const l of lines){if(l.type!=='message'||!l.message)continue;const m=l.message,role=m.role||'assistant';if(role==='user'){ms.push(M('user',m.content||ct(m.content),l.timestamp,m.model))}else if(role==='assistant'){if(m.tool_calls?.length)for(const tc of m.tool_calls){let args=tc.function?.arguments;if(typeof args==='string'){try{args=JSON.parse(args)}catch{}}ms.push(M('tool',`[Tool: ${tc.function?.name||'tool'}] ${JSON.stringify(args||{}).slice(0,300)}`,l.timestamp,m.model,tc.function?.name,args))}const c=m.content||'';if(c)ms.push(M('assistant',c,l.timestamp,m.model))}else if(role==='tool'){ms.push(M('tool',`[Result] ${(m.content||'').slice(0,500)}`,l.timestamp))}}return ms}
+// OpenCode
+function exOpencode(lines){const ms=[];let messages=[];if(lines.length===1&&lines[0].messages)messages=lines[0].messages;else if(lines.length===1&&Array.isArray(lines[0]))messages=lines[0];else messages=lines.filter(l=>l.role&&l.parts);for(const m of messages){const role=m.role||'assistant',parts=m.parts||[],ts=m.createdAt||m.created_at||m.timestamp||null;for(const p of parts){if(p.type==='text'&&p.text)ms.push(M(role==='user'?'user':'assistant',p.text,ts,m.model));else if(p.type==='tool-invocation'||p.type==='tool_call'){const nm=p.toolName||p.name||'tool',args=p.args||p.input||{};ms.push(M('tool',`[Tool: ${nm}] ${JSON.stringify(args).slice(0,300)}`,ts,null,nm,args))}else if(p.type==='tool-result'||p.type==='tool_result'){const c=typeof p.result==='string'?p.result:JSON.stringify(p.result||'').slice(0,500);ms.push(M('tool',`[Result] ${c.slice(0,500)}`,ts))}}}return ms}
+// Tool mapping
+const TM={bash:{claude:'Bash',codex:'exec_command',cursor:'shell',pi:'bash',opencode:'bash'},edit:{claude:'Edit',codex:'apply_patch',cursor:'edit',pi:'edit',opencode:'edit'},write:{claude:'Write',codex:'apply_patch',cursor:'write',pi:'write',opencode:'write'},read:{claude:'Read',codex:'read_file',cursor:'read',pi:'read',opencode:'read'},list:{claude:'ListFiles',codex:'list_files',cursor:'ls',pi:'list',opencode:'list'},glob:{claude:'Glob',codex:'list_files',cursor:'glob',pi:'glob',opencode:'glob'},grep:{claude:'Grep',codex:'exec_command',cursor:'grep',pi:'grep',opencode:'grep'},search:{claude:'WebSearch',codex:'web_search',cursor:'webSearch',pi:'web_search',opencode:'webfetch'}};
+function mapTool(n,t){if(!n)return n;const lo=n.toLowerCase();for(const[,mp]of Object.entries(TM))if(lo===Object.keys(TM).find(k=>k===lo)||Object.values(mp).some(v=>v.toLowerCase()===lo))return mp[t]||n;return n}
+function findCwd(o){for(const l of o.slice(0,10)){if(l.cwd)return l.cwd;if(l.payload?.cwd)return l.payload.cwd;if(l.session?.directory)return l.session.directory}return'/home/user'}
+// Conversion functions
+function toClaude(ms,orig){const ls=[],sid=crypto.randomUUID(),cwd=findCwd(orig);let par=null;for(const m of ms){const u=crypto.randomUUID(),ts=m.timestamp||new Date().toISOString();if(m.role==='user'&&!m.toolUse){ls.push({parentUuid:par,isSidechain:false,userType:'external',cwd,sessionId:sid,version:'1.0.0',gitBranch:'',type:'user',message:{role:'user',content:m.content},uuid:u,timestamp:ts});par=u}else if(m.role==='assistant'&&!m.toolUse){ls.push({parentUuid:par,isSidechain:false,userType:'external',cwd,sessionId:sid,version:'1.0.0',gitBranch:'',type:'assistant',message:{id:`msg_${u.slice(0,24)}`,type:'message',role:'assistant',model:m.model||'claude-sonnet-4-20250514',content:[{type:'text',text:m.content}],stop_reason:'end_turn',stop_sequence:null,usage:{input_tokens:0,output_tokens:0}},uuid:u,timestamp:ts});par=u}else if(m.toolUse&&m.toolName){const nm=mapTool(m.toolName,'claude');ls.push({parentUuid:par,isSidechain:false,userType:'external',cwd,sessionId:sid,version:'1.0.0',gitBranch:'',type:'assistant',message:{id:`msg_${u.slice(0,24)}`,type:'message',role:'assistant',model:'claude-sonnet-4-20250514',content:[{type:'tool_use',id:`toolu_${u.slice(0,16)}`,name:nm,input:m.toolInput||{}}],stop_reason:'tool_use',stop_sequence:null,usage:{input_tokens:0,output_tokens:0}},uuid:u,timestamp:ts});par=u}else if(m.toolUse&&m.content.startsWith('[Result]')){ls.push({parentUuid:par,isSidechain:false,userType:'external',cwd,sessionId:sid,version:'1.0.0',gitBranch:'',type:'result',message:{role:'user',content:[{type:'tool_result',content:m.content.replace(/^\[Result\]\s*/,'')}]},uuid:u,timestamp:ts});par=u}}return ls}
+function toCodex(ms,orig){const ls=[],sid=crypto.randomUUID(),now=new Date().toISOString(),cwd=findCwd(orig);ls.push({type:'session_meta',payload:{session_id:sid,started_at:ms[0]?.timestamp||now,cwd,source:'converted',model_provider:'openai'},timestamp:ms[0]?.timestamp||now});for(const m of ms){const ts=m.timestamp||now;if(m.role==='user'&&!m.toolUse){ls.push({type:'event_msg',payload:{type:'user_message',message:m.content,images:[]},timestamp:ts});ls.push({type:'response_item',payload:{type:'message',role:'user',content:[{type:'input_text',text:m.content}]},timestamp:ts})}else if(m.role==='assistant'&&!m.toolUse){ls.push({type:'response_item',payload:{type:'message',role:'assistant',content:[{type:'output_text',text:m.content}]},timestamp:ts})}else if(m.toolUse&&m.toolName){const nm=mapTool(m.toolName,'codex');ls.push({type:'response_item',payload:{type:'function_call',name:nm,call_id:`call_${crypto.randomUUID().slice(0,12)}`,arguments:JSON.stringify(m.toolInput||{})},timestamp:ts})}else if(m.toolUse&&m.content.startsWith('[Result]')){ls.push({type:'response_item',payload:{type:'function_call_output',output:m.content.replace(/^\[Result\]\s*/,'')},timestamp:ts})}}return ls}
+function toCursor(ms){const ls=[],sid=crypto.randomUUID();for(const m of ms){const ts=m.timestamp||new Date().toISOString();if(m.role==='user'&&!m.toolUse)ls.push({type:'user',message:{role:'user',content:[{type:'text',text:m.content}]},session_id:sid,timestamp:ts});else if(m.role==='assistant'&&!m.toolUse)ls.push({type:'assistant',message:{role:'assistant',content:[{type:'text',text:m.content}]},session_id:sid,timestamp:ts});else if(m.toolUse&&m.toolName){const nm=mapTool(m.toolName,'cursor');ls.push({type:'tool_call',subtype:'started',tool_call:{[nm+'ToolCall']:{args:m.toolInput||{}}},session_id:sid,timestamp:ts})}else if(m.toolUse&&m.content.startsWith('[Result]'))ls.push({type:'tool_call',subtype:'completed',tool_call:{genericToolCall:{result:{success:{output:m.content.replace(/^\[Result\]\s*/,'')}}}},session_id:sid,timestamp:ts})}return ls}
+function toPi(ms,orig){const ls=[],sid=`pi_ses_${crypto.randomUUID().slice(0,8)}`,cwd=findCwd(orig);ls.push({type:'session',id:sid,timestamp:ms[0]?.timestamp||new Date().toISOString(),cwd});let prev=null;for(const m of ms){const id=`msg_${crypto.randomUUID().slice(0,12)}`,ts=m.timestamp||new Date().toISOString();if(m.role==='user'&&!m.toolUse){ls.push({type:'message',id,parentId:prev,timestamp:ts,message:{role:'user',content:m.content}});prev=id}else if(m.role==='assistant'&&!m.toolUse){ls.push({type:'message',id,parentId:prev,timestamp:ts,message:{role:'assistant',content:m.content,model:m.model||'claude-3-5-sonnet',provider:'anthropic'}});prev=id}else if(m.toolUse&&m.toolName){const nm=mapTool(m.toolName,'pi');ls.push({type:'message',id,parentId:prev,timestamp:ts,message:{role:'assistant',content:'',tool_calls:[{id:`call_${id}`,type:'function',function:{name:nm,arguments:JSON.stringify(m.toolInput||{})}}]}});prev=id}else if(m.toolUse&&m.content.startsWith('[Result]')){ls.push({type:'message',id,parentId:prev,timestamp:ts,message:{role:'tool',content:m.content.replace(/^\[Result\]\s*/,'')}});prev=id}}return ls}
+function toOpencode(ms,orig){const sess={id:crypto.randomUUID(),title:'Converted session',directory:findCwd(orig),created_at:ms[0]?.timestamp||new Date().toISOString()};const out=[];for(const m of ms){const ts=m.timestamp||new Date().toISOString();if(m.role==='user'&&!m.toolUse)out.push({id:crypto.randomUUID(),role:'user',createdAt:ts,parts:[{type:'text',text:m.content}]});else if(m.role==='assistant'&&!m.toolUse)out.push({id:crypto.randomUUID(),role:'assistant',createdAt:ts,model:m.model||'anthropic/claude-sonnet-4-5',parts:[{type:'text',text:m.content}]});else if(m.toolUse&&m.toolName){const nm=mapTool(m.toolName,'opencode');out.push({id:crypto.randomUUID(),role:'assistant',createdAt:ts,parts:[{type:'tool-invocation',toolName:nm,args:m.toolInput||{},state:'result'}]})}else if(m.toolUse&&m.content.startsWith('[Result]'))out.push({id:crypto.randomUUID(),role:'tool',createdAt:ts,parts:[{type:'tool-result',result:m.content.replace(/^\[Result\]\s*/,'')}]})}return[{session:sess,messages:out}]}
+function convert(ms,t,orig){return({claude:toClaude,codex:toCodex,cursor:toCursor,pi:toPi,opencode:toOpencode}[t])(ms,orig)}
+// UI
+function updateDetectInfo(){detectInfo.style.display='flex';formatBadge.innerHTML=badge(detectedFormat);msgCount.textContent=`${extractedMessages.length} messages extracted`}
+function renderPreview(){if(!extractedMessages.length){previewSection.style.display='none';return}previewSection.style.display='';previewCount.textContent=extractedMessages.length;previewList.innerHTML=extractedMessages.map(m=>{const rc=m.toolUse?'tool':m.role;const ts=m.timestamp?new Date(m.timestamp).toLocaleTimeString():'';const tc=truncatePreview?'truncated':'';return`<div class="msg-item"><span class="msg-role ${rc}">${rc}</span><div class="msg-content ${tc}">${esc(m.content)}</div><span class="msg-meta">${ts}</span></div>`}).join('')}
+btnToggleTruncate.addEventListener('click',()=>{truncatePreview=!truncatePreview;btnToggleTruncate.textContent=truncatePreview?'Expand all':'Collapse all';renderPreview()});
+// Convert
+btnConvert.addEventListener('click',()=>{if(!detectedFormat||!extractedMessages.length)return;const t=targetFormat.value;const out=convert(extractedMessages,t,parsedLines);const fmt=FORMATS[t];convertedOutput=fmt.jsonl?out.map(l=>JSON.stringify(l)).join('\n'):JSON.stringify(out[0],null,2);outputFormatLabel.innerHTML=badge(t);outputArea.value=convertedOutput;outputSection.style.display='';outputSection.scrollIntoView({behavior:'smooth',block:'nearest'});toast(`Converted to ${fmt.label}`)});
+// Output
+btnCopyOutput.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(convertedOutput);toast('Copied')}catch{toast('Copy failed')}});
+btnDownload.addEventListener('click',()=>{const t=targetFormat.value,fmt=FORMATS[t];const pre={claude:'session',codex:'rollout',cursor:'transcript',pi:'session',opencode:'session'}[t];const fn=`${pre}-${crypto.randomUUID().slice(0,8)}${fmt.ext}`;const b=new Blob([convertedOutput],{type:fmt.jsonl?'application/x-jsonlines':'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);toast(`Downloaded ${fn}`)});
+</script>
+</body>
+</html>

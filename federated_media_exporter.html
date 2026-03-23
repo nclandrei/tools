@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fedi Media Extractor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0b;
+    --surface: #141416;
+    --surface-2: #1c1c20;
+    --surface-3: #242429;
+    --border: #2a2a30;
+    --border-hover: #3a3a42;
+    --text: #e8e8ec;
+    --text-dim: #8e8e96;
+    --text-muted: #5a5a64;
+    --accent-bsky: #0085ff;
+    --accent-bsky-dim: #0070d6;
+    --accent-masto: #6364ff;
+    --accent-masto-dim: #5253d4;
+    --accent: var(--accent-bsky);
+    --accent-dim: var(--accent-bsky-dim);
+    --radius: 10px;
+    --radius-lg: 14px;
+    --font: 'DM Sans', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  html { font-size: 16px; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* HEADER */
+  header {
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  h1 .dot {
+    color: var(--accent);
+    transition: color 0.3s;
+  }
+
+  .subtitle {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-weight: 400;
+  }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 100px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* CONTROLS */
+  .controls {
+    padding: 32px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .platform-switch {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 4px;
+    width: fit-content;
+    border: 1px solid var(--border);
+  }
+
+  .platform-btn {
+    font-family: var(--font);
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .platform-btn:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  .platform-btn.active {
+    background: var(--surface-3);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  .platform-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .search-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .input-wrap {
+    flex: 1;
+    position: relative;
+  }
+
+  .input-wrap input {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    padding: 13px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .input-wrap input::placeholder { color: var(--text-muted); }
+  .input-wrap input:focus { border-color: var(--accent); }
+
+  .hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-family: var(--mono);
+  }
+
+  .fetch-btn {
+    font-family: var(--font);
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 13px 28px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .fetch-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .fetch-btn:active { transform: translateY(0); }
+  .fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
+
+  /* STATUS BAR */
+  .status-bar {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .status-bar.visible { display: flex; }
+
+  .status-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .status-text {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+  }
+
+  .status-text strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .download-all-btn {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .download-all-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* GALLERY */
+  .gallery {
+    padding: 24px 0 60px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  .media-card {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    aspect-ratio: 1;
+    cursor: pointer;
+    transition: all 0.25s;
+    animation: fadeIn 0.4s ease both;
+  }
+
+  .media-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .media-card img, .media-card video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .media-card .overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.25s;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 14px;
+  }
+
+  .media-card:hover .overlay { opacity: 1; }
+
+  .overlay-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .overlay-btn {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    font-weight: 500;
+    padding: 5px 10px;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .overlay-btn:hover { background: rgba(255,255,255,0.25); }
+
+  .media-type-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    font-weight: 500;
+    padding: 3px 8px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: rgba(255,255,255,0.8);
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .alt-indicator {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 3px 6px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: rgba(255,255,255,0.7);
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* LOAD MORE */
+  .load-more-wrap {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+  }
+
+  .load-more-btn {
+    font-family: var(--font);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 12px 32px;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .load-more-btn:hover { border-color: var(--accent); color: var(--text); }
+  .load-more-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ERROR */
+  .error-msg {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .error-msg .error-icon { font-size: 1.8rem; margin-bottom: 12px; }
+  .error-msg strong { color: #ff5555; }
+
+  /* LIGHTBOX */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0,0,0,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    cursor: zoom-out;
+  }
+
+  .lightbox.open { display: flex; }
+
+  .lightbox img, .lightbox video {
+    max-width: 90vw;
+    max-height: 85vh;
+    object-fit: contain;
+    border-radius: var(--radius);
+    cursor: default;
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.6);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 8px;
+    transition: color 0.2s;
+    line-height: 1;
+  }
+
+  .lightbox-close:hover { color: #fff; }
+
+  .lightbox-meta {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 80px 20px;
+  }
+
+  .empty-state .icon {
+    font-size: 2.5rem;
+    margin-bottom: 16px;
+    opacity: 0.3;
+  }
+
+  .empty-state p {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    max-width: 360px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 640px) {
+    header { padding: 32px 0 28px; }
+    h1 { font-size: 1.3rem; }
+    .search-row { flex-direction: column; }
+    .fetch-btn { padding: 13px 28px; }
+    .gallery { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .lightbox { padding: 16px; }
+    .lightbox img, .lightbox video { max-width: 95vw; max-height: 80vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="header-top">
+      <div>
+        <h1>fedi media<span class="dot">.</span></h1>
+        <p class="subtitle">Extract images & videos from Bluesky or Mastodon profiles</p>
+      </div>
+      <span class="badge">No API keys · Client-side only</span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="platform-switch">
+      <button class="platform-btn active" data-platform="bluesky" onclick="setPlatform('bluesky')">
+        <svg viewBox="0 0 600 530" fill="currentColor"><path d="M135.72 44.03C202.22 93.87 273.72 195.16 300 249.47c26.28-54.31 97.78-155.6 164.28-205.44C528.1-5.3 600-28.87 600 76.02c0 20.95-12.01 176-19.05 201.18-24.46 87.49-113.65 109.8-191.95 96.29 136.85 23.29 171.6 100.48 96.42 177.68C383.15 658.43 300 498.87 300 498.87s-83.15 159.56-185.42 52.3c-75.18-77.2-40.43-154.39 96.42-177.68-78.3 13.51-167.49-8.8-191.95-96.29C12.01 252.02 0 96.97 0 76.02 0-28.87 71.9-5.3 135.72 44.03z"/></svg>
+        Bluesky
+      </button>
+      <button class="platform-btn" data-platform="mastodon" onclick="setPlatform('mastodon')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.327 8.566c0-4.339-2.843-5.61-2.843-5.61-1.433-.658-3.894-.935-6.451-.956h-.063c-2.557.021-5.016.298-6.45.956 0 0-2.843 1.272-2.843 5.61 0 .993-.019 2.181.012 3.441.103 4.243.778 8.425 4.701 9.463 1.809.479 3.362.579 4.612.51 2.268-.126 3.541-.809 3.541-.809l-.075-1.646s-1.621.511-3.441.449c-1.804-.062-3.707-.194-3.999-2.409a4.523 4.523 0 0 1-.04-.621s1.77.432 4.014.535c1.372.063 2.658-.08 3.965-.236 2.506-.299 4.688-1.843 4.962-3.254.434-2.223.398-5.424.398-5.424zm-3.353 5.59h-2.081V9.057c0-1.075-.452-1.62-1.357-1.62-1 0-1.501.647-1.501 1.927v2.791h-2.069V9.364c0-1.28-.501-1.927-1.502-1.927-.904 0-1.357.546-1.357 1.62v5.099H6.026V8.903c0-1.074.273-1.927.823-2.558.566-.631 1.307-.955 2.228-.955 1.065 0 1.872.41 2.405 1.228l.518.869.519-.869c.533-.818 1.34-1.228 2.405-1.228.92 0 1.662.324 2.228.955.549.631.822 1.484.822 2.558v5.253z"/></svg>
+        Mastodon
+      </button>
+    </div>
+
+    <div class="search-row">
+      <div class="input-wrap">
+        <input type="text" id="handle-input" placeholder="handle.bsky.social or paste profile URL" spellcheck="false" autocomplete="off">
+        <p class="hint" id="hint-text">Handle or profile URL, e.g. <strong>jay.bsky.team</strong> or <strong>https://bsky.app/profile/…</strong></p>
+      </div>
+      <button class="fetch-btn" id="fetch-btn" onclick="startFetch()">Extract</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <div class="status-info">
+      <div class="spinner" id="spinner"></div>
+      <span class="status-text" id="status-text"></span>
+    </div>
+    <button class="download-all-btn" id="download-all-btn" style="display:none" onclick="downloadAllUrls()">Copy all URLs</button>
+  </div>
+
+  <div class="gallery" id="gallery"></div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <button class="lightbox-close" onclick="closeLightbox(event)">&times;</button>
+  <div id="lightbox-content"></div>
+  <div class="lightbox-meta" id="lightbox-meta"></div>
+</div>
+
+<script>
+  // ── State ──
+  let platform = 'bluesky';
+  let mediaItems = [];
+  let cursor = null;
+  let mastodonAccountId = null;
+  let mastodonInstance = null;
+  let isFetching = false;
+  let hasMore = true;
+
+  const PAGE_SIZE_BSKY = 100;
+  const PAGE_SIZE_MASTO = 40;
+
+  // ── DOM refs ──
+  const $input = document.getElementById('handle-input');
+  const $hint = document.getElementById('hint-text');
+  const $fetchBtn = document.getElementById('fetch-btn');
+  const $statusBar = document.getElementById('status-bar');
+  const $statusText = document.getElementById('status-text');
+  const $spinner = document.getElementById('spinner');
+  const $gallery = document.getElementById('gallery');
+  const $downloadAllBtn = document.getElementById('download-all-btn');
+  const $lightbox = document.getElementById('lightbox');
+  const $lightboxContent = document.getElementById('lightbox-content');
+  const $lightboxMeta = document.getElementById('lightbox-meta');
+
+  // ── Platform switch ──
+  function setPlatform(p) {
+    platform = p;
+    document.querySelectorAll('.platform-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.platform === p);
+    });
+    const isBsky = p === 'bluesky';
+    document.documentElement.style.setProperty('--accent', isBsky ? 'var(--accent-bsky)' : 'var(--accent-masto)');
+    document.documentElement.style.setProperty('--accent-dim', isBsky ? 'var(--accent-bsky-dim)' : 'var(--accent-masto-dim)');
+    $input.placeholder = isBsky ? 'handle.bsky.social or paste profile URL' : 'user@mastodon.social or paste profile URL';
+    $hint.innerHTML = isBsky
+      ? 'Handle or profile URL, e.g. <strong>jay.bsky.team</strong> or <strong>https://bsky.app/profile/…</strong>'
+      : 'Full handle or profile URL, e.g. <strong>Gargron@mastodon.social</strong> or <strong>https://mastodon.social/@…</strong>';
+    reset();
+  }
+
+  function reset() {
+    mediaItems = [];
+    cursor = null;
+    mastodonAccountId = null;
+    mastodonInstance = null;
+    hasMore = true;
+    $gallery.innerHTML = '';
+    $statusBar.classList.remove('visible');
+    $downloadAllBtn.style.display = 'none';
+  }
+
+  // ── Enter key ──
+  $input.addEventListener('keydown', e => { if (e.key === 'Enter') startFetch(); });
+
+  // ── Main fetch ──
+  // ── Parse input: detect URLs and extract handles ──
+  function parseInput(raw) {
+    const val = raw.trim();
+
+    // Bluesky profile URL: https://bsky.app/profile/handle.bsky.social
+    const bskyMatch = val.match(/^https?:\/\/bsky\.app\/profile\/([^\/?#]+)/i);
+    if (bskyMatch) {
+      return { platform: 'bluesky', handle: bskyMatch[1] };
+    }
+
+    // Mastodon profile URL: https://mastodon.social/@username
+    const mastoMatch = val.match(/^https?:\/\/([^\/]+)\/@([^\/?#]+)/i);
+    if (mastoMatch) {
+      const instance = mastoMatch[1];
+      const username = mastoMatch[2];
+      return { platform: 'mastodon', handle: `${username}@${instance}` };
+    }
+
+    // Plain handle — use current platform
+    return { platform, handle: val };
+  }
+
+  async function startFetch() {
+    const raw = $input.value.trim();
+    if (!raw) return;
+
+    const parsed = parseInput(raw);
+
+    // Auto-switch platform if URL was detected
+    if (parsed.platform !== platform) {
+      setPlatform(parsed.platform);
+    }
+
+    reset();
+    setLoading(true);
+    setStatus('Resolving profile…');
+
+    try {
+      if (parsed.platform === 'bluesky') {
+        await fetchBluesky(parsed.handle);
+      } else {
+        await fetchMastodon(parsed.handle);
+      }
+    } catch (err) {
+      showError(err.message);
+    }
+
+    setLoading(false);
+    updateStatus();
+  }
+
+  // ── Bluesky ──
+  async function fetchBluesky(handle) {
+    const baseUrl = 'https://public.api.bsky.app/xrpc';
+
+    // Resolve handle -> DID (also validates the user exists)
+    const profileRes = await fetch(`${baseUrl}/app.bsky.actor.getProfile?actor=${encodeURIComponent(handle)}`);
+    if (!profileRes.ok) throw new Error(`Could not find Bluesky user "${handle}". Check the handle and try again.`);
+    const profile = await profileRes.json();
+
+    setStatus(`Fetching posts from <strong>${profile.displayName || profile.handle}</strong>…`);
+
+    let pageCount = 0;
+    const maxPages = 50; // safety limit ~5000 posts
+
+    while (hasMore && pageCount < maxPages) {
+      let url = `${baseUrl}/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(handle)}&limit=${PAGE_SIZE_BSKY}&filter=posts_with_media`;
+      if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch feed. The API may be rate-limiting requests — try again in a moment.');
+      const data = await res.json();
+
+      const feed = data.feed || [];
+      if (feed.length === 0) { hasMore = false; break; }
+
+      for (const item of feed) {
+        const post = item.post;
+        if (!post?.embed) continue;
+        extractBlueskyMedia(post);
+      }
+
+      cursor = data.cursor || null;
+      hasMore = !!cursor;
+      pageCount++;
+
+      updateStatus();
+      // Small delay to be respectful to the API
+      if (hasMore) await sleep(200);
+    }
+
+    finalize();
+  }
+
+  function extractBlueskyMedia(post) {
+    const embed = post.embed;
+    const postUrl = `https://bsky.app/profile/${post.author.handle}/post/${post.uri.split('/').pop()}`;
+    const postDate = post.record?.createdAt ? new Date(post.record.createdAt) : null;
+
+    // Images: $type = "app.bsky.embed.images#view"
+    if (embed.$type === 'app.bsky.embed.images#view' && embed.images) {
+      for (const img of embed.images) {
+        mediaItems.push({
+          type: 'image',
+          thumb: img.thumb,
+          full: img.fullsize,
+          alt: img.alt || '',
+          postUrl,
+          date: postDate,
+        });
+      }
+    }
+
+    // Video: $type = "app.bsky.embed.video#view"
+    if (embed.$type === 'app.bsky.embed.video#view') {
+      mediaItems.push({
+        type: 'video',
+        thumb: embed.thumbnail || '',
+        full: embed.playlist || '', // HLS playlist
+        alt: embed.alt || '',
+        postUrl,
+        date: postDate,
+      });
+    }
+
+    // RecordWithMedia (quote posts with media)
+    if (embed.$type === 'app.bsky.embed.recordWithMedia#view' && embed.media) {
+      const media = embed.media;
+      if (media.$type === 'app.bsky.embed.images#view' && media.images) {
+        for (const img of media.images) {
+          mediaItems.push({
+            type: 'image',
+            thumb: img.thumb,
+            full: img.fullsize,
+            alt: img.alt || '',
+            postUrl,
+            date: postDate,
+          });
+        }
+      }
+      if (media.$type === 'app.bsky.embed.video#view') {
+        mediaItems.push({
+          type: 'video',
+          thumb: media.thumbnail || '',
+          full: media.playlist || '',
+          alt: media.alt || '',
+          postUrl,
+          date: postDate,
+        });
+      }
+    }
+  }
+
+  // ── Mastodon ──
+  async function fetchMastodon(handle) {
+    // Parse handle: user@instance or @user@instance
+    const cleaned = handle.replace(/^@/, '');
+    const parts = cleaned.split('@');
+    if (parts.length !== 2) throw new Error('Please enter a full Mastodon handle like user@mastodon.social');
+
+    const [username, instance] = parts;
+    mastodonInstance = instance;
+
+    // Lookup account
+    const lookupUrl = `https://${instance}/api/v1/accounts/lookup?acct=${encodeURIComponent(username)}`;
+    const lookupRes = await fetch(lookupUrl);
+    if (!lookupRes.ok) throw new Error(`Could not find user "${username}" on ${instance}. Check the handle and instance.`);
+    const account = await lookupRes.json();
+    mastodonAccountId = account.id;
+
+    setStatus(`Fetching media from <strong>${account.display_name || account.username}</strong>…`);
+
+    let pageCount = 0;
+    const maxPages = 100; // safety limit ~4000 statuses
+
+    while (hasMore && pageCount < maxPages) {
+      let url = `https://${instance}/api/v1/accounts/${mastodonAccountId}/statuses?only_media=true&limit=${PAGE_SIZE_MASTO}&exclude_reblogs=true`;
+      if (cursor) url += `&max_id=${cursor}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch statuses. The instance may be rate-limiting or requires authentication.');
+      const statuses = await res.json();
+
+      if (statuses.length === 0) { hasMore = false; break; }
+
+      for (const status of statuses) {
+        extractMastodonMedia(status);
+      }
+
+      // Mastodon uses the last status ID as cursor
+      cursor = statuses[statuses.length - 1].id;
+      pageCount++;
+
+      updateStatus();
+      if (hasMore) await sleep(300);
+    }
+
+    finalize();
+  }
+
+  function extractMastodonMedia(status) {
+    const postUrl = status.url;
+    const postDate = status.created_at ? new Date(status.created_at) : null;
+
+    if (!status.media_attachments) return;
+
+    for (const att of status.media_attachments) {
+      if (att.type === 'image') {
+        mediaItems.push({
+          type: 'image',
+          thumb: att.preview_url,
+          full: att.url,
+          alt: att.description || '',
+          postUrl,
+          date: postDate,
+        });
+      } else if (att.type === 'video' || att.type === 'gifv') {
+        mediaItems.push({
+          type: att.type === 'gifv' ? 'gif' : 'video',
+          thumb: att.preview_url || '',
+          full: att.url,
+          alt: att.description || '',
+          postUrl,
+          date: postDate,
+        });
+      }
+    }
+  }
+
+  // ── Rendering ──
+  function renderItem(item, index) {
+    const card = document.createElement('div');
+    card.className = 'media-card';
+    card.style.animationDelay = `${(index % 20) * 30}ms`;
+
+    if (item.type === 'image') {
+      const img = document.createElement('img');
+      img.src = item.thumb;
+      img.alt = item.alt || 'Media';
+      img.loading = 'lazy';
+      card.appendChild(img);
+    } else {
+      // For videos, show thumbnail as image
+      if (item.thumb) {
+        const img = document.createElement('img');
+        img.src = item.thumb;
+        img.alt = item.alt || 'Video thumbnail';
+        img.loading = 'lazy';
+        card.appendChild(img);
+      }
+    }
+
+    // Type badge
+    if (item.type !== 'image') {
+      const badge = document.createElement('span');
+      badge.className = 'media-type-badge';
+      badge.textContent = item.type === 'gif' ? 'GIF' : 'Video';
+      card.appendChild(badge);
+    }
+
+    // Alt text indicator
+    if (item.alt) {
+      const altBadge = document.createElement('span');
+      altBadge.className = 'alt-indicator';
+      altBadge.textContent = 'ALT';
+      altBadge.title = item.alt;
+      card.appendChild(altBadge);
+    }
+
+    // Overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+
+    const actions = document.createElement('div');
+    actions.className = 'overlay-actions';
+
+    // Open full
+    const openBtn = document.createElement('a');
+    openBtn.className = 'overlay-btn';
+    openBtn.href = item.full;
+    openBtn.target = '_blank';
+    openBtn.rel = 'noopener';
+    openBtn.textContent = 'Open';
+    openBtn.onclick = e => e.stopPropagation();
+    actions.appendChild(openBtn);
+
+    // View post
+    if (item.postUrl) {
+      const postBtn = document.createElement('a');
+      postBtn.className = 'overlay-btn';
+      postBtn.href = item.postUrl;
+      postBtn.target = '_blank';
+      postBtn.rel = 'noopener';
+      postBtn.textContent = 'Post';
+      postBtn.onclick = e => e.stopPropagation();
+      actions.appendChild(postBtn);
+    }
+
+    overlay.appendChild(actions);
+    card.appendChild(overlay);
+
+    // Click for lightbox
+    card.onclick = () => openLightbox(item, index);
+
+    return card;
+  }
+
+  function renderGallery() {
+    $gallery.innerHTML = '';
+    if (mediaItems.length === 0) {
+      $gallery.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📭</div>
+          <p>No media found for this user. They might not have any public posts with images or videos.</p>
+        </div>`;
+      return;
+    }
+
+    mediaItems.forEach((item, i) => {
+      $gallery.appendChild(renderItem(item, i));
+    });
+  }
+
+  function appendNewItems(startIndex) {
+    for (let i = startIndex; i < mediaItems.length; i++) {
+      $gallery.appendChild(renderItem(mediaItems[i], i));
+    }
+  }
+
+  // ── Lightbox ──
+  let lightboxIndex = -1;
+
+  function openLightbox(item, index) {
+    if (index !== undefined) lightboxIndex = index;
+    else lightboxIndex = mediaItems.indexOf(item);
+    $lightboxContent.innerHTML = '';
+    $lightboxMeta.innerHTML = '';
+
+    if (item.type === 'image') {
+      const img = document.createElement('img');
+      img.src = item.full;
+      img.alt = item.alt || '';
+      $lightboxContent.appendChild(img);
+    } else {
+      const video = document.createElement('video');
+      video.src = item.full;
+      video.controls = true;
+      video.autoplay = true;
+      video.style.maxWidth = '90vw';
+      video.style.maxHeight = '85vh';
+      video.style.borderRadius = 'var(--radius)';
+      $lightboxContent.appendChild(video);
+    }
+
+    // Meta buttons
+    const openBtn = document.createElement('a');
+    openBtn.className = 'overlay-btn';
+    openBtn.href = item.full;
+    openBtn.target = '_blank';
+    openBtn.textContent = 'Open full';
+    openBtn.onclick = e => e.stopPropagation();
+    $lightboxMeta.appendChild(openBtn);
+
+    if (item.postUrl) {
+      const postBtn = document.createElement('a');
+      postBtn.className = 'overlay-btn';
+      postBtn.href = item.postUrl;
+      postBtn.target = '_blank';
+      postBtn.textContent = 'View post';
+      postBtn.onclick = e => e.stopPropagation();
+      $lightboxMeta.appendChild(postBtn);
+    }
+
+    if (item.alt) {
+      const altBtn = document.createElement('button');
+      altBtn.className = 'overlay-btn';
+      altBtn.textContent = 'Show alt text';
+      altBtn.onclick = e => {
+        e.stopPropagation();
+        // Toggle alt text display inline instead of using alert
+        let altEl = document.getElementById('lightbox-alt-text');
+        if (altEl) {
+          altEl.remove();
+        } else {
+          altEl = document.createElement('div');
+          altEl.id = 'lightbox-alt-text';
+          altEl.style.cssText = 'position:absolute;bottom:60px;left:50%;transform:translateX(-50%);max-width:600px;padding:12px 16px;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:rgba(255,255,255,0.9);font-size:0.82rem;line-height:1.5;border-radius:8px;border:1px solid rgba(255,255,255,0.1);cursor:default;';
+          altEl.textContent = item.alt;
+          altEl.onclick = ev => ev.stopPropagation();
+          $lightbox.appendChild(altEl);
+        }
+      };
+      $lightboxMeta.appendChild(altBtn);
+    }
+
+    $lightbox.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeLightbox(e) {
+    if (e.target === $lightbox || e.target.classList.contains('lightbox-close')) {
+      $lightbox.classList.remove('open');
+      document.body.style.overflow = '';
+      // Stop any playing video
+      const video = $lightboxContent.querySelector('video');
+      if (video) video.pause();
+      // Remove alt text overlay
+      const altEl = document.getElementById('lightbox-alt-text');
+      if (altEl) altEl.remove();
+    }
+  }
+
+  function navigateLightbox(delta) {
+    if (mediaItems.length === 0) return;
+    const newIndex = lightboxIndex + delta;
+    if (newIndex < 0 || newIndex >= mediaItems.length) return;
+    openLightbox(mediaItems[newIndex], newIndex);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (!$lightbox.classList.contains('open')) return;
+    if (e.key === 'Escape') {
+      $lightbox.classList.remove('open');
+      document.body.style.overflow = '';
+      const video = $lightboxContent.querySelector('video');
+      if (video) video.pause();
+      const altEl = document.getElementById('lightbox-alt-text');
+      if (altEl) altEl.remove();
+    } else if (e.key === 'ArrowLeft') {
+      navigateLightbox(-1);
+    } else if (e.key === 'ArrowRight') {
+      navigateLightbox(1);
+    }
+  });
+
+  // ── Copy all URLs ──
+  function downloadAllUrls() {
+    const urls = mediaItems.map(item => item.full).join('\n');
+    navigator.clipboard.writeText(urls).then(() => {
+      const btn = $downloadAllBtn;
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    }).catch(() => {
+      // Fallback: open in new tab as text
+      const blob = new Blob([mediaItems.map(item => item.full).join('\n')], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    });
+  }
+
+  // ── Helpers ──
+  function setLoading(loading) {
+    isFetching = loading;
+    $fetchBtn.disabled = loading;
+    $fetchBtn.textContent = loading ? 'Extracting…' : 'Extract';
+    $statusBar.classList.toggle('visible', loading || mediaItems.length > 0);
+    $spinner.style.display = loading ? 'block' : 'none';
+  }
+
+  function setStatus(html) {
+    $statusText.innerHTML = html;
+  }
+
+  function updateStatus() {
+    const imgCount = mediaItems.filter(m => m.type === 'image').length;
+    const vidCount = mediaItems.filter(m => m.type !== 'image').length;
+
+    let parts = [];
+    if (imgCount) parts.push(`<strong>${imgCount}</strong> image${imgCount !== 1 ? 's' : ''}`);
+    if (vidCount) parts.push(`<strong>${vidCount}</strong> video${vidCount !== 1 ? 's' : ''}`);
+
+    const text = isFetching ? `Found ${parts.join(', ')}… still scanning` : `Found ${parts.join(', ')}`;
+    setStatus(text);
+
+    // Live-render new items
+    const rendered = $gallery.querySelectorAll('.media-card').length;
+    if (mediaItems.length > rendered) {
+      appendNewItems(rendered);
+    }
+  }
+
+  function finalize() {
+    updateStatus();
+    if (mediaItems.length === 0) {
+      renderGallery();
+    }
+    if (mediaItems.length > 0) {
+      $downloadAllBtn.style.display = 'inline-flex';
+    }
+  }
+
+  function showError(msg) {
+    $gallery.innerHTML = `
+      <div class="error-msg">
+        <div class="error-icon">⚠</div>
+        <p><strong>Error:</strong> ${msg}</p>
+      </div>`;
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+</script>
+</body>
+</html>

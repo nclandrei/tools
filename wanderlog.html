@@ -1,0 +1,1958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wanderlog — Travel Guide Aggregator</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --paper: #f7f3eb;
+  --paper-dark: #ede7d9;
+  --ink: #1a1612;
+  --ink-mid: #5c4f3d;
+  --ink-light: #9a8b76;
+  --accent: #c45a3c;
+  --accent-glow: #e8714f;
+  --green: #3a7d5c;
+  --radius: 10px;
+}
+
+html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--ink); color: var(--ink); overflow: hidden; }
+
+/* ─── LANDING ─── */
+#landing {
+  position: fixed; inset: 0; z-index: 1000;
+  background: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+#landing.hidden { opacity: 0; pointer-events: none; transform: scale(1.02); }
+
+#landing::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(196,90,60,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 30%, rgba(58,125,92,0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.landing-inner {
+  position: relative; width: 100%; max-width: 480px; padding: 2rem;
+  text-align: center;
+}
+
+.compass {
+  width: 64px; height: 64px; margin: 0 auto 1rem;
+  position: relative;
+}
+.compass svg { width: 100%; height: 100%; }
+
+.brand {
+  font-family: 'Playfair Display', serif;
+  font-size: 3rem; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--ink); margin-bottom: 0.2rem;
+}
+.brand span { color: var(--accent); }
+
+.tagline {
+  font-size: 0.95rem; color: var(--ink-light);
+  margin-bottom: 2.2rem; font-style: italic;
+  font-family: 'Playfair Display', serif;
+}
+
+.search-wrap {
+  display: flex; gap: 0.5rem;
+}
+.search-wrap input {
+  flex: 1; padding: 0.8rem 1rem;
+  border: 1.5px solid var(--paper-dark);
+  border-radius: var(--radius);
+  background: #fff; font-size: 1rem;
+  font-family: inherit; color: var(--ink);
+  outline: none; transition: border-color 0.2s;
+}
+.search-wrap input:focus { border-color: var(--accent); }
+.search-wrap input::placeholder { color: var(--ink-light); }
+
+.btn-go {
+  padding: 0.8rem 1.6rem;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: var(--radius);
+  font-size: 0.95rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn-go:hover { background: var(--accent-glow); }
+.btn-go:active { transform: scale(0.985); }
+.btn-go:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.features {
+  margin-top: 2rem;
+  display: flex; gap: 1.5rem; justify-content: center;
+  font-size: 0.78rem; color: var(--ink-light);
+}
+.features div { display: flex; align-items: center; gap: 0.35rem; }
+.features svg { width: 16px; height: 16px; stroke: var(--accent); fill: none; stroke-width: 2; }
+
+.error-msg {
+  margin-top: 0.75rem; font-size: 0.82rem;
+  color: var(--accent); min-height: 1.2em;
+}
+
+/* ─── LOADING OVERLAY ─── */
+#loading-overlay {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(247,243,235,0.96);
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 1rem;
+}
+#loading-overlay.show { display: flex; }
+
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--paper-dark);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem; color: var(--ink-mid);
+  font-style: italic;
+  transition: opacity 0.3s;
+}
+
+/* ─── MAP VIEW ─── */
+#app { display: none; height: 100vh; position: relative; }
+#app.show { display: block; }
+
+#map { width: 100%; height: 100%; z-index: 1; }
+
+/* remove leaflet link clutter */
+.leaflet-control-attribution { font-size: 10px !important; opacity: 0.7; }
+
+/* top bar */
+.top-bar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 800;
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  background: linear-gradient(to bottom, rgba(247,243,235,0.97) 60%, transparent);
+  pointer-events: none;
+}
+.top-bar > * { pointer-events: auto; }
+
+.top-brand {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem; font-weight: 700;
+  color: var(--ink); white-space: nowrap;
+}
+.top-brand span { color: var(--accent); }
+
+.city-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.95rem; color: var(--ink-mid);
+  font-style: italic; flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-align: center;
+}
+
+.top-stats {
+  font-size: 0.72rem; color: var(--ink-light);
+  white-space: nowrap;
+}
+.top-stats strong { color: var(--ink-mid); font-weight: 600; }
+
+.btn-new {
+  padding: 0.4rem 0.8rem;
+  background: var(--ink); color: var(--paper);
+  border: none; border-radius: 6px;
+  font-size: 0.72rem; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+  white-space: nowrap; transition: background 0.2s;
+}
+.btn-new:hover { background: var(--ink-mid); }
+
+/* sidebar */
+#sidebar {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 900;
+  width: 380px; max-width: 88vw;
+  background: var(--paper);
+  box-shadow: -4px 0 32px rgba(26,22,18,0.15);
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+#sidebar.open { transform: translateX(0); }
+
+.sidebar-header {
+  padding: 1.1rem 1.2rem 0.8rem;
+  border-bottom: 1px solid var(--paper-dark);
+  display: flex; align-items: flex-start; gap: 0.75rem;
+}
+.sidebar-number {
+  width: 32px; height: 32px; flex-shrink: 0;
+  background: var(--accent); color: #fff;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.85rem; margin-top: 2px;
+}
+.sidebar-header-text { flex: 1; }
+.sidebar-header h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem; font-weight: 700;
+  color: var(--ink); line-height: 1.2;
+}
+.sidebar-type {
+  font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--ink-light);
+  font-weight: 600; margin-top: 0.15rem;
+}
+
+.btn-close {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: none; background: var(--paper-dark);
+  border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s; margin-top: 2px;
+}
+.btn-close:hover { background: #ddd5c7; }
+.btn-close svg { width: 14px; height: 14px; stroke: var(--ink-mid); stroke-width: 2.5; }
+
+.sidebar-body {
+  flex: 1; overflow-y: auto; padding: 1.2rem;
+}
+
+.fact-section { margin-bottom: 1.4rem; }
+.fact-section h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.85rem; font-weight: 700; color: var(--accent);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--paper-dark);
+}
+.fact-section p {
+  font-size: 0.88rem; line-height: 1.6; color: var(--ink-mid);
+}
+.fact-section .wiki-link {
+  display: inline-block; margin-top: 0.5rem;
+  font-size: 0.78rem; color: var(--accent);
+  text-decoration: none; font-weight: 500;
+}
+.fact-section .wiki-link:hover { text-decoration: underline; }
+
+.fact-tags {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem;
+}
+.fact-tag {
+  padding: 0.2rem 0.6rem;
+  background: var(--paper-dark); border-radius: 20px;
+  font-size: 0.72rem; color: var(--ink-mid); font-weight: 500;
+}
+
+/* stop list at bottom of sidebar */
+.stop-list {
+  border-top: 1px solid var(--paper-dark);
+  padding: 0.8rem 1.2rem;
+  max-height: 200px; overflow-y: auto;
+}
+.stop-list h4 {
+  font-size: 0.7rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--ink-light);
+  font-weight: 600; margin-bottom: 0.5rem;
+}
+.stop-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0; cursor: pointer;
+  transition: color 0.15s;
+}
+.stop-item:hover { color: var(--accent); }
+.stop-item .num {
+  width: 22px; height: 22px; flex-shrink: 0;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 700;
+  background: var(--paper-dark); color: var(--ink-mid);
+}
+.stop-item.active .num { background: var(--accent); color: #fff; }
+.stop-item .stop-name {
+  font-size: 0.8rem; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+/* custom marker */
+.marker-icon {
+  width: 30px; height: 30px; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.marker-dot {
+  width: 28px; height: 28px;
+  background: var(--accent); color: #fff;
+  border-radius: 50%; border: 2.5px solid #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* tier colors */
+.marker-dot.tier-must { background: #d4a017; border-color: #fff; }
+.marker-dot.tier-great { background: var(--accent); border-color: #fff; }
+.marker-dot.tier-gem { background: var(--ink-light); border-color: #fff; }
+
+.tier-badge {
+  display: inline-block; padding: 0.15rem 0.55rem;
+  border-radius: 20px; font-size: 0.65rem;
+  font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; vertical-align: middle;
+}
+.tier-badge.must { background: #d4a017; color: #fff; }
+.tier-badge.great { background: var(--accent); color: #fff; }
+.tier-badge.gem { background: var(--paper-dark); color: var(--ink-mid); }
+
+.stop-item .tier-pip {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.stop-item .tier-pip.must { background: #d4a017; }
+.stop-item .tier-pip.great { background: var(--accent); }
+.stop-item .tier-pip.gem { background: var(--ink-light); }
+
+.tier-group-label {
+  font-size: 0.68rem; text-transform: uppercase;
+  letter-spacing: 0.08em; font-weight: 700;
+  margin-top: 0.6rem; margin-bottom: 0.3rem;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.tier-group-label .tg-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.tier-group-label.must { color: #d4a017; }
+.tier-group-label.must .tg-dot { background: #d4a017; }
+.tier-group-label.great { color: var(--accent); }
+.tier-group-label.great .tg-dot { background: var(--accent); }
+.tier-group-label.gem { color: var(--ink-light); }
+.tier-group-label.gem .tg-dot { background: var(--ink-light); }
+
+/* ─── CATEGORY CHIPS ─── */
+.category-chips {
+  display: flex; flex-wrap: wrap; gap: 0.45rem;
+  justify-content: center; margin-bottom: 1.5rem;
+}
+.cat-chip {
+  padding: 0.4rem 0.9rem;
+  border: 1.5px solid var(--paper-dark);
+  border-radius: 20px; background: #fff;
+  font-size: 0.78rem; font-weight: 600; font-family: inherit;
+  color: var(--ink-light); cursor: pointer;
+  transition: all 0.2s; user-select: none;
+  display: flex; align-items: center; gap: 0.35rem;
+}
+.cat-chip.active {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(196,90,60,0.06);
+}
+.cat-chip:hover:not(.active) { border-color: var(--ink-light); color: var(--ink-mid); }
+.cat-chip .chip-icon { font-size: 0.9rem; }
+
+/* ─── ARCHITECTURE STYLE COLORS ─── */
+.marker-dot.style-gothic { background: #3b82f6; }
+.marker-dot.style-baroque { background: #f59e0b; }
+.marker-dot.style-renaissance { background: #10b981; }
+.marker-dot.style-art-nouveau { background: #8b5cf6; }
+.marker-dot.style-neoclassical { background: #06b6d4; }
+.marker-dot.style-romanesque { background: #92400e; }
+.marker-dot.style-modern { background: #6b7280; }
+.marker-dot.style-other { background: #d4a373; }
+
+.style-badge {
+  display: inline-block; padding: 0.15rem 0.55rem;
+  border-radius: 20px; font-size: 0.65rem;
+  font-weight: 700; letter-spacing: 0.04em;
+  color: #fff; vertical-align: middle;
+}
+
+/* legend on map */
+.map-legend {
+  position: absolute; bottom: 2rem; left: 0.75rem; z-index: 800;
+  background: rgba(247,243,235,0.94); border-radius: 8px;
+  padding: 0.55rem 0.75rem; font-size: 0.7rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  display: flex; flex-direction: column; gap: 0.3rem;
+}
+.map-legend .leg-row { display: flex; align-items: center; gap: 0.4rem; }
+.map-legend .leg-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 1.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* ─── RESEARCH & MY PLACES PANEL ─── */
+.fab-row {
+  position: absolute; bottom: 1.2rem; right: 1rem; z-index: 800;
+  display: flex; gap: 0.5rem;
+}
+.fab-btn {
+  padding: 0.55rem 1rem;
+  background: var(--ink); color: var(--paper);
+  border: none; border-radius: 8px;
+  font-size: 0.78rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; display: flex; align-items: center; gap: 0.4rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  transition: background 0.2s, transform 0.1s;
+}
+.fab-btn:hover { background: var(--ink-mid); }
+.fab-btn:active { transform: scale(0.97); }
+.fab-btn .fab-icon { font-size: 1rem; }
+
+.panel-overlay {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 950;
+  width: 380px; max-width: 92vw;
+  background: var(--paper);
+  box-shadow: -4px 0 32px rgba(26,22,18,0.15);
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.panel-overlay.open { transform: translateX(0); }
+
+.panel-header {
+  padding: 1rem 1.2rem 0.8rem;
+  border-bottom: 1px solid var(--paper-dark);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.panel-header h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.15rem; font-weight: 700; color: var(--ink);
+}
+.panel-body {
+  flex: 1; overflow-y: auto; padding: 1rem 1.2rem;
+}
+
+.research-category {
+  margin-bottom: 1.2rem;
+}
+.research-category h3 {
+  font-size: 0.78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--ink-mid); margin-bottom: 0.5rem;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.research-category h3 .rc-icon { font-size: 1rem; }
+.research-link {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 0.75rem; margin-bottom: 0.35rem;
+  background: #fff; border: 1px solid var(--paper-dark);
+  border-radius: 8px; text-decoration: none;
+  color: var(--ink); font-size: 0.82rem; font-weight: 500;
+  transition: border-color 0.2s, background 0.2s;
+}
+.research-link:hover { border-color: var(--accent); background: rgba(196,90,60,0.03); }
+.research-link .rl-source {
+  font-size: 0.68rem; color: var(--ink-light);
+  margin-left: auto; white-space: nowrap;
+}
+
+/* ─── MY PLACES ─── */
+.my-places-empty {
+  text-align: center; padding: 2rem 1rem;
+  color: var(--ink-light); font-size: 0.85rem;
+}
+.add-place-form {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  margin-bottom: 1rem; padding-bottom: 1rem;
+  border-bottom: 1px solid var(--paper-dark);
+}
+.add-place-form input, .add-place-form select, .add-place-form textarea {
+  padding: 0.55rem 0.75rem;
+  border: 1.5px solid var(--paper-dark);
+  border-radius: 8px; font-family: inherit; font-size: 0.85rem;
+  color: var(--ink); background: #fff; outline: none;
+  transition: border-color 0.2s;
+}
+.add-place-form input:focus, .add-place-form select:focus, .add-place-form textarea:focus {
+  border-color: var(--accent);
+}
+.add-place-form textarea { resize: vertical; min-height: 50px; }
+.btn-add-place {
+  padding: 0.55rem; background: var(--accent); color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: background 0.2s;
+}
+.btn-add-place:hover { background: var(--accent-glow); }
+
+.saved-place {
+  display: flex; align-items: flex-start; gap: 0.6rem;
+  padding: 0.6rem 0; border-bottom: 1px solid var(--paper-dark);
+}
+.saved-place:last-child { border-bottom: none; }
+.saved-place-info { flex: 1; }
+.saved-place-name {
+  font-size: 0.88rem; font-weight: 600; color: var(--ink);
+}
+.saved-place-cat {
+  font-size: 0.68rem; color: var(--ink-light);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.saved-place-notes {
+  font-size: 0.78rem; color: var(--ink-mid); margin-top: 0.2rem;
+}
+.saved-place-actions {
+  display: flex; gap: 0.3rem; flex-shrink: 0;
+}
+.saved-place-actions button {
+  width: 28px; height: 28px; border: none;
+  background: var(--paper-dark); border-radius: 6px;
+  cursor: pointer; font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.saved-place-actions button:hover { background: #ddd5c7; }
+
+.btn-route {
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  width: 100%; padding: 0.7rem;
+  background: var(--green); color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 0.88rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; margin-top: 1rem;
+  transition: background 0.2s;
+}
+.btn-route:hover { background: #2e6a4a; }
+.btn-route:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* responsive */
+@media (max-width: 600px) {
+  .brand { font-size: 2.2rem; }
+  .search-wrap { flex-direction: column; }
+  .btn-go { width: 100%; }
+  .features { flex-direction: column; align-items: center; gap: 0.5rem; }
+  #sidebar { width: 100%; max-width: 100%; }
+  .panel-overlay { width: 100%; max-width: 100%; }
+  .top-stats { display: none; }
+  .fab-row { bottom: 0.7rem; right: 0.5rem; }
+  .fab-btn { padding: 0.45rem 0.7rem; font-size: 0.72rem; }
+  .category-chips { gap: 0.35rem; }
+  .cat-chip { padding: 0.35rem 0.7rem; font-size: 0.72rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── LANDING ─── -->
+<div id="landing">
+  <div class="landing-inner">
+    <div class="compass">
+      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="32" cy="32" r="30" stroke="#ede7d9" stroke-width="2"/>
+        <circle cx="32" cy="32" r="24" stroke="#ede7d9" stroke-width="1"/>
+        <polygon points="32,8 36,28 32,24 28,28" fill="#c45a3c"/>
+        <polygon points="32,56 28,36 32,40 36,36" fill="#9a8b76"/>
+        <circle cx="32" cy="32" r="3" fill="#1a1612"/>
+      </svg>
+    </div>
+    <h1 class="brand">Wander<span>log</span></h1>
+    <p class="tagline">Your travel research, all in one place</p>
+    <div class="category-chips" id="category-chips">
+      <button class="cat-chip active" data-cat="walking" onclick="toggleCat(this)"><span class="chip-icon">🚶</span> Walking</button>
+      <button class="cat-chip active" data-cat="architecture" onclick="toggleCat(this)"><span class="chip-icon">🏛</span> Architecture</button>
+      <button class="cat-chip" data-cat="obscura" onclick="toggleCat(this)"><span class="chip-icon">🗿</span> Atlas Obscura</button>
+      <button class="cat-chip" data-cat="beer" onclick="toggleCat(this)"><span class="chip-icon">🍺</span> Craft Beer</button>
+      <button class="cat-chip" data-cat="coffee" onclick="toggleCat(this)"><span class="chip-icon">☕</span> Specialty Coffee</button>
+    </div>
+    <div class="search-wrap">
+      <input type="text" id="city-input" placeholder="Type a city — Rome, Tokyo, Prague..." autofocus />
+      <button class="btn-go" id="btn-generate" onclick="generate()">Explore</button>
+    </div>
+    <p class="error-msg" id="error-msg"></p>
+    <div class="features">
+      <div>
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+        Notable places
+      </div>
+      <div>
+        <svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.5 5v9h2v-5h2v5h2v-9c0-1.1-.9-2-2-2h-2c-1.1 0-2 .9-2 2z"/></svg>
+        Walk everywhere
+      </div>
+      <div>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Auto-ranked stops
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── LOADING ─── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">Finding landmarks...</div>
+</div>
+
+<!-- ─── MAP APP ─── -->
+<div id="app">
+  <div class="top-bar">
+    <div class="top-brand">W<span>.</span></div>
+    <div class="city-title" id="city-label"></div>
+    <div class="top-stats" id="top-stats"></div>
+    <button class="btn-new" onclick="reset()">New city</button>
+  </div>
+  <div id="map"></div>
+  <div class="map-legend" id="map-legend" style="display:none;"></div>
+  <!-- FAB buttons -->
+  <div class="fab-row" id="fab-row">
+    <button class="fab-btn" onclick="openPanel('research')"><span class="fab-icon">🔍</span> Research</button>
+    <button class="fab-btn" onclick="openPanel('places')"><span class="fab-icon">📌</span> My Places <span id="places-count"></span></button>
+  </div>
+
+  <!-- Research panel -->
+  <div class="panel-overlay" id="panel-research">
+    <div class="panel-header">
+      <h2>Research Links</h2>
+      <button class="btn-close" onclick="closePanel('research')">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="panel-body" id="research-body"></div>
+  </div>
+
+  <!-- My Places panel -->
+  <div class="panel-overlay" id="panel-places">
+    <div class="panel-header">
+      <h2>My Places</h2>
+      <button class="btn-close" onclick="closePanel('places')">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="panel-body" id="places-body"></div>
+  </div>
+
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-number" id="sb-number">1</div>
+      <div class="sidebar-header-text">
+        <h2 id="sb-title">Place</h2>
+        <div class="sidebar-type" id="sb-type">Landmark</div>
+      </div>
+      <button class="btn-close" onclick="closeSidebar()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sidebar-body" id="sb-body"></div>
+    <div class="stop-list" id="stop-list"></div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───
+let map, routeLayer, markersLayer;
+let stops = [];
+let currentStop = -1;
+let cityIntro = null;
+let activeCategories = new Set(['walking', 'architecture']);
+
+const $ = id => document.getElementById(id);
+
+// ─── ARCHITECTURE MODE ───
+const STYLE_COLORS = {
+  gothic:        { color: '#3b82f6', label: 'Gothic' },
+  baroque:       { color: '#f59e0b', label: 'Baroque' },
+  renaissance:   { color: '#10b981', label: 'Renaissance' },
+  'art nouveau': { color: '#8b5cf6', label: 'Art Nouveau' },
+  neoclassical:  { color: '#06b6d4', label: 'Neoclassical' },
+  romanesque:    { color: '#92400e', label: 'Romanesque' },
+  modern:        { color: '#6b7280', label: 'Modern' },
+  other:         { color: '#d4a373', label: 'Other' },
+};
+
+const STYLE_ALIASES = {
+  'catalan modernism': 'art nouveau', 'art nouveau': 'art nouveau', 'modernisme': 'art nouveau',
+  'jugendstil': 'art nouveau', 'sezessionsstil': 'art nouveau', 'liberty style': 'art nouveau',
+  'gothic': 'gothic', 'gothic architecture': 'gothic', 'gothic revival': 'gothic',
+  'catalan gothic': 'gothic', 'gothic art': 'gothic', 'english gothic': 'gothic',
+  'french gothic architecture': 'gothic', 'rayonnant': 'gothic', 'flamboyant': 'gothic',
+  'baroque': 'baroque', 'baroque architecture': 'baroque', 'late baroque': 'baroque',
+  'sicilian baroque': 'baroque', 'rococo': 'baroque', 'churrigueresque': 'baroque',
+  'renaissance': 'renaissance', 'renaissance architecture': 'renaissance',
+  'italian renaissance': 'renaissance', 'high renaissance': 'renaissance',
+  'neoclassical': 'neoclassical', 'neoclassical architecture': 'neoclassical',
+  'classicism': 'neoclassical', 'greek revival': 'neoclassical', 'palladian': 'neoclassical',
+  'romanesque': 'romanesque', 'romanesque architecture': 'romanesque',
+  'romanesque revival': 'romanesque', 'neo-romanesque': 'romanesque',
+  'modern': 'modern', 'modern architecture': 'modern', 'modernism': 'modern',
+  'international style': 'modern', 'brutalism': 'modern', 'brutalist architecture': 'modern',
+  'functionalism': 'modern', 'constructivism': 'modern', 'deconstructivism': 'modern',
+  'art deco': 'modern', 'postmodern architecture': 'modern',
+};
+
+function normalizeStyle(rawStyle) {
+  if (!rawStyle) return null;
+  const lc = rawStyle.toLowerCase().trim();
+  if (STYLE_ALIASES[lc]) return STYLE_ALIASES[lc];
+  // Partial matching for compound names
+  for (const [alias, norm] of Object.entries(STYLE_ALIASES)) {
+    if (lc.includes(alias) || alias.includes(lc)) return norm;
+  }
+  return 'other';
+}
+
+function toggleCat(btn) {
+  const cat = btn.dataset.cat;
+  if (activeCategories.has(cat)) {
+    // Must keep at least one of walking/architecture
+    if ((cat === 'walking' || cat === 'architecture') &&
+        !activeCategories.has(cat === 'walking' ? 'architecture' : 'walking')) return;
+    activeCategories.delete(cat);
+    btn.classList.remove('active');
+  } else {
+    activeCategories.add(cat);
+    btn.classList.add('active');
+  }
+}
+
+async function queryWikidataArchitecture(wikidataId) {
+  return sparqlQuery(`SELECT DISTINCT ?item ?itemLabel ?lat ?lon ?sitelinks ?instanceLabel WHERE {
+  ?item wdt:P131+ wd:${wikidataId} .
+  ?item wdt:P625 ?coord .
+  BIND(geof:latitude(?coord) AS ?lat)
+  BIND(geof:longitude(?coord) AS ?lon)
+  ?item wdt:P31 ?instance .
+  ?item wikibase:sitelinks ?sitelinks .
+  FILTER EXISTS { ?item wdt:P149 [] }
+  FILTER(?sitelinks > 0)
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,${LANG}". }
+} ORDER BY DESC(?sitelinks) LIMIT 150`);
+}
+
+async function queryWikidataArchitectureGeo(lat, lon) {
+  return sparqlQuery(`SELECT DISTINCT ?item ?itemLabel ?lat ?lon ?sitelinks ?instanceLabel WHERE {
+  SERVICE wikibase:around {
+    ?item wdt:P625 ?loc .
+    bd:serviceParam wikibase:center "Point(${lon} ${lat})"^^geo:wktLiteral .
+    bd:serviceParam wikibase:radius "7" .
+  }
+  ?item wdt:P625 ?loc .
+  BIND(geof:latitude(?loc) AS ?lat)
+  BIND(geof:longitude(?loc) AS ?lon)
+  ?item wdt:P31 ?instance .
+  ?item wikibase:sitelinks ?sitelinks .
+  FILTER EXISTS { ?item wdt:P149 [] }
+  FILTER(?sitelinks > 0)
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,${LANG}". }
+} ORDER BY DESC(?sitelinks) LIMIT 150`);
+}
+
+async function fetchArchitecturePOIs(geo) {
+  if (!geo.wikidata) throw new Error('Could not identify this city. Try a more specific name.');
+
+  let results = await queryWikidataArchitecture(geo.wikidata);
+
+  if (results.length < 10) {
+    const parentId = await findParentEntity(geo.wikidata);
+    if (parentId) {
+      const parentResults = await queryWikidataArchitecture(parentId);
+      if (parentResults.length > results.length) results = parentResults;
+    }
+  }
+
+  if (results.length < 5) {
+    const geoResults = await queryWikidataArchitectureGeo(geo.lat, geo.lon);
+    if (geoResults.length > results.length) results = geoResults;
+  }
+
+  const seen = new Set();
+  const pois = [];
+
+  for (const r of results) {
+    const name = r.itemLabel?.value;
+    if (!name || name.startsWith('Q')) continue;
+    const key = name.toLowerCase().replace(/\s+/g, '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const wdId = r.item?.value?.split('/').pop() || null;
+    const instanceType = r.instanceLabel?.value || '';
+
+    pois.push({
+      name,
+      lat: +r.lat.value,
+      lon: +r.lon.value,
+      type: categorizeWikidata(instanceType),
+      tags: {},
+      wiki: null,
+      wikidata: wdId,
+      sitelinks: +r.sitelinks.value,
+      summary: null,
+      thumb: null,
+    });
+  }
+
+  // Enrich with Wikidata properties (needed for style resolution)
+  await fetchWikidataProperties(pois);
+
+  // Resolve and assign normalized style
+  for (const poi of pois) {
+    const rawStyle = poi.facts?.style;
+    poi.archStyle = normalizeStyle(rawStyle);
+  }
+
+  // Filter to those with a resolved known style (drop "other" if we have enough known styles)
+  const withKnownStyle = pois.filter(p => p.archStyle && p.archStyle !== 'other');
+  const withAnyStyle = pois.filter(p => p.archStyle);
+
+  return withKnownStyle.length >= 10 ? withKnownStyle : withAnyStyle;
+}
+
+function scoreArchitecturePOIs(pois, geo) {
+  for (const poi of pois) {
+    let score = 0;
+    const f = poi.facts || {};
+
+    // Architect known
+    if (f.architect && !f.architect.startsWith('Q')) score += 20;
+    // Heritage designation
+    if (f.heritage) score += 25;
+    // Built date known
+    if (f.built) score += 10;
+    // Height known
+    if (f.height) score += 5;
+
+    // Sitelinks (fame)
+    const sl = poi.sitelinks || 0;
+    if (sl > 60) score += 40;
+    else if (sl > 30) score += 28;
+    else if (sl > 15) score += 18;
+    else if (sl > 8) score += 10;
+    else if (sl > 3) score += 5;
+
+    // Summary richness
+    if (poi.summary) score += Math.min(poi.summary.length / 40, 15);
+    if (poi.thumb) score += 8;
+
+    // Distance from center
+    if (geo) {
+      const dist = haversine(geo.lat, geo.lon, poi.lat, poi.lon);
+      if (dist <= 1500) score += 12;
+      else if (dist <= 3000) score += 4;
+    }
+
+    poi.score = score;
+  }
+}
+
+function styleColorClass(archStyle) {
+  return 'style-' + (archStyle || 'other').replace(/\s+/g, '-');
+}
+
+function styleColor(archStyle) {
+  return STYLE_COLORS[archStyle]?.color || STYLE_COLORS.other.color;
+}
+
+function buildArchitectureLegend() {
+  const present = new Set(stops.map(s => s.archStyle).filter(Boolean));
+  let html = '';
+  for (const [key, val] of Object.entries(STYLE_COLORS)) {
+    if (!present.has(key)) continue;
+    html += `<div class="leg-row"><div class="leg-dot" style="background:${val.color};"></div> ${val.label}</div>`;
+  }
+  $('map-legend').innerHTML = html;
+}
+
+function buildArchitectureStopList() {
+  // Group by style, largest group first
+  const groups = {};
+  stops.forEach((s, i) => {
+    const style = s.archStyle || 'other';
+    if (!groups[style]) groups[style] = [];
+    groups[style].push({ ...s, idx: i });
+  });
+
+  const sortedKeys = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
+
+  let html = '';
+  for (const style of sortedKeys) {
+    const sc = STYLE_COLORS[style] || STYLE_COLORS.other;
+    html += `<div class="tier-group-label" style="color:${sc.color}"><div class="tg-dot" style="background:${sc.color}"></div>${sc.label} (${groups[style].length})</div>`;
+    for (const s of groups[style]) {
+      html += `<div class="stop-item" onclick="openSidebar(${s.idx})">
+        <div class="num" style="background:${sc.color};color:#fff;">${s.idx + 1}</div>
+        <div class="stop-name">${s.name}</div>
+      </div>`;
+    }
+  }
+  $('stop-list').innerHTML = html;
+}
+
+// ─── GENERATE TOUR ───
+async function generate() {
+  const city = $('city-input').value.trim();
+  if (!city) { $('error-msg').textContent = 'Please enter a city name.'; return; }
+  $('error-msg').textContent = '';
+  $('btn-generate').disabled = true;
+  $('loading-overlay').classList.add('show');
+  setLoading('Locating ' + city + '...');
+
+  try {
+    // 1) Geocode city
+    const geo = await geocode(city);
+    if (!geo) throw new Error('Could not find that city. Try a different spelling.');
+
+    const wantArch = activeCategories.has('architecture');
+    const wantWalk = activeCategories.has('walking');
+
+    setLoading('Searching for places...');
+
+    // 2) Fetch POIs — merge landmarks + architecture if both selected
+    let pois = [];
+    if (wantWalk) {
+      const landmarkPois = await fetchPOIs(geo);
+      pois.push(...landmarkPois);
+    }
+    if (wantArch) {
+      try {
+        const archPois = await fetchArchitecturePOIs(geo);
+        // Merge, dedup by name
+        const existingNames = new Set(pois.map(p => p.name.toLowerCase().replace(/\s+/g, '')));
+        for (const ap of archPois) {
+          const key = ap.name.toLowerCase().replace(/\s+/g, '');
+          if (!existingNames.has(key)) {
+            pois.push(ap);
+            existingNames.add(key);
+          }
+        }
+      } catch { /* architecture query failed, continue with landmarks */ }
+    }
+    if (pois.length < 2) throw new Error('Not enough places found. Try a larger or more well-known city.');
+
+    setLoading('Loading fun facts...');
+
+    // 3) Fetch enrichment in parallel: Wikipedia hooks + Wikivoyage city intro
+    const cityName = geo.display.split(',')[0].trim();
+    currentCity = cityName;
+    const [, wikivoyageIntro] = await Promise.all([
+      fetchWikiSummaries(pois, false),
+      fetchWikivoyageIntro(cityName),
+    ]);
+
+    setLoading('Ranking attractions...');
+
+    // 4) Score all POIs — use architecture scorer for those with style, landmark scorer for rest
+    for (const poi of pois) {
+      if (poi.archStyle && poi.archStyle !== 'other') {
+        scoreArchitecturePOIs([poi], geo);
+      } else {
+        scorePOIs([poi], geo);
+      }
+    }
+
+    // 5) Take top N by score
+    const topN = 20;
+    pois.sort((a, b) => b.score - a.score);
+    let selected = pois.slice(0, topN);
+    if (selected.length < 2) throw new Error('Not enough landmarks found.');
+
+    // 7) Optimize walk path
+    const walked = nearestNeighborSort(selected);
+
+    // 8) Fetch walking route from OSRM
+    setLoading('Planning walking route...');
+    const route = await fetchRoute(walked);
+
+    // 8) Store city intro for sidebar
+    cityIntro = wikivoyageIntro;
+
+
+    // 9) Render — show app BEFORE fitBounds so Leaflet can measure the container
+    stops = walked;
+    $('loading-overlay').classList.remove('show');
+    $('landing').classList.add('hidden');
+    $('app').classList.add('show');
+
+    renderMap(geo, stops, route);
+
+    $('city-label').textContent = geo.display;
+    updatePlacesCount();
+    if (route) {
+      const km = (route.distance / 1000).toFixed(1);
+      // Walking ~5km/h + ~3 min per stop for looking around
+      const walkMins = Math.round((route.distance / 1000) / 5 * 60) + stops.length * 3;
+      const hrs = Math.floor(walkMins / 60);
+      const rmins = walkMins % 60;
+      const timeStr = hrs > 0 ? `${hrs}h ${rmins}m` : `${walkMins} min`;
+      const mustCount = stops.filter(s => s.tier === 'must').length;
+      const styleCount = new Set(stops.map(s => s.archStyle).filter(s => s && s !== 'other')).size;
+      let statsHtml = `<strong>${km} km</strong> · ~${timeStr} · <strong>${stops.length}</strong> stops`;
+      if (mustCount) statsHtml += ` · <strong style="color:#d4a017">${mustCount} must-see</strong>`;
+      if (styleCount > 1) statsHtml += ` · <strong style="color:#8b5cf6">${styleCount} styles</strong>`;
+      $('top-stats').innerHTML = statsHtml;
+    }
+
+  } catch (e) {
+    $('loading-overlay').classList.remove('show');
+    $('error-msg').textContent = e.message;
+    $('btn-generate').disabled = false;
+  }
+}
+
+function setLoading(txt) { $('loading-text').textContent = txt; }
+
+// ─── GEOCODE (Nominatim) ───
+async function geocode(city) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=1&addressdetails=1&extratags=1`;
+  const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+  const data = await res.json();
+  if (!data.length) return null;
+  const d = data[0];
+  return {
+    lat: +d.lat, lon: +d.lon,
+    display: d.display_name.split(',').slice(0, 2).join(', '),
+    wikidata: d.extratags?.wikidata || null,
+  };
+}
+
+// ─── WIKIDATA HELPERS ───
+const SPARQL_URL = 'https://query.wikidata.org/sparql';
+const SKIP_TYPES = [
+  'wd:Q5',       // human
+  'wd:Q515',     // city
+  'wd:Q15284',   // municipality
+  'wd:Q928830',  // metro area
+  'wd:Q476028',  // neighborhood
+  'wd:Q847017',  // sports club
+  'wd:Q1187580', // district
+  'wd:Q54128',   // religious order
+  'wd:Q9842',    // primary school
+  'wd:Q5503',    // rapid transit (metro systems)
+  'wd:Q55488',   // railway station
+];
+const LANG = navigator.language?.split('-')[0] || 'en';
+
+async function sparqlQuery(query) {
+  const res = await fetch(SPARQL_URL + '?' + new URLSearchParams({ query, format: 'json' }), {
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.results?.bindings || [];
+}
+
+async function queryWikidataPOIs(wikidataId) {
+  return sparqlQuery(`SELECT DISTINCT ?item ?itemLabel ?lat ?lon ?sitelinks ?instanceLabel WHERE {
+  ?item wdt:P131+ wd:${wikidataId} .
+  ?item wdt:P625 ?coord .
+  BIND(geof:latitude(?coord) AS ?lat)
+  BIND(geof:longitude(?coord) AS ?lon)
+  ?item wdt:P31 ?instance .
+  ?item wikibase:sitelinks ?sitelinks .
+  ${SKIP_TYPES.map(t => `FILTER NOT EXISTS { ?item wdt:P31 ${t} }`).join('\n  ')}
+  FILTER(?sitelinks > 2)
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,${LANG}". }
+} ORDER BY DESC(?sitelinks) LIMIT 80`);
+}
+
+async function queryWikidataGeo(lat, lon) {
+  return sparqlQuery(`SELECT DISTINCT ?item ?itemLabel ?lat ?lon ?sitelinks ?instanceLabel WHERE {
+  SERVICE wikibase:around {
+    ?item wdt:P625 ?loc .
+    bd:serviceParam wikibase:center "Point(${lon} ${lat})"^^geo:wktLiteral .
+    bd:serviceParam wikibase:radius "7" .
+  }
+  ?item wdt:P625 ?loc .
+  BIND(geof:latitude(?loc) AS ?lat)
+  BIND(geof:longitude(?loc) AS ?lon)
+  ?item wdt:P31 ?instance .
+  ?item wikibase:sitelinks ?sitelinks .
+  ${SKIP_TYPES.map(t => `FILTER NOT EXISTS { ?item wdt:P31 ${t} }`).join('\n  ')}
+  FILTER(?sitelinks > 2)
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,${LANG}". }
+} ORDER BY DESC(?sitelinks) LIMIT 80`);
+}
+
+async function findParentEntity(wikidataId) {
+  const results = await sparqlQuery(`SELECT ?parent WHERE {
+    wd:${wikidataId} wdt:P131 ?parent .
+  } LIMIT 1`);
+  return results[0]?.parent?.value?.split('/').pop() || null;
+}
+
+// ─── FETCH POIs (Wikidata SPARQL) ───
+async function fetchPOIs(geo) {
+  if (!geo.wikidata) throw new Error('Could not identify this city. Try a more specific name.');
+
+  // Try the Nominatim wikidata ID first; if too few results, find the parent municipality
+  let results = await queryWikidataPOIs(geo.wikidata);
+
+  if (results.length < 10) {
+    // Nominatim sometimes returns a sub-entity (e.g. "city" vs "municipality")
+    // Try the parent administrative entity
+    const parentId = await findParentEntity(geo.wikidata);
+    if (parentId) {
+      const parentResults = await queryWikidataPOIs(parentId);
+      if (parentResults.length > results.length) results = parentResults;
+    }
+  }
+
+  if (results.length < 5) {
+    // Last resort: geo-based search using coordinates
+    const geoResults = await queryWikidataGeo(geo.lat, geo.lon);
+    if (geoResults.length > results.length) results = geoResults;
+  }
+
+  const seen = new Set();
+  const pois = [];
+  // Skip types that aren't worth walking to
+  const skipLabels = ['hospital', 'school', 'hotel', 'hostel', 'motel',
+    'bus station', 'shopping', 'mall', 'airport', 'prison', 'barracks',
+    'kindergarten', 'clinic', 'pharmacy', 'supermarket', 'office',
+    'rapid transit', 'metro system', 'railway station', 'public university',
+    'old town', 'borough', 'district', 'sector', 'ward', 'municipality',
+    'administrative', 'subdivision', 'county',
+    'stadium', 'arena', 'sports venue', 'multi-purpose stadium'];
+
+  for (const r of results) {
+    const name = r.itemLabel?.value;
+    if (!name || name.startsWith('Q')) continue;
+
+    const key = name.toLowerCase().replace(/\s+/g, '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const instanceType = r.instanceLabel?.value || '';
+    const lcType = instanceType.toLowerCase();
+    if (skipLabels.some(s => lcType.includes(s))) continue;
+
+    const wdId = r.item?.value?.split('/').pop() || null;
+
+    pois.push({
+      name,
+      lat: +r.lat.value,
+      lon: +r.lon.value,
+      type: categorizeWikidata(instanceType),
+      tags: {},
+      wiki: null,
+      wikidata: wdId,
+      sitelinks: +r.sitelinks.value,
+      summary: null,
+      thumb: null,
+    });
+  }
+
+  return pois.slice(0, 40);
+}
+
+function categorizeWikidata(instanceLabel) {
+  if (!instanceLabel) return 'Point of Interest';
+  const lc = instanceLabel.toLowerCase();
+  if (lc.includes('church') || lc.includes('cathedral') || lc.includes('basilica')) return 'Church';
+  if (lc.includes('synagogue')) return 'Synagogue';
+  if (lc.includes('mosque')) return 'Mosque';
+  if (lc.includes('temple')) return 'Temple';
+  if (lc.includes('palace')) return 'Palace';
+  if (lc.includes('castle') || lc.includes('fortress') || lc.includes('citadel')) return 'Castle';
+  if (lc.includes('monument') || lc.includes('memorial')) return 'Monument';
+  if (lc.includes('sculpture') || lc.includes('statue')) return 'Monument';
+  if (lc.includes('square') || lc.includes('piazza') || lc.includes('plaza')) return 'Square';
+  if (lc.includes('museum')) return 'Museum';
+  if (lc.includes('park') || lc.includes('garden')) return 'Park';
+  if (lc.includes('bridge')) return 'Bridge';
+  if (lc.includes('tower')) return 'Tower';
+  if (lc.includes('gate')) return 'City Gate';
+  if (lc.includes('theatre') || lc.includes('theater') || lc.includes('opera')) return 'Theatre';
+  if (lc.includes('cemetery')) return 'Cemetery';
+  if (lc.includes('fountain')) return 'Fountain';
+  if (lc.includes('ruin') || lc.includes('archaeological')) return 'Historic Ruins';
+  if (lc.includes('station')) return 'Train Station';
+  if (lc.includes('stadium') || lc.includes('arena') || lc.includes('venue')) return 'Stadium';
+  if (lc.includes('library')) return 'Library';
+  if (lc.includes('city hall') || lc.includes('town hall')) return 'City Hall';
+  if (lc.includes('building') || lc.includes('house') || lc.includes('architectural')) return 'Notable Building';
+  if (lc.includes('forest') || lc.includes('nature') || lc.includes('reserve')) return 'Nature';
+  if (lc.includes('street') || lc.includes('road') || lc.includes('avenue')) return 'Street';
+  return instanceLabel.split(/\s+/).slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// ─── NEAREST NEIGHBOR SORT ───
+function nearestNeighborSort(pois) {
+  if (pois.length <= 2) return [...pois];
+  const remaining = [...pois];
+  const sorted = [remaining.shift()];
+  while (remaining.length) {
+    const last = sorted[sorted.length - 1];
+    let bestIdx = 0, bestDist = Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const d = haversine(last.lat, last.lon, remaining[i].lat, remaining[i].lon);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    sorted.push(remaining.splice(bestIdx, 1)[0]);
+  }
+  return sorted;
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ─── WALKING ROUTE (OSRM) ───
+async function fetchRoute(pois) {
+  if (pois.length < 2) return null;
+  const coords = pois.map(p => `${p.lon},${p.lat}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.code !== 'Ok') return null;
+    return {
+      geometry: data.routes[0].geometry,
+      distance: data.routes[0].distance,
+      duration: data.routes[0].duration,
+    };
+  } catch { return null; }
+}
+
+// ─── ENRICH POIs (Wikidata properties + Wikipedia hook) ───
+async function fetchWikiSummaries(pois, skipProperties) {
+  // 1) Batch-fetch rich Wikidata properties for all POIs (skip if already done)
+  if (!skipProperties) await fetchWikidataProperties(pois);
+
+  // 2) Fetch Wikipedia first-sentence hooks (parallel)
+  const tasks = pois.map(async (poi) => {
+    try {
+      let title = null;
+      if (poi.wikidata) {
+        const wdUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${poi.wikidata}&props=sitelinks&sitefilter=enwiki&format=json&origin=*`;
+        const wdRes = await fetch(wdUrl);
+        const wdData = await wdRes.json();
+        title = wdData.entities?.[poi.wikidata]?.sitelinks?.enwiki?.title || null;
+      }
+      if (!title) return;
+
+      const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Pick the most interesting sentence(s), not the boring first one
+      poi.summary = pickInterestingSentences(data.extract || '', 2);
+      poi.wikiTitle = data.title || title;
+      // Only use Wikipedia thumb if we don't already have a Wikidata image
+      if (!poi.thumb) poi.thumb = data.thumbnail?.source || null;
+    } catch { /* skip */ }
+  });
+
+  await Promise.allSettled(tasks);
+}
+
+// ─── WIKIVOYAGE CITY INTRO ───
+async function fetchWikivoyageIntro(cityName) {
+  try {
+    const url = `https://en.wikivoyage.org/w/api.php?action=query&titles=${encodeURIComponent(cityName)}&prop=extracts&exintro=1&explaintext=1&format=json&origin=*`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const pages = data.query?.pages || {};
+    const page = Object.values(pages)[0];
+    const text = page?.extract || '';
+    if (!text || page?.missing !== undefined) return null;
+    // Pick 2-3 most interesting sentences from the intro
+    return pickInterestingSentences(text, 3);
+  } catch { return null; }
+}
+
+function pickInterestingSentences(text, count) {
+  if (!text) return null;
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.length > 20);
+  if (!sentences.length) return text.slice(0, 200);
+
+  const interestingWords = /\b(first|oldest|largest|tallest|only|unique|famous|legendary|built|destroyed|designed|million|century|world|record|UNESCO|heritage|never|secret|hidden|original|survived|ancient|medieval|remarkable|iconic|celebrated|masterpiece|controversial|mysterious|restored|abandoned|renamed|dedicated|commissioned|inspired|nicknamed|crowned|buried|birthplace)\b/gi;
+
+  const scored = sentences.map((s, i) => {
+    let score = 0;
+    const matches = s.match(interestingWords);
+    if (matches) score += matches.length * 2;
+    if (/\d{3,}/.test(s)) score += 1; // has a year or big number
+    if (i === 0) score -= 3; // penalize first sentence ("X is a Y in Z")
+    if (s.length < 30) score -= 2; // too short
+    return { s, score, i };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  // Take top N interesting sentences, in original order
+  const n = count || 2;
+  const picks = scored.slice(0, n).sort((a, b) => a.i - b.i);
+  const result = picks.map(p => p.s).join(' ');
+
+  // If nothing scored well, just use sentence 2 (skip the boring definition)
+  if (picks[0].score <= 0 && sentences.length > 1) return sentences[1];
+  return result || sentences[0];
+}
+
+// ─── WIKIDATA RICH PROPERTIES ───
+async function fetchWikidataProperties(pois) {
+  const withWD = pois.filter(p => p.wikidata);
+  if (!withWD.length) return;
+
+  // Batch in groups of 50
+  for (let i = 0; i < withWD.length; i += 50) {
+    const batch = withWD.slice(i, i + 50);
+    const ids = batch.map(p => p.wikidata).join('|');
+    try {
+      const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${ids}&props=claims&format=json&origin=*`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      for (const poi of batch) {
+        const entity = data.entities?.[poi.wikidata];
+        if (!entity?.claims) continue;
+        const claims = entity.claims;
+
+        poi.facts = {};
+
+        // P571 — inception (year built)
+        const inception = getClaimYear(claims.P571);
+        if (inception) poi.facts.built = inception;
+
+        // P84 — architect
+        const architect = getClaimEntityLabel(claims.P84);
+        if (architect) poi.facts.architect = architect;
+
+        // P149 — architectural style
+        const style = getClaimEntityLabel(claims.P149);
+        if (style) poi.facts.style = style;
+
+        // P2048 — height
+        const height = getClaimQuantity(claims.P2048);
+        if (height) poi.facts.height = height;
+
+        // P138 — named after
+        const namedAfter = getClaimEntityLabel(claims.P138);
+        if (namedAfter) poi.facts.namedAfter = namedAfter;
+
+        // P1435 — heritage designation
+        const heritage = getClaimEntityLabel(claims.P1435);
+        if (heritage) poi.facts.heritage = heritage;
+
+        // P18 — image from Wikimedia Commons
+        const image = claims.P18?.[0]?.mainsnak?.datavalue?.value;
+        if (image) {
+          const filename = encodeURIComponent(image.replace(/ /g, '_'));
+          const md5 = await getMD5Hash(image.replace(/ /g, '_'));
+          poi.thumb = `https://upload.wikimedia.org/wikipedia/commons/thumb/${md5[0]}/${md5[0]}${md5[1]}/${filename}/400px-${filename}`;
+        }
+
+        // P856 — official website
+        const website = claims.P856?.[0]?.mainsnak?.datavalue?.value;
+        if (website) poi.facts.website = website;
+      }
+    } catch { /* skip batch */ }
+  }
+
+  // Resolve entity labels (architect, style, etc. are Q-IDs, need labels)
+  await resolveEntityLabels(pois);
+}
+
+function getClaimYear(claim) {
+  const time = claim?.[0]?.mainsnak?.datavalue?.value?.time;
+  if (!time) return null;
+  const match = time.match(/([+-]?\d{4})/);
+  return match ? match[1].replace(/^\+0*/, '') : null;
+}
+
+function getClaimEntityLabel(claim) {
+  const id = claim?.[0]?.mainsnak?.datavalue?.value?.id;
+  return id || null;
+}
+
+function getClaimQuantity(claim) {
+  const amount = claim?.[0]?.mainsnak?.datavalue?.value?.amount;
+  if (!amount) return null;
+  const num = parseFloat(amount);
+  return num > 0 ? Math.round(num) + 'm' : null;
+}
+
+// Simple MD5-like hash for Wikimedia Commons image URLs
+async function getMD5Hash(filename) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(filename);
+  const hashBuffer = await crypto.subtle.digest('MD5', data).catch(() => null);
+  if (hashBuffer) {
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  // Fallback: use the Wikimedia API thumb URL pattern without MD5
+  return filename.length >= 2 ? filename[0] + filename[1] : 'aa';
+}
+
+async function resolveEntityLabels(pois) {
+  // Collect all Q-IDs that need labels
+  const qIds = new Set();
+  for (const poi of pois) {
+    if (!poi.facts) continue;
+    for (const val of Object.values(poi.facts)) {
+      if (typeof val === 'string' && val.match(/^Q\d+$/)) qIds.add(val);
+    }
+  }
+  if (!qIds.size) return;
+
+  // Batch resolve labels
+  const ids = [...qIds];
+  for (let i = 0; i < ids.length; i += 50) {
+    const batch = ids.slice(i, i + 50).join('|');
+    try {
+      const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${batch}&props=labels&languages=en&format=json&origin=*`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      const labelMap = {};
+      for (const [id, entity] of Object.entries(data.entities || {})) {
+        labelMap[id] = entity.labels?.en?.value || id;
+      }
+
+      // Replace Q-IDs with labels in facts
+      for (const poi of pois) {
+        if (!poi.facts) continue;
+        for (const [key, val] of Object.entries(poi.facts)) {
+          if (typeof val === 'string' && labelMap[val]) {
+            poi.facts[key] = labelMap[val];
+          }
+        }
+      }
+    } catch { /* skip */ }
+  }
+}
+
+// ─── SCORE & TIER ASSIGNMENT ───
+function scorePOIs(pois, geo) {
+  for (const poi of pois) {
+    let score = 0;
+
+    // Wikipedia summary length (longer = more notable)
+    if (poi.summary) {
+      const len = poi.summary.length;
+      if (len > 800) score += 30;
+      else if (len > 400) score += 20;
+      else if (len > 100) score += 10;
+      else score += 5;
+    }
+
+    // Has thumbnail image
+    if (poi.thumb) score += 10;
+
+    // Wikidata sitelinks (global fame) — primary signal
+    const sl = poi.sitelinks || 0;
+    if (sl > 60) score += 50;
+    else if (sl > 30) score += 35;
+    else if (sl > 15) score += 20;
+    else if (sl > 8) score += 12;
+    else if (sl > 3) score += 6;
+
+    // Type-based bonuses
+    const type = poi.type || '';
+    const walkable = ['Church', 'Cathedral', 'Palace', 'Castle', 'Monument', 'Square',
+      'Park', 'City Gate', 'Historic Ruins', 'Tower', 'Bridge', 'Fountain', 'Theatre',
+      'Museum', 'Synagogue', 'Mosque', 'Temple', 'Street'];
+    if (walkable.includes(type)) score += 10;
+    if (['Castle', 'Palace', 'Cathedral'].includes(type)) score += 5;
+    if (type === 'Street') score += 8; // streets are perfect for walking tours
+
+    // Distance penalty — gentle: nearby spots get a bonus, far ones just don't
+    // A world-famous castle 4km out still beats a random plaque 200m away
+    if (geo) {
+      const dist = haversine(geo.lat, geo.lon, poi.lat, poi.lon);
+      if (dist <= 1500) score += 15;       // walking distance bonus
+      else if (dist <= 3000) score += 5;    // reachable bonus
+      // > 3km: no bonus, but no penalty either — score alone decides
+    }
+
+    poi.score = score;
+  }
+
+  // Assign tiers by score thresholds (don't re-sort — preserve walk order)
+  const scores = pois.map(p => p.score).sort((a, b) => b - a);
+  const mustThreshold = scores[Math.floor(scores.length * 0.3)] || 0;
+  const greatThreshold = scores[Math.floor(scores.length * 0.65)] || 0;
+
+  for (const poi of pois) {
+    if (poi.score >= mustThreshold) {
+      poi.tier = 'must';
+      poi.tierLabel = 'Must See';
+    } else if (poi.score >= greatThreshold) {
+      poi.tier = 'great';
+      poi.tierLabel = 'Worth a Stop';
+    } else {
+      poi.tier = 'gem';
+      poi.tierLabel = 'Hidden Gem';
+    }
+  }
+}
+
+// ─── RENDER MAP ───
+function renderMap(center, stops, route) {
+  if (map) map.remove();
+
+  map = L.map('map', {
+    center: [center.lat, center.lon],
+    zoom: 14,
+    zoomControl: false,
+  });
+
+  L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+  // Tiles — CartoDB Voyager (clean, labeled, free)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(map);
+
+  // Route polyline
+  if (route?.geometry) {
+    routeLayer = L.geoJSON(route.geometry, {
+      style: {
+        color: '#c45a3c',
+        weight: 3,
+        opacity: 0.45,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }
+    }).addTo(map);
+  }
+
+  // Markers — color by architectural style if known, else by tier
+  markersLayer = L.layerGroup().addTo(map);
+  stops.forEach((stop, i) => {
+    const markerClass = (stop.archStyle && stop.archStyle !== 'other')
+      ? styleColorClass(stop.archStyle)
+      : 'tier-' + (stop.tier || 'great');
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="marker-dot ${markerClass}">${i + 1}</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+
+    const marker = L.marker([stop.lat, stop.lon], { icon }).addTo(markersLayer);
+    marker.on('click', () => openSidebar(i));
+    stop._marker = marker;
+  });
+
+  // Fit bounds — invalidateSize first since container just became visible
+  map.invalidateSize();
+  if (stops.length) {
+    const group = L.featureGroup(stops.map(s => s._marker));
+    map.fitBounds(group.getBounds().pad(0.15));
+  }
+
+  // Build stop list — unified
+  buildStopList();
+  // Legend: show tier legend + any architecture style colors present
+  let legendHtml = `
+    <div class="leg-row"><div class="leg-dot" style="background:#d4a017;"></div> Must See</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#c45a3c;"></div> Worth a Stop</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#9a8b76;"></div> Hidden Gem</div>`;
+  const presentStyles = new Set(stops.map(s => s.archStyle).filter(s => s && s !== 'other'));
+  if (presentStyles.size > 0) {
+    legendHtml += `<div style="border-top:1px solid var(--paper-dark);margin:0.3rem 0;"></div>`;
+    for (const [key, val] of Object.entries(STYLE_COLORS)) {
+      if (key === 'other' || !presentStyles.has(key)) continue;
+      legendHtml += `<div class="leg-row"><div class="leg-dot" style="background:${val.color};"></div> ${val.label}</div>`;
+    }
+  }
+  $('map-legend').innerHTML = legendHtml;
+  $('map-legend').style.display = 'flex';
+
+  // Auto-open sidebar with city overview
+  if (cityIntro) showCityOverview();
+}
+
+function showCityOverview() {
+  const cityName = $('city-label').textContent || 'This city';
+  $('sb-number').textContent = '✦';
+  $('sb-number').style.background = 'var(--ink)';
+  $('sb-title').textContent = cityName;
+  $('sb-type').innerHTML = 'City Overview <span class="tier-badge must">Wikivoyage</span>';
+
+  let html = `<div class="fact-section">
+    <p>${cityIntro}</p>
+    <a class="wiki-link" href="https://en.wikivoyage.org/wiki/${encodeURIComponent(cityName.split(',')[0].trim())}" target="_blank" rel="noopener">Read travel guide on Wikivoyage →</a>
+  </div>`;
+  $('sb-body').innerHTML = html;
+  $('sidebar').classList.add('open');
+}
+
+// ─── SIDEBAR ───
+function openSidebar(idx) {
+  currentStop = idx;
+  const stop = stops[idx];
+
+  $('sb-number').textContent = idx + 1;
+  $('sb-number').className = 'sidebar-number';
+  const f = stop.facts || {};
+
+  // Color by style if known, else by tier
+  if (stop.archStyle && stop.archStyle !== 'other') {
+    const sc = styleColor(stop.archStyle);
+    $('sb-number').style.background = sc;
+  } else {
+    $('sb-number').style.background = stop.tier === 'must' ? '#d4a017' : stop.tier === 'great' ? '#c45a3c' : '#9a8b76';
+  }
+  $('sb-title').textContent = stop.name;
+  let typeHtml = stop.type;
+  typeHtml += ' <span class="tier-badge ' + (stop.tier || 'great') + '">' + (stop.tierLabel || 'Attraction') + '</span>';
+  if (stop.archStyle && stop.archStyle !== 'other') {
+    const sc = styleColor(stop.archStyle);
+    const styleLbl = STYLE_COLORS[stop.archStyle]?.label || 'Architecture';
+    typeHtml += ` <span class="style-badge" style="background:${sc}">${styleLbl}</span>`;
+  }
+  $('sb-type').innerHTML = typeHtml;
+
+  let html = '';
+
+  // Image
+  if (stop.thumb) {
+    html += `<img src="${stop.thumb}" alt="" style="width:100%;border-radius:8px;margin-bottom:0.7rem;" onerror="this.style.display='none'" />`;
+  }
+
+  // Quick facts — architecture mode shows style/architect/built prominently
+  // Show architecture details if available, else quick fact tags
+  const hasArchDetails = f.style || f.architect;
+  if (hasArchDetails) {
+    const archFacts = [];
+    if (f.style) archFacts.push({ label: 'Style', value: f.style });
+    if (f.architect) archFacts.push({ label: 'Architect', value: f.architect });
+    if (f.built) archFacts.push({ label: 'Built', value: f.built });
+    if (f.height) archFacts.push({ label: 'Height', value: f.height });
+    if (f.heritage) archFacts.push({ label: 'Heritage', value: f.heritage });
+    if (f.namedAfter) archFacts.push({ label: 'Named after', value: f.namedAfter });
+    html += `<div class="fact-section"><h3>Details</h3>`;
+    html += archFacts.map(af =>
+      `<p style="margin-bottom:0.3rem;"><strong style="color:var(--ink);font-size:0.8rem;">${af.label}:</strong> ${af.value}</p>`
+    ).join('');
+    html += `</div>`;
+  } else {
+    const quickFacts = [];
+    if (f.built) quickFacts.push(`Built ${f.built}`);
+    if (f.height) quickFacts.push(f.height + ' tall');
+    if (f.namedAfter) quickFacts.push('Named after ' + f.namedAfter);
+    if (f.heritage) quickFacts.push(f.heritage);
+    if (quickFacts.length) {
+      html += `<div class="fact-section">
+        <div class="fact-tags">${quickFacts.map(t => `<span class="fact-tag">${t}</span>`).join('')}</div>
+      </div>`;
+    }
+  }
+
+  // Wikipedia one-liner hook
+  if (stop.summary) {
+    html += `<div class="fact-section">
+      <h3>About</h3>
+      <p>${stop.summary}</p>
+      ${stop.wikiTitle ? `<a class="wiki-link" href="https://en.wikipedia.org/wiki/${encodeURIComponent(stop.wikiTitle)}" target="_blank" rel="noopener">Read more on Wikipedia →</a>` : ''}
+    </div>`;
+  }
+
+  // Official website
+  if (f.website) {
+    html += `<div class="fact-section">
+      <a class="wiki-link" href="${f.website}" target="_blank" rel="noopener">Official website →</a>
+    </div>`;
+  }
+
+  // Location + Save
+  html += `<div class="fact-section">
+    <h3>Location</h3>
+    <a class="wiki-link" href="https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lon}&travelmode=walking" target="_blank" rel="noopener">Open in Google Maps →</a>
+    <br><a class="wiki-link" style="cursor:pointer;" onclick="saveStopToPlaces(${idx}); this.textContent='Saved ✓'; this.style.color='var(--green)';">Save to My Places →</a>
+  </div>`;
+
+  $('sb-body').innerHTML = html;
+
+  // Update active state in stop list
+  document.querySelectorAll('.stop-item').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+
+  $('sidebar').classList.add('open');
+
+  // Pan map
+  map.panTo([stop.lat, stop.lon], { animate: true });
+}
+
+function closeSidebar() {
+  $('sidebar').classList.remove('open');
+  currentStop = -1;
+}
+
+function buildStopList() {
+  const tiers = [
+    { key: 'must', label: 'Must See', color: '#d4a017' },
+    { key: 'great', label: 'Worth a Stop', color: '#c45a3c' },
+    { key: 'gem', label: 'Hidden Gem', color: '#9a8b76' },
+  ];
+
+  let html = '';
+  for (const tier of tiers) {
+    const items = stops
+      .map((s, i) => ({ ...s, idx: i }))
+      .filter(s => s.tier === tier.key);
+    if (!items.length) continue;
+
+    html += `<div class="tier-group-label ${tier.key}"><div class="tg-dot"></div>${tier.label}</div>`;
+    for (const s of items) {
+      html += `<div class="stop-item" onclick="openSidebar(${s.idx})">
+        <div class="num" style="background:${tier.color};color:#fff;">${s.idx + 1}</div>
+        <div class="stop-name">${s.name}</div>
+      </div>`;
+    }
+  }
+  $('stop-list').innerHTML = html;
+}
+
+function extractInterestingTags(stop) {
+  const show = [];
+  if (stop.type && stop.type !== 'Point of Interest') show.push(stop.type);
+  if (stop.sitelinks > 10) show.push('Widely known (' + stop.sitelinks + ' languages)');
+  return show;
+}
+
+// ─── RESET ───
+function reset() {
+  $('app').classList.remove('show');
+  $('landing').classList.remove('hidden');
+  $('btn-generate').disabled = false;
+  $('city-input').value = '';
+  $('city-input').focus();
+  closeSidebar();
+  closePanel('research');
+  closePanel('places');
+  $('map-legend').style.display = 'none';
+  $('map-legend').innerHTML = '';
+  stops = [];
+  cityIntro = null;
+  currentCity = '';
+  if (map) { map.remove(); map = null; }
+}
+
+// ─── RESEARCH LINKS ───
+const RESEARCH_LINKS = {
+  coffee: {
+    icon: '☕', label: 'Specialty Coffee',
+    links: city => [
+      { label: 'Google Maps — Specialty Coffee', source: 'Google Maps', url: `https://www.google.com/maps/search/specialty+coffee+${encodeURIComponent(city)}` },
+      { label: 'European Coffee Trip', source: 'europeancoffeetrip.com', url: `https://europeancoffeetrip.com/${city.toLowerCase().replace(/\s+/g, '-')}/` },
+      { label: 'Reddit — Specialty Coffee', source: 'Reddit', url: `https://www.reddit.com/search/?q=${encodeURIComponent(city + ' specialty coffee')}&type=link` },
+    ],
+  },
+  beer: {
+    icon: '🍺', label: 'Craft Beer',
+    links: city => [
+      { label: 'Google Maps — Craft Beer Bars', source: 'Google Maps', url: `https://www.google.com/maps/search/craft+beer+bar+${encodeURIComponent(city)}` },
+      { label: 'Untappd — Nearby', source: 'Untappd', url: `https://untappd.com/search?q=${encodeURIComponent(city)}` },
+      { label: 'Reddit — Craft Beer', source: 'Reddit', url: `https://www.reddit.com/search/?q=${encodeURIComponent(city + ' craft beer bars')}&type=link` },
+    ],
+  },
+  obscura: {
+    icon: '🗿', label: 'Atlas Obscura',
+    links: city => [
+      { label: 'Atlas Obscura — Places', source: 'atlasobscura.com', url: `https://www.atlasobscura.com/search?q=${encodeURIComponent(city)}` },
+      { label: 'Reddit — Hidden Gems', source: 'Reddit', url: `https://www.reddit.com/search/?q=${encodeURIComponent(city + ' hidden gems off the beaten path')}&type=link` },
+      { label: 'Google Maps — Unusual Places', source: 'Google Maps', url: `https://www.google.com/maps/search/unusual+places+${encodeURIComponent(city)}` },
+    ],
+  },
+  architecture: {
+    icon: '🏛', label: 'Architecture',
+    links: city => [
+      { label: 'Reddit — Architecture', source: 'Reddit', url: `https://www.reddit.com/search/?q=${encodeURIComponent(city + ' architecture must see buildings')}&type=link` },
+      { label: 'Google Maps — Architecture', source: 'Google Maps', url: `https://www.google.com/maps/search/architecture+landmark+${encodeURIComponent(city)}` },
+    ],
+  },
+  walking: {
+    icon: '🚶', label: 'Walking Routes',
+    links: city => [
+      { label: 'Reddit — Walking Tours', source: 'Reddit', url: `https://www.reddit.com/search/?q=${encodeURIComponent(city + ' walking tour self guided')}&type=link` },
+      { label: 'Wikivoyage', source: 'Wikivoyage', url: `https://en.wikivoyage.org/wiki/${encodeURIComponent(city)}` },
+    ],
+  },
+};
+
+let currentCity = '';
+
+function buildResearchLinks() {
+  let html = '';
+  for (const cat of activeCategories) {
+    const cfg = RESEARCH_LINKS[cat];
+    if (!cfg) continue;
+    const links = cfg.links(currentCity);
+    html += `<div class="research-category">
+      <h3><span class="rc-icon">${cfg.icon}</span> ${cfg.label}</h3>
+      ${links.map(l => `<a class="research-link" href="${l.url}" target="_blank" rel="noopener">
+        ${l.label} <span class="rl-source">${l.source} ↗</span>
+      </a>`).join('')}
+    </div>`;
+  }
+  $('research-body').innerHTML = html;
+}
+
+// ─── PANELS ───
+function openPanel(name) {
+  // Close other panels and sidebar
+  closeSidebar();
+  document.querySelectorAll('.panel-overlay').forEach(p => p.classList.remove('open'));
+  $('panel-' + name).classList.add('open');
+  if (name === 'places') renderMyPlaces();
+  if (name === 'research') buildResearchLinks();
+}
+
+function closePanel(name) {
+  $('panel-' + name).classList.remove('open');
+}
+
+// ─── MY PLACES (localStorage) ───
+function getStorageKey() { return 'wanderlog_places_' + currentCity.toLowerCase().replace(/\s+/g, '_'); }
+
+function loadMyPlaces() {
+  try { return JSON.parse(localStorage.getItem(getStorageKey())) || []; }
+  catch { return []; }
+}
+
+function saveMyPlaces(places) {
+  localStorage.setItem(getStorageKey(), JSON.stringify(places));
+  updatePlacesCount();
+}
+
+function updatePlacesCount() {
+  const count = loadMyPlaces().length;
+  $('places-count').textContent = count > 0 ? `(${count})` : '';
+}
+
+function addPlace() {
+  const name = $('place-name').value.trim();
+  if (!name) return;
+  const cat = $('place-cat').value;
+  const notes = $('place-notes').value.trim();
+  const places = loadMyPlaces();
+  places.push({ id: Date.now(), name, category: cat, notes, addedAt: new Date().toISOString() });
+  saveMyPlaces(places);
+  $('place-name').value = '';
+  $('place-notes').value = '';
+  renderMyPlaces();
+}
+
+function removePlace(id) {
+  const places = loadMyPlaces().filter(p => p.id !== id);
+  saveMyPlaces(places);
+  renderMyPlaces();
+}
+
+function movePlaceUp(id) {
+  const places = loadMyPlaces();
+  const idx = places.findIndex(p => p.id === id);
+  if (idx > 0) { [places[idx - 1], places[idx]] = [places[idx], places[idx - 1]]; }
+  saveMyPlaces(places);
+  renderMyPlaces();
+}
+
+function movePlaceDown(id) {
+  const places = loadMyPlaces();
+  const idx = places.findIndex(p => p.id === id);
+  if (idx < places.length - 1) { [places[idx], places[idx + 1]] = [places[idx + 1], places[idx]]; }
+  saveMyPlaces(places);
+  renderMyPlaces();
+}
+
+function saveStopToPlaces(idx) {
+  const stop = stops[idx];
+  if (!stop) return;
+  const places = loadMyPlaces();
+  // Avoid duplicates
+  if (places.some(p => p.name.toLowerCase() === stop.name.toLowerCase())) return;
+  places.push({
+    id: Date.now(),
+    name: stop.name,
+    category: stop.archStyle && stop.archStyle !== 'other' ? 'architecture' : 'walking',
+    notes: stop.type + (stop.facts?.built ? `, built ${stop.facts.built}` : ''),
+    addedAt: new Date().toISOString(),
+  });
+  saveMyPlaces(places);
+  updatePlacesCount();
+}
+
+const CAT_ICONS = { walking: '🚶', architecture: '🏛', coffee: '☕', beer: '🍺', obscura: '🗿', food: '🍽', other: '📍' };
+
+function renderMyPlaces() {
+  const places = loadMyPlaces();
+  let html = `<div class="add-place-form">
+    <input type="text" id="place-name" placeholder="Place name" />
+    <select id="place-cat">
+      <option value="walking">🚶 Walking / Sight</option>
+      <option value="architecture">🏛 Architecture</option>
+      <option value="coffee">☕ Coffee</option>
+      <option value="beer">🍺 Beer</option>
+      <option value="obscura">🗿 Atlas Obscura</option>
+      <option value="food">🍽 Food</option>
+      <option value="other">📍 Other</option>
+    </select>
+    <textarea id="place-notes" placeholder="Notes (optional)" rows="2"></textarea>
+    <button class="btn-add-place" onclick="addPlace()">+ Add Place</button>
+  </div>`;
+
+  if (!places.length) {
+    html += `<div class="my-places-empty">
+      No saved places yet.<br>Add places from your research, or save stops from the map.
+    </div>`;
+  } else {
+    for (const p of places) {
+      const icon = CAT_ICONS[p.category] || '📍';
+      html += `<div class="saved-place">
+        <div style="font-size:1.2rem;margin-top:2px;">${icon}</div>
+        <div class="saved-place-info">
+          <div class="saved-place-name">${p.name}</div>
+          <div class="saved-place-cat">${p.category}</div>
+          ${p.notes ? `<div class="saved-place-notes">${p.notes}</div>` : ''}
+        </div>
+        <div class="saved-place-actions">
+          <button onclick="movePlaceUp(${p.id})" title="Move up">↑</button>
+          <button onclick="movePlaceDown(${p.id})" title="Move down">↓</button>
+          <button onclick="removePlace(${p.id})" title="Remove">✕</button>
+        </div>
+      </div>`;
+    }
+    html += `<button class="btn-route" onclick="openRoute()" ${places.length < 2 ? 'disabled' : ''}>
+      🗺 Open Walking Route in Google Maps
+    </button>`;
+  }
+  $('places-body').innerHTML = html;
+  // Focus name input
+  $('place-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') addPlace(); });
+}
+
+// ─── GOOGLE MAPS ROUTE EXPORT ───
+function openRoute() {
+  const places = loadMyPlaces();
+  if (places.length < 2) return;
+  // Google Maps directions: max ~10 waypoints
+  const pts = places.slice(0, 10);
+  const origin = encodeURIComponent(pts[0].name + ', ' + currentCity);
+  const dest = encodeURIComponent(pts[pts.length - 1].name + ', ' + currentCity);
+  const waypoints = pts.slice(1, -1).map(p => encodeURIComponent(p.name + ', ' + currentCity)).join('|');
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=walking`;
+  if (waypoints) url += `&waypoints=${waypoints}`;
+  window.open(url, '_blank');
+}
+
+// Enter key on input
+$('city-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') generate();
+});
+</script>
+</body>
+</html>

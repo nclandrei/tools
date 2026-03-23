@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Asset Resizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0b;
+      --surface: #141416;
+      --surface-hover: #1c1c1f;
+      --border: #2a2a2e;
+      --text: #e4e4e7;
+      --text-dim: #71717a;
+      --accent: #a78bfa;
+      --accent-hover: #8b5cf6;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font: 'DM Sans', -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .container { max-width: 900px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 2.5rem; animation: fadeUp .4s ease; }
+    h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: .4rem; }
+    .subtitle { color: var(--text-dim); font-size: .95rem; }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all .15s ease;
+      position: relative;
+      animation: fadeUp .4s ease .05s both;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(167,139,250,.05);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .drop-zone p { color: var(--text-dim); font-size: .95rem; }
+    .drop-icon {
+      font-size: 2rem; margin-bottom: .75rem; color: var(--text-dim);
+      line-height: 1;
+    }
+
+    /* Source preview */
+    .source-preview {
+      display: flex; align-items: center; gap: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem;
+      animation: fadeUp .3s ease;
+    }
+    .source-preview img {
+      width: 72px; height: 72px; object-fit: contain;
+      border-radius: var(--radius-sm); background: #000;
+    }
+    .source-info { flex: 1; }
+    .source-info .name { font-weight: 500; margin-bottom: .2rem; word-break: break-all; }
+    .source-info .dims { color: var(--text-dim); font-family: var(--mono); font-size: .85rem; }
+    .change-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-dim);
+      padding: .4rem .75rem; border-radius: var(--radius-sm); cursor: pointer;
+      font-family: var(--font); font-size: .85rem; transition: all .15s ease;
+      white-space: nowrap;
+    }
+    .change-btn:hover { border-color: var(--text-dim); color: var(--text); }
+
+    /* Controls */
+    .controls-bar {
+      display: flex; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap;
+      align-items: center; animation: fadeUp .3s ease .05s both;
+    }
+    .control-group { display: flex; align-items: center; gap: .5rem; }
+    .control-group > label { font-size: .85rem; color: var(--text-dim); white-space: nowrap; }
+    select {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      border-radius: var(--radius-sm); padding: .4rem .6rem;
+      font-family: var(--font); font-size: .85rem; cursor: pointer;
+    }
+    select:focus { outline: none; border-color: var(--accent); }
+    input[type="color"] {
+      width: 32px; height: 28px; padding: 1px; border: 1px solid var(--border);
+      border-radius: 6px; background: var(--surface); cursor: pointer;
+    }
+    .cb-label {
+      display: flex; align-items: center; gap: 4px; font-size: .85rem;
+      color: var(--text-dim); cursor: pointer; user-select: none;
+    }
+    .cb-label input { accent-color: var(--accent); cursor: pointer; }
+
+    /* Platforms */
+    .platform-section {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: .5rem; overflow: hidden;
+    }
+    .platform-header {
+      display: flex; align-items: center; gap: .6rem;
+      padding: .65rem 1rem; background: var(--surface); cursor: pointer;
+      user-select: none; transition: background .15s ease;
+    }
+    .platform-header:hover { background: var(--surface-hover); }
+    .arrow {
+      color: var(--text-dim); font-size: .65rem; transition: transform .15s ease;
+      width: .8rem; text-align: center; flex-shrink: 0;
+    }
+    .platform-header.open .arrow { transform: rotate(90deg); }
+    .platform-header .pname { font-weight: 500; flex: 1; font-size: .95rem; }
+    .platform-header .pcount {
+      font-size: .8rem; color: var(--text-dim); font-family: var(--mono);
+    }
+    .toggle-all-btn {
+      font-size: .8rem; color: var(--accent); cursor: pointer;
+      background: none; border: none; font-family: var(--font);
+      padding: .15rem .4rem;
+    }
+    .toggle-all-btn:hover { text-decoration: underline; }
+    .platform-sizes { display: none; padding: .25rem 1rem .6rem; }
+    .platform-sizes.open { display: block; }
+    .size-item {
+      display: flex; align-items: center; gap: .5rem; padding: .35rem 0; cursor: pointer;
+    }
+    .size-item input[type="checkbox"] {
+      accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0;
+    }
+    .size-name { flex: 1; font-size: .9rem; }
+    .size-dims { font-family: var(--mono); font-size: .8rem; color: var(--text-dim); }
+    .size-warn { font-size: .7rem; color: var(--amber); margin-left: .25rem; }
+
+    /* Actions */
+    .actions { display: flex; gap: .75rem; margin: 1.25rem 0; flex-wrap: wrap; }
+    .btn {
+      padding: .55rem 1.1rem; border-radius: var(--radius-sm); border: none;
+      font-family: var(--font); font-size: .9rem; font-weight: 500;
+      cursor: pointer; transition: all .15s ease;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:disabled, .btn-secondary:disabled {
+      opacity: .4; cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--surface-hover); }
+    .selected-count { font-size: .85rem; color: var(--text-dim); align-self: center; }
+
+    /* Progress */
+    .progress-bar {
+      width: 100%; height: 4px; background: var(--surface);
+      border-radius: 2px; margin: .75rem 0; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; background: var(--accent); border-radius: 2px;
+      transition: width .15s ease; width: 0%;
+    }
+
+    /* Results */
+    .results-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: .75rem;
+    }
+    .results-header h2 { font-size: 1.1rem; font-weight: 500; }
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: .75rem;
+    }
+    .result-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      animation: fadeUp .25s ease;
+    }
+    .result-preview {
+      aspect-ratio: 1; display: flex; align-items: center;
+      justify-content: center; background: #000; padding: .4rem;
+    }
+    .result-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .result-info { padding: .6rem .7rem; }
+    .result-label { font-size: .78rem; font-weight: 500; margin-bottom: .1rem; }
+    .result-platform { font-size: .7rem; color: var(--text-dim); margin-bottom: .1rem; }
+    .result-meta {
+      font-family: var(--mono); font-size: .72rem; color: var(--text-dim);
+      margin-bottom: .4rem;
+    }
+    .dl-btn {
+      width: 100%; padding: .35rem; background: transparent;
+      border: 1px solid var(--border); color: var(--text-dim);
+      border-radius: 6px; cursor: pointer; font-family: var(--font);
+      font-size: .78rem; transition: all .15s ease;
+    }
+    .dl-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 1rem; }
+      h1 { font-size: 1.35rem; }
+      .controls-bar { flex-direction: column; align-items: stretch; }
+      .results-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+      .source-preview { flex-wrap: wrap; }
+    }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Asset Resizer</h1>
+    <p class="subtitle">Resize images for app stores, extensions, and platforms</p>
+  </header>
+
+  <main>
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">&#8595;</div>
+      <p>Drop an image here or click to browse</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div id="sourcePreview" class="source-preview" hidden>
+      <img id="sourceImg" alt="Source">
+      <div class="source-info">
+        <div class="name" id="sourceName"></div>
+        <div class="dims" id="sourceDims"></div>
+      </div>
+      <button class="change-btn" id="changeBtn">Change</button>
+    </div>
+
+    <div id="controlsSection" hidden>
+      <div class="controls-bar">
+        <div class="control-group">
+          <label for="resizeMode">Mode</label>
+          <select id="resizeMode">
+            <option value="cover">Cover (crop to fill)</option>
+            <option value="contain">Contain (fit with padding)</option>
+            <option value="stretch">Stretch</option>
+          </select>
+        </div>
+        <div class="control-group" id="bgGroup">
+          <label>Background</label>
+          <input type="color" id="bgColor" value="#ffffff">
+          <label class="cb-label">
+            <input type="checkbox" id="bgTransparent"> Transparent
+          </label>
+        </div>
+      </div>
+
+      <div id="platformList"></div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="generateBtn" disabled>Generate Selected</button>
+        <button class="btn btn-secondary" id="downloadAllBtn" disabled>Download All as ZIP</button>
+        <span class="selected-count" id="selectedCount"></span>
+      </div>
+    </div>
+
+    <div class="progress-bar" id="progressBar" hidden>
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <div id="resultsSection" hidden>
+      <div class="results-header">
+        <h2>Generated Assets</h2>
+      </div>
+      <div class="results-grid" id="resultsGrid"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+const PLATFORMS = [
+  {
+    id: 'ios', name: 'iOS App Store',
+    sizes: [
+      { name: 'App Icon', w: 1024, h: 1024 },
+      { name: 'iPhone 6.9\u2033 (16 Pro Max)', w: 1320, h: 2868 },
+      { name: 'iPhone 6.7\u2033 (16 Plus, 15 Plus)', w: 1290, h: 2796 },
+      { name: 'iPhone 6.5\u2033 (11 Pro Max, XS Max)', w: 1284, h: 2778 },
+      { name: 'iPhone 6.1\u2033 (16, 15, 14, 13)', w: 1170, h: 2532 },
+      { name: 'iPhone 5.5\u2033 (8 Plus, 7 Plus)', w: 1242, h: 2208 },
+      { name: 'iPad 13\u2033', w: 2048, h: 2732 },
+      { name: 'iPad 11\u2033', w: 1668, h: 2388 },
+    ]
+  },
+  {
+    id: 'mac', name: 'Mac App Store',
+    sizes: [
+      { name: 'App Icon', w: 1024, h: 1024 },
+      { name: 'Retina Screenshot', w: 2880, h: 1800 },
+      { name: 'HiDPI Screenshot', w: 2560, h: 1600 },
+      { name: 'Standard Screenshot', w: 1440, h: 900 },
+    ]
+  },
+  {
+    id: 'chrome', name: 'Chrome Web Store',
+    sizes: [
+      { name: 'Extension Icon', w: 128, h: 128 },
+      { name: 'Screenshot', w: 1280, h: 800 },
+      { name: 'Small Promo Tile', w: 440, h: 280 },
+      { name: 'Marquee Promo Tile', w: 1400, h: 560 },
+    ]
+  },
+  {
+    id: 'firefox', name: 'Firefox Add-ons',
+    sizes: [
+      { name: 'Add-on Icon', w: 128, h: 128 },
+      { name: 'Screenshot', w: 1280, h: 800 },
+    ]
+  },
+  {
+    id: 'youtube', name: 'YouTube',
+    sizes: [
+      { name: 'Channel Banner', w: 2560, h: 1440 },
+      { name: 'Video Thumbnail', w: 1280, h: 720 },
+      { name: 'Profile Picture', w: 800, h: 800 },
+      { name: 'Shorts Thumbnail', w: 1080, h: 1920 },
+    ]
+  },
+  {
+    id: 'play', name: 'Google Play Store',
+    sizes: [
+      { name: 'App Icon', w: 512, h: 512 },
+      { name: 'Feature Graphic', w: 1024, h: 500 },
+    ]
+  },
+  {
+    id: 'steam', name: 'Steam',
+    sizes: [
+      { name: 'Header Capsule', w: 920, h: 430 },
+      { name: 'Small Capsule', w: 462, h: 174 },
+      { name: 'Main Capsule', w: 1232, h: 706 },
+      { name: 'Vertical Capsule', w: 748, h: 896 },
+      { name: 'Library Capsule', w: 600, h: 900 },
+      { name: 'Library Hero', w: 3840, h: 1240 },
+    ]
+  },
+  {
+    id: 'web', name: 'Favicon & Web',
+    sizes: [
+      { name: 'Favicon 16px', w: 16, h: 16 },
+      { name: 'Favicon 32px', w: 32, h: 32 },
+      { name: 'Apple Touch Icon', w: 180, h: 180 },
+      { name: 'Android Icon', w: 192, h: 192 },
+      { name: 'PWA Icon', w: 512, h: 512 },
+      { name: 'OG Image', w: 1200, h: 630 },
+    ]
+  },
+  {
+    id: 'github', name: 'GitHub',
+    sizes: [
+      { name: 'Social Preview', w: 1280, h: 640 },
+    ]
+  },
+];
+
+let sourceImage = null;
+let sourceFile = null;
+let generated = [];
+
+const $ = id => document.getElementById(id);
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+const sourcePreview = $('sourcePreview');
+const sourceImg = $('sourceImg');
+const sourceName = $('sourceName');
+const sourceDims = $('sourceDims');
+const controlsSection = $('controlsSection');
+const platformList = $('platformList');
+const generateBtn = $('generateBtn');
+const downloadAllBtn = $('downloadAllBtn');
+const selectedCount = $('selectedCount');
+const progressBar = $('progressBar');
+const progressFill = $('progressFill');
+const resultsSection = $('resultsSection');
+const resultsGrid = $('resultsGrid');
+const resizeMode = $('resizeMode');
+const bgColor = $('bgColor');
+const bgTransparent = $('bgTransparent');
+const bgGroup = $('bgGroup');
+
+function slugify(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function renderPlatforms() {
+  platformList.innerHTML = PLATFORMS.map(p => `
+    <div class="platform-section" data-pid="${p.id}">
+      <div class="platform-header" data-pid="${p.id}">
+        <span class="arrow">\u25B6</span>
+        <span class="pname">${p.name}</span>
+        <span class="pcount" id="cnt-${p.id}">0/${p.sizes.length}</span>
+        <button class="toggle-all-btn" data-pid="${p.id}">Select all</button>
+      </div>
+      <div class="platform-sizes" id="sizes-${p.id}">
+        ${p.sizes.map((s, i) => `
+          <label class="size-item">
+            <input type="checkbox" data-pid="${p.id}" data-idx="${i}">
+            <span class="size-name">${s.name}</span>
+            <span class="size-dims">${s.w} \u00D7 ${s.h}</span>
+          </label>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateCounts() {
+  let total = 0;
+  PLATFORMS.forEach(p => {
+    const boxes = platformList.querySelectorAll(`input[data-pid="${p.id}"]`);
+    const checked = [...boxes].filter(b => b.checked).length;
+    const el = $(`cnt-${p.id}`);
+    if (el) el.textContent = `${checked}/${p.sizes.length}`;
+    total += checked;
+  });
+  generateBtn.disabled = total === 0;
+  selectedCount.textContent = total > 0 ? `${total} selected` : '';
+}
+
+function togglePlatformPanel(pid) {
+  const header = platformList.querySelector(`.platform-header[data-pid="${pid}"]`);
+  const sizes = $(`sizes-${pid}`);
+  if (!header || !sizes) return;
+  const isOpen = header.classList.toggle('open');
+  sizes.classList.toggle('open', isOpen);
+}
+
+function toggleAllSizes(pid, e) {
+  if (e) e.stopPropagation();
+  const boxes = [...platformList.querySelectorAll(`input[data-pid="${pid}"]`)];
+  const allChecked = boxes.every(b => b.checked);
+  boxes.forEach(b => b.checked = !allChecked);
+  const btn = platformList.querySelector(`.toggle-all-btn[data-pid="${pid}"]`);
+  if (btn) btn.textContent = allChecked ? 'Select all' : 'None';
+  updateCounts();
+}
+
+platformList.addEventListener('click', e => {
+  const toggleBtn = e.target.closest('.toggle-all-btn');
+  if (toggleBtn) {
+    toggleAllSizes(toggleBtn.dataset.pid, e);
+    return;
+  }
+  const header = e.target.closest('.platform-header');
+  if (header) {
+    togglePlatformPanel(header.dataset.pid);
+  }
+});
+
+platformList.addEventListener('change', e => {
+  if (e.target.type === 'checkbox') {
+    const pid = e.target.dataset.pid;
+    const boxes = [...platformList.querySelectorAll(`input[data-pid="${pid}"]`)];
+    const allChecked = boxes.every(b => b.checked);
+    const btn = platformList.querySelector(`.toggle-all-btn[data-pid="${pid}"]`);
+    if (btn) btn.textContent = allChecked ? 'None' : 'Select all';
+    updateCounts();
+  }
+});
+
+resizeMode.addEventListener('change', () => {
+  bgGroup.style.display = resizeMode.value === 'contain' ? '' : 'none';
+});
+bgGroup.style.display = 'none';
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  sourceFile = file;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    sourceImage = img;
+    sourceImg.src = url;
+    sourceName.textContent = file.name;
+    sourceDims.textContent = `${img.naturalWidth} \u00D7 ${img.naturalHeight}`;
+    dropZone.hidden = true;
+    sourcePreview.hidden = false;
+    controlsSection.hidden = false;
+    resultsSection.hidden = true;
+    downloadAllBtn.disabled = true;
+    generated = [];
+    updateUpscaleWarnings();
+  };
+  img.onerror = () => { alert('Could not load image.'); };
+  img.src = url;
+}
+
+function updateUpscaleWarnings() {
+  if (!sourceImage) return;
+  const sw = sourceImage.naturalWidth;
+  const sh = sourceImage.naturalHeight;
+  platformList.querySelectorAll('.size-item').forEach(item => {
+    const cb = item.querySelector('input[type="checkbox"]');
+    const pid = cb.dataset.pid;
+    const idx = parseInt(cb.dataset.idx);
+    const p = PLATFORMS.find(p => p.id === pid);
+    const s = p.sizes[idx];
+    let warn = item.querySelector('.size-warn');
+    if (s.w > sw * 1.5 || s.h > sh * 1.5) {
+      if (!warn) {
+        warn = document.createElement('span');
+        warn.className = 'size-warn';
+        item.appendChild(warn);
+      }
+      warn.textContent = 'upscale';
+    } else if (warn) {
+      warn.remove();
+    }
+  });
+}
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+$('changeBtn').addEventListener('click', () => {
+  dropZone.hidden = false;
+  sourcePreview.hidden = true;
+  controlsSection.hidden = true;
+  resultsSection.hidden = true;
+  sourceImage = null;
+  generated = [];
+  fileInput.value = '';
+});
+
+function resizeCanvas(img, tw, th, mode, bg, transparent) {
+  const canvas = document.createElement('canvas');
+  canvas.width = tw;
+  canvas.height = th;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const sw = img.naturalWidth;
+  const sh = img.naturalHeight;
+
+  if (mode === 'cover') {
+    const scale = Math.max(tw / sw, th / sh);
+    const dw = sw * scale;
+    const dh = sh * scale;
+    ctx.drawImage(img, (tw - dw) / 2, (th - dh) / 2, dw, dh);
+  } else if (mode === 'contain') {
+    if (!transparent) {
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, tw, th);
+    }
+    const scale = Math.min(tw / sw, th / sh);
+    const dw = sw * scale;
+    const dh = sh * scale;
+    ctx.drawImage(img, (tw - dw) / 2, (th - dh) / 2, dw, dh);
+  } else {
+    ctx.drawImage(img, 0, 0, tw, th);
+  }
+  return canvas;
+}
+
+function getSelectedSizes() {
+  const items = [];
+  platformList.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+    const p = PLATFORMS.find(p => p.id === cb.dataset.pid);
+    const s = p.sizes[parseInt(cb.dataset.idx)];
+    items.push({ platform: p, size: s });
+  });
+  return items;
+}
+
+async function generate() {
+  if (!sourceImage) return;
+  const selected = getSelectedSizes();
+  if (selected.length === 0) return;
+
+  const mode = resizeMode.value;
+  const bg = bgColor.value;
+  const transp = bgTransparent.checked;
+
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Generating\u2026';
+  progressBar.hidden = false;
+  progressFill.style.width = '0%';
+  resultsSection.hidden = true;
+  generated = [];
+
+  for (let i = 0; i < selected.length; i++) {
+    const { platform, size } = selected[i];
+    await new Promise(r => setTimeout(r, 0));
+
+    const canvas = resizeCanvas(sourceImage, size.w, size.h, mode, bg, transp);
+    const dataUrl = canvas.toDataURL('image/png');
+
+    generated.push({
+      platformName: platform.name,
+      platformId: platform.id,
+      sizeName: size.name,
+      w: size.w, h: size.h,
+      canvas, dataUrl,
+    });
+
+    progressFill.style.width = `${((i + 1) / selected.length) * 100}%`;
+  }
+
+  renderResults();
+  progressBar.hidden = true;
+  generateBtn.disabled = false;
+  generateBtn.textContent = 'Generate Selected';
+  downloadAllBtn.disabled = false;
+}
+
+function renderResults() {
+  resultsGrid.innerHTML = generated.map((item, i) => `
+    <div class="result-card">
+      <div class="result-preview">
+        <img src="${item.dataUrl}" alt="${item.sizeName}">
+      </div>
+      <div class="result-info">
+        <div class="result-label">${item.sizeName}</div>
+        <div class="result-platform">${item.platformName}</div>
+        <div class="result-meta">${item.w} \u00D7 ${item.h} px</div>
+        <button class="dl-btn" data-idx="${i}">Download PNG</button>
+      </div>
+    </div>
+  `).join('');
+  resultsSection.hidden = false;
+}
+
+resultsGrid.addEventListener('click', e => {
+  const btn = e.target.closest('.dl-btn');
+  if (!btn) return;
+  const item = generated[parseInt(btn.dataset.idx)];
+  downloadOne(item);
+});
+
+function downloadOne(item) {
+  const a = document.createElement('a');
+  a.href = item.dataUrl;
+  a.download = `${slugify(item.platformId)}_${slugify(item.sizeName)}_${item.w}x${item.h}.png`;
+  a.click();
+}
+
+function canvasToBlob(canvas) {
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+async function downloadAllZip() {
+  if (generated.length === 0) return;
+
+  if (typeof JSZip === 'undefined') {
+    for (const item of generated) {
+      downloadOne(item);
+      await new Promise(r => setTimeout(r, 150));
+    }
+    return;
+  }
+
+  downloadAllBtn.disabled = true;
+  downloadAllBtn.textContent = 'Zipping\u2026';
+
+  const zip = new JSZip();
+  for (const item of generated) {
+    const folder = zip.folder(slugify(item.platformName));
+    const blob = await canvasToBlob(item.canvas);
+    folder.file(`${slugify(item.sizeName)}_${item.w}x${item.h}.png`, blob);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(zipBlob);
+  a.download = 'assets.zip';
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  downloadAllBtn.disabled = false;
+  downloadAllBtn.textContent = 'Download All as ZIP';
+}
+
+generateBtn.addEventListener('click', generate);
+downloadAllBtn.addEventListener('click', downloadAllZip);
+
+renderPlatforms();
+updateCounts();
+</script>
+</body>
+</html>

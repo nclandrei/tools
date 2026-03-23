@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grand Sumo Calendar</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0c0b;
+    --surface: #1a1715;
+    --surface-hover: #242019;
+    --border: #2e2923;
+    --sand: #c4a882;
+    --sand-dim: #8a7560;
+    --cream: #f0e6d6;
+    --red: #c43c3c;
+    --red-glow: #c43c3c44;
+    --white: #faf6f0;
+    --text-dim: #7a7268;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .noise {
+    position: fixed;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .container {
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 60px 24px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 56px;
+    animation: fadeUp 0.8s ease both;
+  }
+
+  .kanji {
+    font-family: 'Noto Serif JP', serif;
+    font-size: 14px;
+    letter-spacing: 0.5em;
+    color: var(--sand-dim);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-family: 'Noto Serif JP', serif;
+    font-weight: 900;
+    font-size: clamp(32px, 6vw, 52px);
+    line-height: 1.15;
+    color: var(--cream);
+    margin-bottom: 12px;
+  }
+
+  h1 span {
+    color: var(--red);
+  }
+
+  .subtitle {
+    font-size: 15px;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+
+  .subtitle strong {
+    color: var(--sand);
+    font-weight: 600;
+  }
+
+  .badge-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 5px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    font-size: 12px;
+    color: var(--sand-dim);
+    letter-spacing: 0.02em;
+  }
+
+  .badge.algo {
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  .year-nav {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 40px;
+    animation: fadeUp 0.7s ease 0.05s both;
+  }
+
+  .year-nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--sand);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .year-nav button:hover {
+    background: var(--surface-hover);
+    border-color: var(--sand-dim);
+  }
+
+  .year-nav .year-display {
+    font-family: 'Noto Serif JP', serif;
+    font-weight: 900;
+    font-size: 28px;
+    color: var(--cream);
+    min-width: 80px;
+    text-align: center;
+  }
+
+  .basho-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 48px;
+  }
+
+  .basho-card {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: all 0.25s ease;
+    animation: fadeUp 0.6s ease both;
+    cursor: default;
+  }
+
+  .basho-card:nth-child(1) { animation-delay: 0.1s; }
+  .basho-card:nth-child(2) { animation-delay: 0.15s; }
+  .basho-card:nth-child(3) { animation-delay: 0.2s; }
+  .basho-card:nth-child(4) { animation-delay: 0.25s; }
+  .basho-card:nth-child(5) { animation-delay: 0.3s; }
+  .basho-card:nth-child(6) { animation-delay: 0.35s; }
+
+  .basho-card:hover {
+    background: var(--surface-hover);
+    border-color: var(--sand-dim);
+    transform: translateY(-1px);
+  }
+
+  .basho-card.past {
+    opacity: 0.45;
+  }
+
+  .basho-card.active {
+    border-color: var(--red);
+    box-shadow: 0 0 24px var(--red-glow), inset 0 0 24px var(--red-glow);
+  }
+
+  .basho-card.active .month-num {
+    color: var(--red);
+  }
+
+  .month-block {
+    text-align: center;
+  }
+
+  .month-num {
+    font-family: 'Noto Serif JP', serif;
+    font-weight: 900;
+    font-size: 28px;
+    color: var(--sand);
+    line-height: 1;
+  }
+
+  .month-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+
+  .basho-info h3 {
+    font-family: 'Noto Serif JP', serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--cream);
+    margin-bottom: 4px;
+  }
+
+  .basho-info .jp-name {
+    font-family: 'Noto Serif JP', serif;
+    font-size: 13px;
+    color: var(--sand-dim);
+    margin-bottom: 6px;
+  }
+
+  .basho-meta {
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+
+  .basho-meta .venue::before {
+    content: '◦ ';
+    color: var(--sand-dim);
+  }
+
+  .basho-dates {
+    text-align: right;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .basho-dates .date-range {
+    color: var(--cream);
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .basho-dates .days-label {
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  .live-dot {
+    display: none;
+    width: 8px;
+    height: 8px;
+    background: var(--red);
+    border-radius: 50%;
+    animation: pulse 1.8s ease infinite;
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  .basho-card.active .live-dot { display: inline-block; }
+
+  .download-section {
+    text-align: center;
+    animation: fadeUp 0.8s ease 0.45s both;
+  }
+
+  .download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 36px;
+    background: var(--red);
+    color: var(--white);
+    border: none;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.01em;
+  }
+
+  .download-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px var(--red-glow);
+    filter: brightness(1.1);
+  }
+
+  .download-btn:active {
+    transform: translateY(0);
+  }
+
+  .download-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .download-hint {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .footer-note {
+    text-align: center;
+    margin-top: 48px;
+    font-size: 12px;
+    color: var(--text-dim);
+    opacity: 0.6;
+    line-height: 1.6;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--red-glow); }
+    50% { opacity: 0.6; box-shadow: 0 0 0 6px transparent; }
+  }
+
+  @media (max-width: 600px) {
+    .basho-card {
+      grid-template-columns: 44px 1fr;
+      gap: 14px;
+      padding: 16px 18px;
+    }
+    .basho-dates {
+      grid-column: 1 / -1;
+      text-align: left;
+      padding-left: 58px;
+      margin-top: -6px;
+    }
+    .month-num { font-size: 22px; }
+    .basho-info h3 { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="container">
+  <header>
+    <div class="kanji">大相撲 本場所</div>
+    <h1>Grand Sumo <span id="yearTitle"></span></h1>
+    <p class="subtitle"><strong>6 Honbasho</strong> — all tournaments in one calendar</p>
+    <div class="badge-row">
+      <span class="badge" id="tzBadge">Detecting timezone…</span>
+      <span class="badge algo" id="sourceBadge"></span>
+    </div>
+  </header>
+
+  <nav class="year-nav">
+    <button onclick="changeYear(-1)" aria-label="Previous year">‹</button>
+    <div class="year-display" id="yearNav"></div>
+    <button onclick="changeYear(1)" aria-label="Next year">›</button>
+  </nav>
+
+  <div class="basho-list" id="bashoList"></div>
+
+  <div class="download-section">
+    <button class="download-btn" onclick="downloadICS()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <span id="dlLabel">Download .ics Calendar</span>
+    </button>
+    <p class="download-hint">Import into Google Calendar, Apple Calendar, Outlook, or any app that supports ICS.</p>
+  </div>
+
+  <p class="footer-note" id="footerNote"></p>
+</div>
+
+<script>
+// ── Tournament metadata (constant across all years) ──
+const TOURNAMENT_INFO = [
+  { month: 1,  name: "Hatsu Basho",   jp: "初場所",     city: "Tokyo",   venue: "Ryōgoku Kokugikan" },
+  { month: 3,  name: "Haru Basho",    jp: "春場所",     city: "Osaka",   venue: "EDION Arena Osaka" },
+  { month: 5,  name: "Natsu Basho",   jp: "夏場所",     city: "Tokyo",   venue: "Ryōgoku Kokugikan" },
+  { month: 7,  name: "Nagoya Basho",  jp: "名古屋場所", city: "Nagoya",  venue: "IG Arena" },
+  { month: 9,  name: "Aki Basho",     jp: "秋場所",     city: "Tokyo",   venue: "Ryōgoku Kokugikan" },
+  { month: 11, name: "Kyūshū Basho",  jp: "九州場所",   city: "Fukuoka", venue: "Fukuoka Kokusai Center" }
+];
+
+// ── Hardcoded official dates (JSA-confirmed) ──
+const HARDCODED = {
+  2026: [
+    [1, 11], [3, 8], [5, 10], [7, 12], [9, 13], [11, 8]
+  ],
+  2027: [
+    [1, 10], [3, 14], [5, 9], [7, 11], [9, 12], [11, 14]
+  ]
+};
+
+// ── Algorithm: 2nd Sunday of the month ──
+function secondSunday(year, month) {
+  // Day of week for the 1st (0=Sun, 6=Sat)
+  const dow = new Date(year, month - 1, 1).getDay();
+  // First Sunday: if dow=0 → 1st, else 8-dow
+  const firstSun = dow === 0 ? 1 : 8 - dow;
+  return firstSun + 7; // 2nd Sunday
+}
+
+// ── Build basho schedule for any year ──
+function getSchedule(year) {
+  const isHardcoded = HARDCODED.hasOwnProperty(year);
+
+  return TOURNAMENT_INFO.map((info, i) => {
+    let startDay;
+    if (isHardcoded) {
+      startDay = HARDCODED[year][i][1];
+    } else {
+      startDay = secondSunday(year, info.month);
+    }
+
+    const startDate = new Date(year, info.month - 1, startDay);
+    const endDate = new Date(year, info.month - 1, startDay + 14); // 15 days inclusive
+
+    return {
+      ...info,
+      year,
+      startDay,
+      start: [year, info.month, startDay],
+      end: [year, info.month, startDay + 14],
+      startDate,
+      endDate,
+      isHardcoded
+    };
+  });
+}
+
+// ── Helpers ──
+const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function pad(n) { return String(n).padStart(2, '0'); }
+function formatDay(arr) { return `${MONTHS[arr[1]]} ${arr[2]}`; }
+function getUserTZ() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone; }
+  catch { return 'UTC'; }
+}
+
+// ── State ──
+let currentYear = new Date().getFullYear();
+
+function changeYear(delta) {
+  currentYear += delta;
+  render();
+}
+
+// ── Render ──
+function render() {
+  const year = currentYear;
+  const schedule = getSchedule(year);
+  const now = new Date();
+  const tz = getUserTZ();
+  const isHardcoded = HARDCODED.hasOwnProperty(year);
+
+  document.getElementById('yearTitle').textContent = year;
+  document.getElementById('yearNav').textContent = year;
+  document.getElementById('tzBadge').textContent = `🕐 ${tz}`;
+  document.getElementById('dlLabel').textContent = `Download ${year} .ics`;
+
+  const srcBadge = document.getElementById('sourceBadge');
+  if (isHardcoded) {
+    srcBadge.textContent = '✓ Official JSA dates';
+  } else {
+    srcBadge.textContent = '⚙ Calculated (2nd Sunday rule)';
+  }
+
+  const footer = document.getElementById('footerNote');
+  if (isHardcoded) {
+    footer.textContent = `Dates confirmed by the Japan Sumo Association (日本相撲協会)`;
+  } else {
+    footer.textContent = `Dates computed via the 2nd-Sunday rule. Confirm with the JSA (日本相撲協会) when officially announced.`;
+  }
+
+  const list = document.getElementById('bashoList');
+  list.innerHTML = '';
+
+  schedule.forEach((b, idx) => {
+    const endWithTime = new Date(b.endDate);
+    endWithTime.setHours(23, 59, 59);
+
+    let status = '';
+    if (now > endWithTime) status = 'past';
+    else if (now >= b.startDate && now <= endWithTime) status = 'active';
+
+    const card = document.createElement('div');
+    card.className = `basho-card ${status}`;
+    card.style.animationDelay = `${0.1 + idx * 0.05}s`;
+    card.innerHTML = `
+      <div class="month-block">
+        <div class="month-num">${pad(b.month)}</div>
+        <div class="month-label">${MONTHS[b.month]}</div>
+      </div>
+      <div class="basho-info">
+        <h3><span class="live-dot"></span>${b.name}</h3>
+        <div class="jp-name">${b.jp}</div>
+        <div class="basho-meta">
+          <span>${b.city}</span>
+          <span class="venue">${b.venue}</span>
+        </div>
+      </div>
+      <div class="basho-dates">
+        <div class="date-range">${formatDay(b.start)} – ${formatDay(b.end)}</div>
+        <div class="days-label">15 days</div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// ── ICS generation ──
+function icsDate(arr) {
+  return `${arr[0]}${pad(arr[1])}${pad(arr[2])}`;
+}
+
+function icsEndDate(arr) {
+  const d = new Date(arr[0], arr[1] - 1, arr[2]);
+  d.setDate(d.getDate() + 1); // ICS DATE end is exclusive
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+}
+
+function uid(b) {
+  return `${b.start.join('')}-${b.name.replace(/\s/g, '').toLowerCase()}@grandsumo`;
+}
+
+function generateICS() {
+  const year = currentYear;
+  const schedule = getSchedule(year);
+  const tz = getUserTZ();
+  const now = new Date();
+  const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+
+  let cal = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Grand Sumo ' + year + '//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Grand Sumo ' + year,
+    'X-WR-TIMEZONE:' + tz
+  ];
+
+  schedule.forEach(b => {
+    cal.push(
+      'BEGIN:VEVENT',
+      'UID:' + uid(b),
+      'DTSTAMP:' + stamp,
+      'DTSTART;VALUE=DATE:' + icsDate(b.start),
+      'DTEND;VALUE=DATE:' + icsEndDate(b.end),
+      `SUMMARY:${b.name} (${b.jp}) — ${b.city}`,
+      `DESCRIPTION:Grand Sumo Tournament ${b.name} (${b.jp})\\n${b.venue}\\, ${b.city}\\nDays 1–15\\nMore info: https://www.sumo.or.jp/En/`,
+      `LOCATION:${b.venue}\\, ${b.city}\\, Japan`,
+      'STATUS:CONFIRMED',
+      'TRANSP:TRANSPARENT',
+      'END:VEVENT'
+    );
+  });
+
+  cal.push('END:VCALENDAR');
+  return cal.join('\r\n');
+}
+
+function downloadICS() {
+  const ics = generateICS();
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `grand-sumo-${currentYear}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Init ──
+render();
+</script>
+</body>
+</html>

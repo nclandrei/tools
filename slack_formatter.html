@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Terminal → Slack Formatter</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0f11;
+    --surface: #16181c;
+    --surface-2: #1e2026;
+    --border: #2a2d35;
+    --text: #e4e6eb;
+    --text-dim: #8b8f9a;
+    --accent: #4a7cff;
+    --accent-glow: rgba(74, 124, 255, 0.15);
+    --green: #34d399;
+    --red: #f87171;
+    --radius: 12px;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    min-height: 100dvh;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  textarea:focus {
+    border-color: var(--accent);
+  }
+
+  textarea::placeholder {
+    color: var(--text-dim);
+    opacity: 0.6;
+  }
+
+  .output-wrap {
+    position: relative;
+  }
+
+  #output {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text);
+    cursor: default;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  button {
+    flex: 1;
+    padding: 10px 18px;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+
+  button:active { transform: scale(0.97); }
+
+  .btn-convert {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-convert:hover { background: #5d8bff; }
+
+  .btn-copy {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-copy:hover { border-color: var(--accent); }
+  .btn-copy.copied {
+    background: var(--green);
+    color: #000;
+    border-color: var(--green);
+  }
+
+  .btn-clear {
+    background: var(--surface);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    flex: 0.4;
+  }
+  .btn-clear:hover { border-color: var(--red); color: var(--red); }
+
+  .ref-table {
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    font-size: 0.78rem;
+  }
+
+  .ref-table summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-weight: 500;
+    background: var(--surface);
+    user-select: none;
+  }
+
+  .ref-table table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .ref-table th, .ref-table td {
+    padding: 6px 14px;
+    text-align: left;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+  }
+
+  .ref-table th {
+    color: var(--text-dim);
+    font-weight: 500;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  .ref-table td:first-child { color: var(--text-dim); }
+  .ref-table td:last-child { color: var(--green); }
+
+  .preview-section {
+    margin-top: 4px;
+  }
+
+  .preview-box {
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    min-height: 60px;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .preview-box .bold { font-weight: 700; }
+  .preview-box .italic { font-style: italic; }
+  .preview-box .strike { text-decoration: line-through; }
+  .preview-box .code-inline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--red);
+  }
+  .preview-box .code-block {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 6px 0;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--text);
+  }
+  .preview-box .blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: 10px;
+    color: var(--text-dim);
+  }
+  .preview-box a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .preview-box a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div>
+    <h1>Terminal → Slack Formatter</h1>
+    <p class="subtitle">Paste Claude Code / terminal markdown output, get Slack-ready mrkdwn</p>
+  </div>
+
+  <div>
+    <label for="input">Input (Markdown)</label>
+    <textarea id="input" placeholder="Paste terminal output here...
+
+Example:
+## Summary
+
+I've **refactored** the `auth` module:
+
+- Replaced `bcrypt` with `argon2` for password hashing
+- Added rate limiting to the `/login` endpoint
+- Fixed [issue #42](https://github.com/org/repo/issues/42)
+
+```js
+const hash = await argon2.hash(password);
+```"></textarea>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-convert" onclick="convert()">Convert to Slack</button>
+    <button class="btn-clear" onclick="clearAll()">Clear</button>
+  </div>
+
+  <div>
+    <label for="output">Output (Slack mrkdwn)</label>
+    <div class="output-wrap">
+      <textarea id="output" readonly placeholder="Converted output will appear here..."></textarea>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-copy" id="copyBtn" onclick="copyOutput()">Copy to Clipboard</button>
+  </div>
+
+  <div class="preview-section">
+    <label>Preview</label>
+    <div class="preview-box" id="preview">Slack preview will appear here...</div>
+  </div>
+
+  <details class="ref-table">
+    <summary>Conversion Reference</summary>
+    <table>
+      <tr><th>Markdown</th><th>Slack mrkdwn</th></tr>
+      <tr><td>**bold**</td><td>*bold*</td></tr>
+      <tr><td>*italic*</td><td>_italic_</td></tr>
+      <tr><td>~~strike~~</td><td>~strike~</td></tr>
+      <tr><td>[text](url)</td><td>&lt;url|text&gt;</td></tr>
+      <tr><td># Heading</td><td>*Heading*</td></tr>
+      <tr><td>- list item</td><td>• list item</td></tr>
+      <tr><td>1. item</td><td>1. item</td></tr>
+      <tr><td>`code`</td><td>`code`</td></tr>
+      <tr><td>```block```</td><td>```block```</td></tr>
+      <tr><td>> quote</td><td>&gt; quote</td></tr>
+    </table>
+  </details>
+</div>
+
+<script>
+function dedent(text) {
+  const lines = text.split('\n');
+  // Find minimum leading whitespace across non-empty lines
+  let minIndent = Infinity;
+  for (const line of lines) {
+    if (line.trim().length === 0) continue;
+    const match = line.match(/^(\s+)/);
+    if (match) {
+      minIndent = Math.min(minIndent, match[1].length);
+    } else {
+      minIndent = 0;
+      break;
+    }
+  }
+  if (minIndent === 0 || minIndent === Infinity) return text;
+  return lines.map(l => l.slice(minIndent)).join('\n');
+}
+
+function convert() {
+  const input = document.getElementById('input').value;
+  if (!input.trim()) return;
+
+  const result = markdownToSlack(input);
+  document.getElementById('output').value = result;
+  renderPreview(result);
+
+  // Reset copy button
+  const btn = document.getElementById('copyBtn');
+  btn.textContent = 'Copy to Clipboard';
+  btn.classList.remove('copied');
+}
+
+function markdownToSlack(md) {
+  // Strip common leading whitespace (terminal padding from Claude Code)
+  md = dedent(md);
+  const lines = md.split('\n');
+  const out = [];
+  let inCodeBlock = false;
+  let codeLang = '';
+  let codeLines = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // Code block toggle
+    if (line.match(/^\s*```/)) {
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeLang = line.replace(/^```/, '').trim();
+        codeLines = [];
+        continue;
+      } else {
+        inCodeBlock = false;
+        out.push('```');
+        out.push(...codeLines);
+        out.push('```');
+        continue;
+      }
+    }
+
+    if (inCodeBlock) {
+      codeLines.push(line);
+      continue;
+    }
+
+    // Headers → bold
+    line = line.replace(/^#{1,6}\s+(.+)$/, '*$1*');
+
+    // Horizontal rules
+    if (line.match(/^(-{3,}|_{3,}|\*{3,})$/)) {
+      out.push('---');
+      continue;
+    }
+
+    // Unordered lists: - or * at start → bullet
+    line = line.replace(/^(\s*)[-*]\s+/, (match, indent) => {
+      const depth = Math.floor(indent.length / 2);
+      return '  '.repeat(depth) + '• ';
+    });
+
+    // Inline transforms (skip inside backticks)
+    line = transformInline(line);
+
+    out.push(line);
+  }
+
+  // Handle unclosed code block
+  if (inCodeBlock) {
+    out.push('```');
+    out.push(...codeLines);
+    out.push('```');
+  }
+
+  return out.join('\n').trim();
+}
+
+function transformInline(line) {
+  // Split by inline code to avoid transforming inside backticks
+  const parts = line.split(/(`[^`]+`)/g);
+
+  return parts.map((part, i) => {
+    // Odd indices are code spans — leave them alone
+    if (i % 2 === 1) return part;
+
+    // Links: [text](url) → <url|text>
+    part = part.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<$2|$1>');
+
+    // Images: ![alt](url) → <url|alt> (already handled by link regex above mostly, but just in case)
+    part = part.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<$2|$1>');
+
+    // Bold: **text** → *text*
+    part = part.replace(/\*\*(.+?)\*\*/g, '*$1*');
+
+    // Bold: __text__ → *text*
+    part = part.replace(/__(.+?)__/g, '*$1*');
+
+    // Italic: *text* → _text_ (but not inside bold which we already converted)
+    // Only match single * that aren't part of **
+    part = part.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '_$1_');
+
+    // Italic: _text_ → _text_ (already correct for Slack)
+
+    // Strikethrough: ~~text~~ → ~text~
+    part = part.replace(/~~(.+?)~~/g, '~$1~');
+
+    return part;
+  }).join('');
+}
+
+function copyOutput() {
+  const output = document.getElementById('output');
+  if (!output.value) return;
+
+  navigator.clipboard.writeText(output.value).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy to Clipboard';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+function clearAll() {
+  document.getElementById('input').value = '';
+  document.getElementById('output').value = '';
+  document.getElementById('preview').innerHTML = 'Slack preview will appear here...';
+}
+
+function renderPreview(slackMrkdwn) {
+  const preview = document.getElementById('preview');
+  let html = escapeHtml(slackMrkdwn);
+
+  // Code blocks first
+  html = html.replace(/```\n?([\s\S]*?)```/g, '<span class="code-block">$1</span>');
+
+  // Inline code
+  html = html.replace(/`([^`\n]+)`/g, '<span class="code-inline">$1</span>');
+
+  // Bold
+  html = html.replace(/\*([^*\n]+)\*/g, '<span class="bold">$1</span>');
+
+  // Italic
+  html = html.replace(/_([^_\n]+)_/g, '<span class="italic">$1</span>');
+
+  // Strikethrough
+  html = html.replace(/~([^~\n]+)~/g, '<span class="strike">$1</span>');
+
+  // Links
+  html = html.replace(/&lt;(https?:\/\/[^|&]+)\|([^&]+)&gt;/g, '<a href="$1" target="_blank">$2</a>');
+  html = html.replace(/&lt;(https?:\/\/[^&]+)&gt;/g, '<a href="$1" target="_blank">$1</a>');
+
+  // Blockquotes
+  html = html.replace(/^&gt; (.+)$/gm, '<span class="blockquote">$1</span>');
+
+  preview.innerHTML = html || 'Slack preview will appear here...';
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Auto-convert on input
+document.getElementById('input').addEventListener('input', () => {
+  convert();
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sumo Stats</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a14;
+  --surface: #12122a;
+  --surface-raised: #1a1a3a;
+  --surface-hover: #22224a;
+  --gold: #c8a55a;
+  --gold-light: #e8d5a0;
+  --gold-dim: #8a7340;
+  --cream: #e8e0d0;
+  --cream-dim: #9a9488;
+  --win: #3d9970;
+  --loss: #c0392b;
+  --border: #2a2a4a;
+  --r: 12px;
+  --r2: #6db3c4;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--cream);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(200,165,90,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 80% 90%, rgba(61,153,112,0.03) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+header {
+  position: relative;
+  z-index: 10;
+  padding: 1.5rem 2rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(18,18,42,0.95), rgba(10,10,20,0.9));
+  backdrop-filter: blur(20px);
+}
+
+.header-top {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.logo {
+  font-family: 'Crimson Pro', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.logo-sub {
+  font-size: 0.8rem;
+  color: var(--cream-dim);
+  font-weight: 300;
+  letter-spacing: 0.08em;
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1rem;
+  align-items: end;
+}
+
+.search-group { position: relative; display: flex; flex-direction: column; gap: 0.35rem; }
+
+.search-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--cream-dim);
+  font-weight: 500;
+}
+
+.search-box {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.search-box:focus-within { border-color: var(--gold-dim); }
+
+.search-box input {
+  flex: 1;
+  padding: 0.7rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--cream);
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  min-width: 0;
+}
+
+.search-box input::placeholder { color: var(--cream-dim); opacity: 0.5; }
+
+.search-box button {
+  padding: 0.7rem 1.2rem;
+  background: var(--gold);
+  color: var(--bg);
+  border: none;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.search-box button:hover { background: var(--gold-light); }
+
+.vs-divider {
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.2rem;
+  color: var(--gold-dim);
+  font-weight: 600;
+  padding-bottom: 0.7rem;
+  text-align: center;
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--r) var(--r);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 100;
+  display: none;
+}
+
+.dropdown.active { display: block; }
+
+.dd-item {
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(42,42,74,0.4);
+  transition: background 0.15s;
+}
+
+.dd-item:hover { background: var(--surface-hover); }
+.dd-item .hint { color: var(--gold-dim); font-size: 0.72rem; margin-left: 0.5rem; }
+.dd-msg { padding: 0.7rem 1rem; font-size: 0.82rem; color: var(--cream-dim); }
+
+main {
+  position: relative;
+  z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.proxy-bar {
+  padding: 0.4rem 2rem;
+  background: rgba(18,18,42,0.5);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.7rem;
+  color: var(--cream-dim);
+}
+
+.proxy-bar select {
+  background: var(--surface);
+  color: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  font-family: inherit;
+  font-size: 0.7rem;
+  outline: none;
+}
+
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cream-dim); display: inline-block; }
+.dot.ok { background: var(--win); }
+.dot.err { background: var(--loss); }
+
+.empty {
+  text-align: center;
+  padding: 6rem 2rem;
+  color: var(--cream-dim);
+}
+
+.empty .ring {
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  margin: 0 auto 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty .ring::before {
+  content: '';
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  border: 1px solid var(--gold-dim);
+  opacity: 0.4;
+}
+
+.empty h2 {
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.4rem;
+  color: var(--cream);
+  margin-bottom: 0.5rem;
+}
+
+.empty p { font-size: 0.85rem; max-width: 420px; margin: 0 auto; }
+
+.loading-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: var(--cream-dim);
+  gap: 0.75rem;
+}
+
+.spin {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: sp 0.8s linear infinite;
+}
+
+@keyframes sp { to { transform: rotate(360deg); } }
+
+.err-box {
+  background: rgba(192,57,43,0.1);
+  border: 1px solid rgba(192,57,43,0.3);
+  color: #e74c3c;
+  padding: 1rem 1.5rem;
+  border-radius: var(--r);
+  font-size: 0.85rem;
+  margin: 1rem 0;
+}
+
+.profiles {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.profiles.dual { grid-template-columns: 1fr 1fr; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  animation: fadeUp 0.5s ease-out;
+}
+
+.card-head {
+  padding: 1.5rem 2rem;
+  background: linear-gradient(135deg, var(--surface-raised), var(--surface));
+  border-bottom: 1px solid var(--border);
+}
+
+.shikona {
+  font-family: 'Crimson Pro', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1.2;
+}
+
+.highest-rank {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--cream-dim);
+  margin-top: 0.2rem;
+}
+
+.card-body { padding: 1.5rem 2rem; }
+
+.bio {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 1rem;
+}
+
+.bio-l {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cream-dim);
+  margin-bottom: 0.1rem;
+}
+
+.bio-v { font-size: 0.95rem; font-weight: 500; }
+
+.career-row {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.stat-box { text-align: center; }
+
+.stat-num {
+  font-family: 'Crimson Pro', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stat-num.w { color: var(--win); }
+.stat-num.l { color: var(--loss); }
+.stat-num.g { color: var(--gold); }
+
+.stat-lbl {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cream-dim);
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.ch-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.5rem;
+  animation: fadeUp 0.5s ease-out;
+}
+
+.ch-card.full { grid-column: 1 / -1; }
+
+.ch-title {
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gold);
+  margin-bottom: 1rem;
+}
+
+.ch-wrap { position: relative; height: 280px; }
+
+.tbl-wrap { overflow-x: auto; margin-top: 0.5rem; -webkit-overflow-scrolling: touch; }
+
+table.bt { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+
+table.bt th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cream-dim);
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+table.bt td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid rgba(42,42,74,0.3);
+  white-space: nowrap;
+}
+
+table.bt tr:hover td { background: rgba(42,42,74,0.3); }
+
+.rw { color: var(--win); font-weight: 600; }
+.rl { color: var(--loss); font-weight: 600; }
+.rn { color: var(--cream-dim); }
+.prize { color: var(--gold); font-size: 0.75rem; }
+
+.h2h-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.5rem 2rem;
+  margin-bottom: 2rem;
+  animation: fadeUp 0.5s ease-out;
+}
+
+.h2h-head {
+  font-family: 'Crimson Pro', serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--cream-dim);
+  margin-bottom: 1.25rem;
+}
+
+.h2h-score {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.h2h-name {
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.h2h-name.r1 { color: var(--gold); }
+.h2h-name.r2 { color: var(--r2); }
+
+.h2h-wins {
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  min-width: 2ch;
+  text-align: center;
+}
+
+.h2h-bar-wrap {
+  flex: 1;
+  height: 28px;
+  background: rgba(42,42,74,0.5);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+}
+
+.h2h-bar-l {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 14px 0 0 14px;
+  transition: width 0.6s ease;
+}
+
+.h2h-bar-r {
+  height: 100%;
+  background: var(--r2);
+  border-radius: 0 14px 14px 0;
+  flex: 1;
+}
+
+.h2h-total {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--cream-dim);
+  margin-bottom: 1rem;
+}
+
+.h2h-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  font-size: 0.82rem;
+}
+
+.h2h-meta-item { color: var(--cream-dim); }
+.h2h-meta-item span { color: var(--cream); font-weight: 500; }
+
+.h2h-toggle {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.h2h-toggle summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--gold-dim);
+  font-weight: 500;
+  list-style: none;
+}
+
+.h2h-toggle summary::-webkit-details-marker { display: none; }
+.h2h-toggle summary::before { content: '▸ '; }
+.h2h-toggle[open] summary::before { content: '▾ '; }
+
+.h2h-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--cream-dim);
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
+table.bt tr.h2h-r1 td { background: rgba(200,165,90,0.06); }
+table.bt tr.h2h-r2 td { background: rgba(109,179,196,0.06); }
+
+@media (max-width: 900px) {
+  .search-row { grid-template-columns: 1fr; }
+  .vs-divider { display: none; }
+  .profiles.dual { grid-template-columns: 1fr; }
+  .charts { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  header { padding: 0.75rem 1rem; }
+  .header-top { margin-bottom: 0.75rem; gap: 0.5rem; }
+  .logo { font-size: 1.4rem; }
+  .logo-sub { font-size: 0.65rem; }
+  main { padding: 0.75rem; }
+  .proxy-bar { padding: 0.3rem 0.75rem; font-size: 0.65rem; }
+
+  .search-box input { padding: 0.6rem 0.75rem; font-size: 0.9rem; }
+  .search-box button { padding: 0.6rem 1rem; font-size: 0.75rem; min-height: 44px; }
+  .dd-item { padding: 0.7rem 0.75rem; font-size: 0.82rem; min-height: 44px; display: flex; align-items: center; }
+
+  .card-head { padding: 0.75rem 1rem; }
+  .card-body { padding: 0.75rem 1rem; }
+  .shikona { font-size: 1.4rem; }
+  .highest-rank { font-size: 0.78rem; }
+  .bio { grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+  .bio-v { font-size: 0.85rem; }
+
+  .career-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+  }
+  .stat-box { text-align: center; }
+  .stat-num { font-size: 1.4rem; }
+  .stat-num.kim-name { font-size: 0.95rem; word-break: break-word; }
+  .stat-lbl { font-size: 0.6rem; }
+
+  .charts { gap: 1rem; margin-bottom: 1rem; }
+  .ch-card { padding: 1rem; }
+  .ch-title { font-size: 0.95rem; margin-bottom: 0.75rem; }
+  .ch-wrap { height: 220px !important; }
+
+  table.bt { font-size: 0.72rem; }
+  table.bt th { padding: 0.35rem 0.5rem; font-size: 0.58rem; }
+  table.bt td { padding: 0.3rem 0.5rem; }
+
+  .empty { padding: 3rem 1.5rem; }
+  .empty .ring { width: 80px; height: 80px; margin-bottom: 1.5rem; }
+  .empty .ring::before { width: 40px; height: 40px; }
+  .empty h2 { font-size: 1.2rem; }
+  .empty p { font-size: 0.8rem; }
+
+  .h2h-card { padding: 1rem; }
+  .h2h-score { flex-wrap: wrap; gap: 0.5rem; }
+  .h2h-name { font-size: 0.95rem; }
+  .h2h-wins { font-size: 1.3rem; }
+  .h2h-bar-wrap { width: 100%; order: 3; height: 22px; }
+  .h2h-meta { gap: 0.75rem; font-size: 0.75rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="proxy-bar">
+  <span>CORS Proxy:</span>
+  <select id="proxySel">
+    <option value="auto">Auto (try all)</option>
+    <option value="self" selected>Self-hosted</option>
+    <option value="corsproxy">corsproxy.io</option>
+    <option value="allorigins">allorigins.win</option>
+    <option value="none">None (same-origin)</option>
+  </select>
+  <div class="dot" id="pDot"></div>
+  <span id="pMsg"></span>
+</div>
+
+<header>
+  <div class="header-top">
+    <div class="logo">Sumo Stats</div>
+    <div class="logo-sub">Rikishi Explorer · powered by SumoDB</div>
+  </div>
+  <div class="search-row">
+    <div class="search-group" id="sg1">
+      <div class="search-label">Rikishi 1</div>
+      <div class="search-box">
+        <input type="text" id="q1" placeholder="e.g. Hakuho, Terunofuji…" autocomplete="off">
+        <button id="btn1">Search</button>
+      </div>
+      <div class="dropdown" id="dd1"></div>
+    </div>
+    <div class="vs-divider">VS</div>
+    <div class="search-group" id="sg2">
+      <div class="search-label">Rikishi 2 (compare)</div>
+      <div class="search-box">
+        <input type="text" id="q2" placeholder="Leave empty for single view" autocomplete="off">
+        <button id="btn2">Search</button>
+      </div>
+      <div class="dropdown" id="dd2"></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="out">
+    <div class="empty">
+      <div class="ring"></div>
+      <h2>Enter the Ring</h2>
+      <p>Search for a rikishi above to explore career stats, basho results, and rank progression. Search two names to compare them side by side.</p>
+    </div>
+  </div>
+</main>
+
+<script>
+const BASE = 'https://sumodb.sumogames.de';
+const PROXIES = {
+  self: u => `/api/sumodb-proxy?url=${encodeURIComponent(u)}`,
+  corsproxy: u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  allorigins: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  none: u => u,
+};
+const PROXY_ORDER = ['self', 'corsproxy', 'allorigins'];
+let proxy = 'auto';
+let lastWorkingProxy = 'self';
+let data = [null, null];
+let charts = {};
+let h2hData = null;
+
+const $ = s => document.querySelector(s);
+
+$('#proxySel').onchange = e => { proxy = e.target.value; $('#pMsg').textContent = ''; $('#pDot').className = 'dot'; };
+$('#btn1').onclick = () => search(0);
+$('#btn2').onclick = () => search(1);
+$('#q1').onkeydown = e => { if (e.key === 'Enter') search(0); };
+$('#q2').onkeydown = e => { if (e.key === 'Enter') search(1); };
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#sg1')) $('#dd1').classList.remove('active');
+  if (!e.target.closest('#sg2')) $('#dd2').classList.remove('active');
+});
+
+async function pFetch(url) {
+  const dot = $('#pDot'), msg = $('#pMsg');
+  const tryProxy = async (name) => {
+    const pUrl = PROXIES[name](url);
+    const res = await fetch(pUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    if (!text || text.length < 100) throw new Error('Empty response');
+    return { text, name };
+  };
+
+  if (proxy === 'auto') {
+    // Try last working proxy first, then others
+    const order = [lastWorkingProxy, ...PROXY_ORDER.filter(p => p !== lastWorkingProxy)];
+    let lastErr;
+    for (const p of order) {
+      try {
+        const result = await tryProxy(p);
+        lastWorkingProxy = p;
+        dot.className = 'dot ok';
+        msg.textContent = `via ${p}`;
+        return result.text;
+      } catch (e) {
+        lastErr = e;
+        console.warn(`Proxy ${p} failed:`, e.message);
+      }
+    }
+    dot.className = 'dot err';
+    msg.textContent = 'All proxies failed';
+    throw new Error(`All proxies failed. Last error: ${lastErr?.message}`);
+  } else {
+    // Manual proxy selection
+    const pUrl = PROXIES[proxy](url);
+    const res = await fetch(pUrl);
+    if (!res.ok) {
+      dot.className = 'dot err';
+      msg.textContent = `HTTP ${res.status}`;
+      throw new Error(`HTTP ${res.status} from proxy`);
+    }
+    dot.className = 'dot ok';
+    msg.textContent = `via ${proxy}`;
+    return await res.text();
+  }
+}
+
+async function search(slot) {
+  const q = $(`#q${slot+1}`).value.trim();
+  if (!q) return;
+  const dd = $(`#dd${slot+1}`);
+  dd.innerHTML = '<div class="dd-msg"><span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle;margin-right:6px"></span>Searching…</div>';
+  dd.classList.add('active');
+
+  try {
+    const html = await pFetch(`${BASE}/Rikishi.aspx?shikona=${encodeURIComponent(q)}&heya=-1&shusshin=-1&b=-1&high=-1&hd=-1&entry=-1&intai=-1&sort=1`);
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const bodyText = doc.body ? doc.body.textContent : '';
+    const isSingleProfile = bodyText.includes('Highest Rank') && bodyText.includes('Career Record');
+
+    if (isSingleProfile) {
+      dd.classList.remove('active');
+      let rid = null;
+      const rLinks = doc.querySelectorAll('a[href*="Rikishi_basho.aspx?r="]');
+      if (rLinks.length > 0) {
+        const m = rLinks[0].getAttribute('href').match(/r=(\d+)/);
+        if (m) rid = m[1];
+      }
+      data[slot] = parseProfile(doc);
+      data[slot]._id = rid;
+      if (rid) {
+        try {
+          const kimHtml = await pFetch(`${BASE}/Rikishi_kim.aspx?r=${rid}`);
+          const kimDoc = new DOMParser().parseFromString(kimHtml, 'text/html');
+          data[slot].kimarite = parseKimarite(kimDoc);
+        } catch (_) {}
+      }
+      render();
+    } else {
+      const links = doc.querySelectorAll('a[href*="Rikishi.aspx?r="]');
+      const seen = new Set();
+      const matches = [];
+      links.forEach(a => {
+        const href = a.getAttribute('href') || '';
+        const m = href.match(/r=(\d+)/);
+        if (!m) return;
+        const id = m[1];
+        if (seen.has(id)) return;
+        seen.add(id);
+        const name = a.textContent.trim();
+        if (!name || name.length > 60) return;
+        let hint = '';
+        const tr = a.closest('tr');
+        if (tr) {
+          const tds = tr.querySelectorAll('td');
+          const bits = [];
+          tds.forEach((td, i) => {
+            if (i > 0) { const t = td.textContent.trim(); if (t && t !== name) bits.push(t); }
+          });
+          hint = bits.join(' · ').substring(0, 80);
+        }
+        matches.push({ id, name, hint });
+      });
+
+      if (matches.length === 0) {
+        dd.innerHTML = '<div class="dd-msg">No results found. Try a different spelling.</div>';
+        setTimeout(() => dd.classList.remove('active'), 3000);
+      } else if (matches.length === 1) {
+        dd.classList.remove('active');
+        await loadRikishi(slot, matches[0].id, matches[0].name);
+      } else {
+        dd.innerHTML = '';
+        matches.slice(0, 30).forEach(m => {
+          const el = document.createElement('div');
+          el.className = 'dd-item';
+          el.innerHTML = `${esc(m.name)}${m.hint ? `<span class="hint">${esc(m.hint)}</span>` : ''}`;
+          el.onclick = () => { dd.classList.remove('active'); loadRikishi(slot, m.id, m.name); };
+          dd.appendChild(el);
+        });
+      }
+    }
+  } catch (err) {
+    dd.innerHTML = `<div class="dd-msg" style="color:var(--loss)">Error: ${esc(err.message)}<br><span style="font-size:0.7rem;color:var(--cream-dim)">Try a different proxy in the dropdown, or check the browser console.</span></div>`;
+    console.error('Search error:', err);
+  }
+}
+
+async function loadRikishi(slot, id, name) {
+  $(`#q${slot+1}`).value = name;
+  const out = $('#out');
+  out.innerHTML = '<div class="loading-bar"><div class="spin"></div>Loading from SumoDB…</div>';
+  try {
+    const [profileHtml, kimHtml] = await Promise.all([
+      pFetch(`${BASE}/Rikishi.aspx?r=${id}`),
+      pFetch(`${BASE}/Rikishi_kim.aspx?r=${id}`).catch(() => null),
+    ]);
+    const doc = new DOMParser().parseFromString(profileHtml, 'text/html');
+    data[slot] = parseProfile(doc);
+    data[slot]._id = id;
+    if (kimHtml) {
+      const kimDoc = new DOMParser().parseFromString(kimHtml, 'text/html');
+      data[slot].kimarite = parseKimarite(kimDoc);
+    }
+    render();
+  } catch (err) {
+    out.innerHTML = `<div class="err-box">Failed to load rikishi: ${esc(err.message)}</div>`;
+  }
+}
+
+// ─── Parse Profile ────────────────────────────────────────
+function parseProfile(doc) {
+  const p = {
+    shikona: '', highestRank: '', realName: '', birthDate: '',
+    shusshin: '', heya: '', height: '', weight: '', debut: '',
+    intai: '', careerRecord: '', makuuchiRecord: '',
+    yusho: 0, junYusho: 0, kinboshi: 0,
+    basho: [], totalW: 0, totalL: 0,
+    kimarite: null,
+  };
+
+  // Title
+  const title = doc.querySelector('title');
+  if (title) {
+    p.shikona = title.textContent.trim().replace(/\s*Rikishi Information\s*/i, '').trim();
+  }
+
+  // Bio: scan all TD pairs for known labels
+  const tds = doc.querySelectorAll('td');
+  for (let i = 0; i < tds.length; i++) {
+    const key = tds[i].textContent.trim();
+    const val = tds[i + 1] ? tds[i + 1].textContent.trim() : '';
+    switch (key) {
+      case 'Highest Rank': p.highestRank = val; break;
+      case 'Real Name': p.realName = val; break;
+      case 'Birth Date': p.birthDate = val; break;
+      case 'Shusshin': p.shusshin = val; break;
+      case 'Heya': p.heya = val; break;
+      case 'Height and Weight': {
+        const hw = val.split(/\s+/);
+        const ci = hw.indexOf('cm');
+        const ki = hw.indexOf('kg');
+        if (ci >= 1) p.height = hw.slice(0, ci + 1).join(' ');
+        if (ki >= 1) p.weight = hw.slice(ci + 1, ki + 1).join(' ');
+        break;
+      }
+      case 'Shikona': {
+        if (val) {
+          const parts = val.split(' - ');
+          p.shikona = parts[parts.length - 1].trim() || p.shikona;
+        }
+        break;
+      }
+      case 'Hatsu Dohyo': p.debut = val; break;
+      case 'Intai': p.intai = val; break;
+      case 'Career Record': p.careerRecord = val; break;
+      case 'In Makuuchi': p.makuuchiRecord = val; break;
+    }
+  }
+
+  // Career numbers
+  const crm = p.careerRecord.match(/^(\d+)-(\d+)/);
+  if (crm) { p.totalW = parseInt(crm[1]); p.totalL = parseInt(crm[2]); }
+
+  const ym = p.makuuchiRecord.match(/(\d+)\s*Yusho/);
+  if (ym) p.yusho = parseInt(ym[1]);
+  const jm = p.makuuchiRecord.match(/(\d+)\s*Jun-Yusho/);
+  if (jm) p.junYusho = parseInt(jm[1]);
+  const km = p.makuuchiRecord.match(/(\d+)\s*Kinboshi/);
+  if (km) p.kinboshi = parseInt(km[1]);
+
+  // ── Basho results: find all <a> whose text is YYYY.MM
+  const allAs = doc.querySelectorAll('a');
+  allAs.forEach(a => {
+    const txt = a.textContent.trim();
+    if (!/^\d{4}\.\d{2}$/.test(txt)) return;
+
+    const tr = a.closest('tr');
+    if (!tr) return;
+    const cells = tr.querySelectorAll('td');
+    if (cells.length < 3) return;
+
+    // Find date cell index
+    let di = -1;
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i].contains(a)) { di = i; break; }
+    }
+    if (di < 0) return;
+
+    // Rank: next cell
+    const rank = cells[di + 1] ? cells[di + 1].textContent.trim() : '';
+
+    // Record: find first cell after di+1 with W-L pattern
+    let record = '', recordIdx = -1;
+    for (let i = di + 2; i < cells.length; i++) {
+      const ct = cells[i].textContent.trim();
+      if (/^\d+-\d+/.test(ct)) { record = ct; recordIdx = i; break; }
+    }
+    if (!record) return;
+
+    // Prizes: cell after record
+    let prizes = '';
+    if (recordIdx >= 0 && cells[recordIdx + 1]) {
+      prizes = cells[recordIdx + 1].textContent.trim();
+      // Filter out height/weight strings from prizes
+      if (/^\d+(\.\d+)?\s*cm/.test(prizes)) prizes = '';
+    }
+
+    // Parse W-L-A, strip trailing Y/D/J
+    const cleaned = record.replace(/\s*[YDJF]\s*$/i, '').trim();
+    const parts = cleaned.split('-').map(s => parseInt(s));
+
+    const bm = txt.match(/(\d{4})\.(\d{2})/);
+    p.basho.push({
+      date: txt,
+      year: bm ? parseInt(bm[1]) : 0,
+      month: bm ? parseInt(bm[2]) : 0,
+      rank,
+      record,
+      w: parts[0] || 0,
+      l: parts[1] || 0,
+      abs: parts[2] || 0,
+      prizes,
+    });
+  });
+
+  p.basho.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+
+  if (p.totalW === 0 && p.basho.length > 0) {
+    p.totalW = p.basho.reduce((s, b) => s + b.w, 0);
+    p.totalL = p.basho.reduce((s, b) => s + b.l, 0);
+  }
+
+  return p;
+}
+
+// ─── Parse Kimarite ───────────────────────────────────────
+function parseKimarite(doc) {
+  const kim = { wins: [], losses: [], winKV50: null, lossKV50: null, winUnique: 0, lossUnique: 0 };
+
+  // The left sidebar has two <p><font> sections: Wins then Losses
+  // Each contains a table.ro_left with technique rows, then text with KV50 and unique count
+  const fonts = doc.querySelectorAll('td.layoutleft font');
+  let section = null; // 'wins' or 'losses'
+
+  fonts.forEach(font => {
+    const text = font.textContent || '';
+    const bolds = font.querySelectorAll('b > u');
+    bolds.forEach(u => {
+      const t = u.textContent.trim();
+      if (/^Wins\s+of\s+/i.test(t)) section = 'wins';
+      else if (/^Losses\s+of\s+/i.test(t)) section = 'losses';
+    });
+    if (!section) return;
+
+    const table = font.querySelector('table.ro_left');
+    if (!table) return;
+
+    const techniques = [];
+    table.querySelectorAll('tr').forEach(tr => {
+      const tds = tr.querySelectorAll('td');
+      if (tds.length < 2) return;
+      const name = tds[0].textContent.trim();
+      const countText = tds[1].textContent.trim();
+      const count = parseInt(countText) || 0;
+      if (name && count > 0) techniques.push({ name, count });
+    });
+    techniques.sort((a, b) => b.count - a.count);
+
+    // Extract KV50 and unique count from text after table
+    const kvMatch = text.match(/KV50:\s*([\d.]+)/);
+    const uniqueMatch = text.match(/(\d+)\s+different\s+kimarite/);
+
+    if (section === 'wins') {
+      kim.wins = techniques;
+      if (kvMatch) kim.winKV50 = parseFloat(kvMatch[1]);
+      if (uniqueMatch) kim.winUnique = parseInt(uniqueMatch[1]);
+    } else {
+      kim.losses = techniques;
+      if (kvMatch) kim.lossKV50 = parseFloat(kvMatch[1]);
+      if (uniqueMatch) kim.lossUnique = parseInt(uniqueMatch[1]);
+    }
+
+    section = null; // reset for next font block
+  });
+
+  // Fallback: parse from rb_basho spans in the right column if left sidebar didn't work
+  if (kim.wins.length === 0 && kim.losses.length === 0) {
+    let currentSection = null;
+    const h2s = doc.querySelectorAll('h2');
+    h2s.forEach(h2 => {
+      const t = h2.textContent.trim();
+      if (/^Wins\s+of\s+/i.test(t)) currentSection = 'wins';
+      else if (/^Losses\s+of\s+/i.test(t)) currentSection = 'losses';
+    });
+
+    // Parse rb_basho spans
+    const spans = doc.querySelectorAll('span.rb_basho');
+    let inWins = true;
+    spans.forEach(span => {
+      const t = span.textContent.trim();
+      // Check preceding anchor to determine section
+      const anchor = span.previousElementSibling;
+      if (anchor && anchor.tagName === 'A' && anchor.name) {
+        inWins = anchor.name.startsWith('0');
+      }
+      const m = t.match(/^(\S+)\s+(\d+)/);
+      if (!m) return;
+      const name = m[1];
+      const count = parseInt(m[2]);
+      if (name === 'unknown') return;
+      if (inWins) kim.wins.push({ name, count });
+      else kim.losses.push({ name, count });
+    });
+    kim.wins.sort((a, b) => b.count - a.count);
+    kim.losses.sort((a, b) => b.count - a.count);
+  }
+
+  return kim;
+}
+
+// ─── Parse Head-to-Head ───────────────────────────────────
+function parseH2H(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const result = { wins1: 0, wins2: 0, bouts: [] };
+
+  // Title format: "Name1 vs. Name2 W1[+P1]-W2[+P2]"
+  const title = doc.querySelector('title');
+  if (title) {
+    const m = title.textContent.match(/(\d+)(?:\[\+(\d+)\])?\s*-\s*(\d+)(?:\[\+(\d+)\])?/);
+    if (m) {
+      result.wins1 = parseInt(m[1]) + (parseInt(m[2]) || 0);
+      result.wins2 = parseInt(m[3]) + (parseInt(m[4]) || 0);
+    }
+  }
+
+  // Parse bouts from table.ro_torikumi
+  const rows = doc.querySelectorAll('table.ro_torikumi tr');
+  rows.forEach(tr => {
+    const tds = tr.querySelectorAll('td');
+    if (tds.length < 7) return;
+
+    const bashoLink = tds[0].querySelector('a');
+    const basho = bashoLink ? bashoLink.textContent.trim() : '';
+    if (!/^\d{4}\.\d{2}$/.test(basho)) return;
+
+    const dayLink = tds[1].querySelector('a');
+    const day = dayLink ? dayLink.textContent.trim().replace(/^Day\s*/i, '') : '';
+
+    // Rikishi 1: rank extracted from "M1e Name" pattern
+    const opp1 = tds[2].textContent.trim();
+    const r1m = opp1.match(/^([A-Z][a-z]*\d*[ew]?)\s/);
+    const rank1 = r1m ? r1m[1] : opp1.split(' ')[0];
+
+    // Winner: hoshi_shiro on r1's side = r1 wins
+    const img1 = tds[3].querySelector('img');
+    const src1 = img1 ? (img1.getAttribute('src') || '') : '';
+    const winner = src1.includes('hoshi_shiro') ? 1 : 2;
+
+    // Kimarite
+    const kimarite = tds[4].textContent.trim().replace(/\u00a0/g, '');
+
+    // Rikishi 2 rank
+    const opp2 = tds[6].textContent.trim();
+    const r2m = opp2.match(/^([A-Z][a-z]*\d*[ew]?)\s/);
+    const rank2 = r2m ? r2m[1] : opp2.split(' ')[0];
+
+    result.bouts.push({ basho, day, rank1, rank2, kimarite, winner });
+  });
+
+  result.bouts.sort((a, b) => b.basho.localeCompare(a.basho) || parseInt(b.day || 0) - parseInt(a.day || 0));
+  return result;
+}
+
+async function fetchH2H(id1, id2) {
+  try {
+    const html = await pFetch(`${BASE}/Rikishi_opp.aspx?r=${id1}&r2=${id2}`);
+    h2hData = parseH2H(html);
+    const el = document.getElementById('h2hSlot');
+    if (el) el.innerHTML = h2hCard();
+  } catch (err) {
+    console.warn('H2H fetch failed:', err);
+    const el = document.getElementById('h2hSlot');
+    if (el) el.innerHTML = '';
+  }
+}
+
+function h2hCard() {
+  if (!h2hData || !data[0] || !data[1]) return '';
+  const d = h2hData;
+  const total = d.wins1 + d.wins2;
+  if (total === 0) return '<div class="h2h-card"><div class="h2h-head">Head to Head</div><p style="color:var(--cream-dim);font-size:0.85rem">No head-to-head record found.</p></div>';
+
+  const pct1 = (d.wins1 / total * 100).toFixed(1);
+
+  let topKim = '—', topKimCount = 0, lastMeeting = '—', streakName = '—', streakCount = 0;
+
+  if (d.bouts.length > 0) {
+    const kimCounts = {};
+    d.bouts.forEach(b => { if (b.kimarite) kimCounts[b.kimarite] = (kimCounts[b.kimarite] || 0) + 1; });
+    const topEntry = Object.entries(kimCounts).sort((a, b) => b[1] - a[1])[0];
+    if (topEntry) { topKim = topEntry[0]; topKimCount = topEntry[1]; }
+
+    lastMeeting = d.bouts[0].basho;
+
+    const lastWinner = d.bouts[0].winner;
+    streakCount = 0;
+    for (const b of d.bouts) {
+      if (b.winner === lastWinner) streakCount++;
+      else break;
+    }
+    streakName = lastWinner === 1 ? data[0].shikona : data[1].shikona;
+  }
+
+  const MAX_BOUTS = 30;
+  const showBouts = d.bouts.slice(0, MAX_BOUTS);
+
+  let h = `<div class="h2h-card">
+    <div class="h2h-head">Head to Head</div>
+    <div class="h2h-score">
+      <div class="h2h-name r1">${esc(data[0].shikona)}</div>
+      <div class="h2h-wins" style="color:var(--gold)">${d.wins1}</div>
+      <div class="h2h-bar-wrap">
+        <div class="h2h-bar-l" style="width:${pct1}%"></div>
+        <div class="h2h-bar-r"></div>
+      </div>
+      <div class="h2h-wins" style="color:var(--r2)">${d.wins2}</div>
+      <div class="h2h-name r2">${esc(data[1].shikona)}</div>
+    </div>
+    <div class="h2h-total">${total} bouts</div>
+    <div class="h2h-meta">
+      <div class="h2h-meta-item">Most common kimarite: <span>${esc(topKim)}${topKimCount ? ' (' + topKimCount + ')' : ''}</span></div>
+      <div class="h2h-meta-item">Last meeting: <span>${esc(lastMeeting)}</span></div>
+      <div class="h2h-meta-item">Win streak: <span>${esc(streakName)} (${streakCount})</span></div>
+    </div>`;
+
+  if (showBouts.length > 0) {
+    h += `<details class="h2h-toggle">
+      <summary>Bout History${d.bouts.length > MAX_BOUTS ? ' (showing ' + MAX_BOUTS + ' of ' + d.bouts.length + ')' : ' (' + d.bouts.length + ')'}</summary>
+      <div class="tbl-wrap" style="margin-top:0.75rem">
+        <table class="bt"><thead><tr>
+          <th>Basho</th><th>Day</th>
+          <th>${esc(data[0].shikona)}</th>
+          <th>Result</th>
+          <th>Kimarite</th>
+          <th>${esc(data[1].shikona)}</th>
+        </tr></thead><tbody>`;
+
+    showBouts.forEach(b => {
+      const cls = b.winner === 1 ? 'h2h-r1' : 'h2h-r2';
+      const resCls = b.winner === 1 ? 'rw' : 'rl';
+      h += `<tr class="${cls}">
+        <td>${esc(b.basho)}</td>
+        <td>${esc(b.day)}</td>
+        <td>${esc(b.rank1)}</td>
+        <td class="${resCls}">${b.winner === 1 ? 'W' : 'L'}</td>
+        <td>${esc(b.kimarite) || '—'}</td>
+        <td>${esc(b.rank2)}</td>
+      </tr>`;
+    });
+
+    h += '</tbody></table></div></details>';
+  }
+
+  h += '</div>';
+  return h;
+}
+
+// ─── Rank helpers ─────────────────────────────────────────
+function rankNum(r) {
+  if (!r) return 999;
+  r = r.trim();
+  const map = [
+    [/^Y(\d*)([ew]?)$/i, (_, n, ew) => 1 + (parseInt(n)||1) - 1 + (ew === 'w' ? 0.5 : 0)],
+    [/^O(\d*)([ew]?)$/i, (_, n, ew) => 10 + (parseInt(n)||1) + (ew === 'w' ? 0.5 : 0)],
+    [/^S(\d*)([ew]?)$/i, (_, n, ew) => 20 + (parseInt(n)||1) + (ew === 'w' ? 0.5 : 0)],
+    [/^K(\d*)([ew]?)$/i, (_, n, ew) => 25 + (parseInt(n)||1) + (ew === 'w' ? 0.5 : 0)],
+    [/^M(\d+)([ew]?)$/i, (_, n, ew) => 30 + parseInt(n) + (ew === 'w' ? 0.5 : 0)],
+    [/^J(\d+)([ew]?)$/i, (_, n, ew) => 50 + parseInt(n) + (ew === 'w' ? 0.5 : 0)],
+    [/^Ms(\d*)([ew]?)$/i, (_, n) => 70 + (parseInt(n)||0)],
+    [/^Sd(\d*)([ew]?)$/i, (_, n) => 90 + (parseInt(n)||0)],
+    [/^Jd(\d*)([ew]?)$/i, (_, n) => 110 + (parseInt(n)||0)],
+    [/^Jk(\d*)([ew]?)$/i, (_, n) => 130 + (parseInt(n)||0)],
+    [/^Mz/i, () => 150],
+  ];
+  for (const [re, fn] of map) {
+    const m = r.match(re);
+    if (m) return fn(...m);
+  }
+  return 999;
+}
+
+function rankLbl(n) {
+  if (n < 5) return 'Y';
+  if (n < 20) return 'O';
+  if (n < 25) return 'S';
+  if (n < 30) return 'K';
+  if (n < 50) return 'M' + Math.max(1, Math.round(n - 30));
+  if (n < 70) return 'J' + Math.max(1, Math.round(n - 50));
+  if (n < 90) return 'Ms';
+  if (n < 110) return 'Sd';
+  if (n < 130) return 'Jd';
+  if (n < 150) return 'Jk';
+  return 'Mz';
+}
+
+// ─── Render ───────────────────────────────────────────────
+function render() {
+  const out = $('#out');
+  const has0 = data[0] !== null;
+  const has1 = data[1] !== null;
+  if (!has0 && !has1) return;
+
+  Object.values(charts).forEach(c => { try { c.destroy(); } catch(e) {} });
+  charts = {};
+
+  let h = '';
+  const dual = has0 && has1;
+
+  h += `<div class="profiles ${dual ? 'dual' : ''}">`;
+  if (has0) h += profileCard(data[0], 0);
+  if (has1) h += profileCard(data[1], 1);
+  h += '</div>';
+
+  if (dual && data[0]._id && data[1]._id) {
+    h += '<div id="h2hSlot"><div class="h2h-loading"><div class="spin"></div>Loading head-to-head record…</div></div>';
+  }
+
+  h += '<div class="charts">';
+  const anyBasho = (has0 && data[0].basho.length > 0) || (has1 && data[1].basho.length > 0);
+  if (anyBasho) {
+    h += '<div class="ch-card"><div class="ch-title">Win Rate per Basho</div><div class="ch-wrap"><canvas id="cWR"></canvas></div></div>';
+    h += '<div class="ch-card"><div class="ch-title">Rank Progression</div><div class="ch-wrap"><canvas id="cRank"></canvas></div></div>';
+  }
+
+  if (has0 && data[0].totalW > 0) h += `<div class="ch-card"><div class="ch-title">${esc(data[0].shikona)} — Career W/L</div><div class="ch-wrap"><canvas id="cD0"></canvas></div></div>`;
+  if (has1 && data[1].totalW > 0) h += `<div class="ch-card"><div class="ch-title">${esc(data[1].shikona)} — Career W/L</div><div class="ch-wrap"><canvas id="cD1"></canvas></div></div>`;
+
+  const anyKim = (has0 && data[0].kimarite?.wins.length > 0) || (has1 && data[1].kimarite?.wins.length > 0);
+  if (anyKim) {
+    h += `<div class="ch-card"><div class="ch-title">Top Winning Techniques</div><div class="ch-wrap" style="height:320px"><canvas id="cKimBar"></canvas></div></div>`;
+    h += `<div class="ch-card"><div class="ch-title">Technique Profile</div><div class="ch-wrap" style="height:320px"><canvas id="cKimRadar"></canvas></div></div>`;
+  }
+
+  if (anyBasho) {
+    h += `<div class="ch-card full"><div class="ch-title">Basho Results</div>${bashoTable()}</div>`;
+  }
+
+  if (anyKim) {
+    h += `<div class="ch-card full"><div class="ch-title">Kimarite Breakdown</div>${kimTable()}</div>`;
+  }
+  h += '</div>';
+
+  out.innerHTML = h;
+
+  if (dual && data[0]._id && data[1]._id) {
+    h2hData = null;
+    fetchH2H(data[0]._id, data[1]._id);
+  }
+
+  requestAnimationFrame(() => {
+    if (anyBasho) { drawWR(); drawRank(); }
+    if (has0 && data[0].totalW > 0) drawDonut(0);
+    if (has1 && data[1].totalW > 0) drawDonut(1);
+    if (anyKim) { drawKimBar(); drawKimRadar(); }
+  });
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+function profileCard(d, idx) {
+  const accent = idx === 0 ? 'var(--gold)' : 'var(--r2)';
+  const total = d.totalW + d.totalL;
+  const wr = total > 0 ? ((d.totalW / total) * 100).toFixed(1) : '—';
+
+  return `
+    <div class="card" style="border-top: 3px solid ${accent};">
+      <div class="card-head">
+        <div class="shikona" style="color:${accent}">${esc(d.shikona) || 'Unknown'}</div>
+        <div class="highest-rank">${esc(d.highestRank)}</div>
+      </div>
+      <div class="card-body">
+        <div class="bio">
+          ${bi('Real Name', d.realName)}
+          ${bi('Birth Date', d.birthDate)}
+          ${bi('Birthplace', d.shusshin)}
+          ${bi('Stable', d.heya)}
+          ${bi('Height', d.height)}
+          ${bi('Weight', d.weight)}
+          ${bi('Debut', d.debut)}
+          ${d.intai ? bi('Retired', d.intai) : ''}
+        </div>
+        <div class="career-row">
+          <div class="stat-box"><div class="stat-num w">${d.totalW || '—'}</div><div class="stat-lbl">Wins</div></div>
+          <div class="stat-box"><div class="stat-num l">${d.totalL || '—'}</div><div class="stat-lbl">Losses</div></div>
+          <div class="stat-box"><div class="stat-num g">${wr}%</div><div class="stat-lbl">Win Rate</div></div>
+          <div class="stat-box"><div class="stat-num" style="color:var(--cream)">${d.basho.length}</div><div class="stat-lbl">Basho</div></div>
+          ${d.yusho ? `<div class="stat-box"><div class="stat-num g">${d.yusho}</div><div class="stat-lbl">Yūshō</div></div>` : ''}
+          ${d.junYusho ? `<div class="stat-box"><div class="stat-num" style="color:var(--cream)">${d.junYusho}</div><div class="stat-lbl">Jun-Yūshō</div></div>` : ''}
+          ${d.kinboshi ? `<div class="stat-box"><div class="stat-num" style="color:var(--cream)">${d.kinboshi}</div><div class="stat-lbl">Kinboshi</div></div>` : ''}
+        </div>
+        ${d.kimarite && d.kimarite.wins.length > 0 ? `
+        <div class="career-row">
+          <div class="stat-box"><div class="stat-num g kim-name">${esc(d.kimarite.wins[0].name)}</div><div class="stat-lbl">Favourite Technique</div></div>
+          ${d.kimarite.winKV50 !== null ? `<div class="stat-box"><div class="stat-num" style="color:var(--cream)">${d.kimarite.winKV50}</div><div class="stat-lbl">KV50 Diversity</div></div>` : ''}
+          <div class="stat-box"><div class="stat-num" style="color:var(--cream)">${d.kimarite.winUnique}</div><div class="stat-lbl">Unique Techniques</div></div>
+        </div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function bi(label, val) {
+  if (!val) return '';
+  return `<div><div class="bio-l">${label}</div><div class="bio-v">${esc(val)}</div></div>`;
+}
+
+// ─── Charts ───────────────────────────────────────────────
+Chart.defaults.color = '#e8e0d0';
+Chart.defaults.font.family = 'Outfit';
+
+function gatherLabels() {
+  const s = new Set();
+  [0, 1].forEach(i => { if (data[i]) data[i].basho.forEach(b => s.add(b.date)); });
+  return Array.from(s).sort();
+}
+
+function drawWR() {
+  const cv = document.getElementById('cWR');
+  if (!cv) return;
+  const labels = gatherLabels();
+  const ds = [];
+  const colors = ['rgba(200,165,90,1)', 'rgba(109,179,196,1)'];
+  const fills = ['rgba(200,165,90,0.1)', 'rgba(109,179,196,0.1)'];
+
+  [0, 1].forEach(i => {
+    if (!data[i] || !data[i].basho.length) return;
+    const map = {};
+    data[i].basho.forEach(b => { const t = b.w + b.l; map[b.date] = t > 0 ? (b.w / t * 100) : null; });
+    ds.push({
+      label: data[i].shikona,
+      data: labels.map(l => map[l] ?? null),
+      borderColor: colors[i], backgroundColor: fills[i],
+      fill: true, tension: 0.3, pointRadius: 2, pointHoverRadius: 5, spanGaps: true,
+    });
+  });
+
+  charts.wr = new Chart(cv, {
+    type: 'line', data: { labels, datasets: ds },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: 'rgba(42,42,74,0.3)' }, ticks: { maxTicksLimit: 15, font: { size: 10 } } },
+        y: { min: 0, max: 100, grid: { color: 'rgba(42,42,74,0.3)' }, ticks: { callback: v => v + '%', font: { size: 10 } } },
+      },
+      plugins: {
+        legend: { display: ds.length > 1 },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(1)}%` } },
+      },
+    }
+  });
+}
+
+function drawRank() {
+  const cv = document.getElementById('cRank');
+  if (!cv) return;
+  const labels = gatherLabels();
+  const ds = [];
+  const colors = ['rgba(200,165,90,1)', 'rgba(109,179,196,1)'];
+  let minR = 999, maxR = 0;
+
+  [0, 1].forEach(i => {
+    if (!data[i] || !data[i].basho.length) return;
+    const map = {};
+    data[i].basho.forEach(b => {
+      const n = rankNum(b.rank);
+      if (n < 999) { map[b.date] = n; minR = Math.min(minR, n); maxR = Math.max(maxR, n); }
+    });
+    ds.push({
+      label: data[i].shikona,
+      data: labels.map(l => map[l] ?? null),
+      borderColor: colors[i], backgroundColor: 'transparent',
+      tension: 0.2, pointRadius: 2, pointHoverRadius: 5, spanGaps: true,
+    });
+  });
+
+  charts.rank = new Chart(cv, {
+    type: 'line', data: { labels, datasets: ds },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: 'rgba(42,42,74,0.3)' }, ticks: { maxTicksLimit: 15, font: { size: 10 } } },
+        y: {
+          reverse: true,
+          min: Math.max(0, minR - 3), max: Math.min(maxR + 5, 160),
+          grid: { color: 'rgba(42,42,74,0.3)' },
+          ticks: { callback: v => rankLbl(v), font: { size: 10 }, stepSize: 10 },
+        },
+      },
+      plugins: {
+        legend: { display: ds.length > 1 },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw !== null ? rankLbl(c.parsed.y) : '—'}` } },
+      },
+    }
+  });
+}
+
+function drawDonut(idx) {
+  const cv = document.getElementById(`cD${idx}`);
+  if (!cv) return;
+  const d = data[idx];
+  const accent = idx === 0 ? '#c8a55a' : '#6db3c4';
+
+  charts[`d${idx}`] = new Chart(cv, {
+    type: 'doughnut',
+    data: {
+      labels: ['Wins', 'Losses'],
+      datasets: [{ data: [d.totalW, d.totalL], backgroundColor: [accent, 'rgba(192,57,43,0.7)'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { position: 'bottom', labels: { padding: 20 } } },
+    }
+  });
+}
+
+// ─── Kimarite Charts ──────────────────────────────────────
+function drawKimBar() {
+  const cv = document.getElementById('cKimBar');
+  if (!cv) return;
+  const topN = 8;
+  const ds = [];
+  const colors = ['rgba(200,165,90,0.85)', 'rgba(109,179,196,0.85)'];
+  const borders = ['rgba(200,165,90,1)', 'rgba(109,179,196,1)'];
+
+  // Collect union of top technique names
+  const allNames = new Set();
+  [0, 1].forEach(i => {
+    if (!data[i]?.kimarite?.wins.length) return;
+    data[i].kimarite.wins.slice(0, topN).forEach(t => allNames.add(t.name));
+  });
+  const labels = Array.from(allNames).slice(0, topN);
+
+  [0, 1].forEach(i => {
+    if (!data[i]?.kimarite?.wins.length) return;
+    const map = {};
+    data[i].kimarite.wins.forEach(t => { map[t.name] = t.count; });
+    ds.push({
+      label: data[i].shikona,
+      data: labels.map(l => map[l] || 0),
+      backgroundColor: colors[i],
+      borderColor: borders[i],
+      borderWidth: 1,
+    });
+  });
+
+  charts.kimBar = new Chart(cv, {
+    type: 'bar',
+    data: { labels, datasets: ds },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: 'rgba(42,42,74,0.3)' }, ticks: { font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      },
+      plugins: {
+        legend: { display: ds.length > 1 },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.x} wins` } },
+      },
+    }
+  });
+}
+
+function drawKimRadar() {
+  const cv = document.getElementById('cKimRadar');
+  if (!cv) return;
+  const topN = 6;
+  const ds = [];
+  const colors = ['rgba(200,165,90,0.3)', 'rgba(109,179,196,0.3)'];
+  const borders = ['rgba(200,165,90,1)', 'rgba(109,179,196,1)'];
+
+  // Collect union of top techniques for radar axes
+  const allNames = new Set();
+  [0, 1].forEach(i => {
+    if (!data[i]?.kimarite?.wins.length) return;
+    data[i].kimarite.wins.slice(0, topN).forEach(t => allNames.add(t.name));
+  });
+  const labels = Array.from(allNames).slice(0, topN);
+  if (labels.length < 3) return; // radar needs at least 3 axes
+
+  [0, 1].forEach(i => {
+    if (!data[i]?.kimarite?.wins.length) return;
+    const totalWins = data[i].kimarite.wins.reduce((s, t) => s + t.count, 0);
+    const map = {};
+    data[i].kimarite.wins.forEach(t => { map[t.name] = totalWins > 0 ? (t.count / totalWins * 100) : 0; });
+    ds.push({
+      label: data[i].shikona,
+      data: labels.map(l => +(map[l] || 0).toFixed(1)),
+      backgroundColor: colors[i],
+      borderColor: borders[i],
+      borderWidth: 2,
+      pointBackgroundColor: borders[i],
+      pointRadius: 3,
+    });
+  });
+
+  charts.kimRadar = new Chart(cv, {
+    type: 'radar',
+    data: { labels, datasets: ds },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        r: {
+          beginAtZero: true,
+          grid: { color: 'rgba(42,42,74,0.4)' },
+          angleLines: { color: 'rgba(42,42,74,0.3)' },
+          pointLabels: { font: { size: 11 }, color: 'var(--cream)' },
+          ticks: { display: false },
+        },
+      },
+      plugins: {
+        legend: { display: ds.length > 1 },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.r}%` } },
+      },
+    }
+  });
+}
+
+// ─── Kimarite Table ───────────────────────────────────────
+function kimTable() {
+  const dual = data[0] && data[1];
+
+  // Build merged technique map
+  const techMap = new Map();
+  [0, 1].forEach(i => {
+    if (!data[i]?.kimarite) return;
+    const totalW = data[i].kimarite.wins.reduce((s, t) => s + t.count, 0);
+    const totalL = data[i].kimarite.losses.reduce((s, t) => s + t.count, 0);
+    data[i].kimarite.wins.forEach(t => {
+      const e = techMap.get(t.name) || {};
+      e[`w${i}`] = t.count;
+      e[`wp${i}`] = totalW > 0 ? (t.count / totalW * 100) : 0;
+      techMap.set(t.name, e);
+    });
+    data[i].kimarite.losses.forEach(t => {
+      const e = techMap.get(t.name) || {};
+      e[`l${i}`] = t.count;
+      e[`lp${i}`] = totalL > 0 ? (t.count / totalL * 100) : 0;
+      techMap.set(t.name, e);
+    });
+  });
+
+  // Sort by primary rikishi win count desc
+  const idx = data[0]?.kimarite ? 0 : 1;
+  const sorted = Array.from(techMap.entries()).sort((a, b) => (b[1][`w${idx}`] || 0) - (a[1][`w${idx}`] || 0));
+
+  let h = '<div class="tbl-wrap"><table class="bt"><thead><tr><th>Technique</th>';
+  if (dual) {
+    h += `<th>${esc(data[0].shikona)} W</th><th>W%</th><th>L</th><th>L%</th>`;
+    h += `<th>${esc(data[1].shikona)} W</th><th>W%</th><th>L</th><th>L%</th>`;
+  } else {
+    h += '<th>Wins</th><th>Win %</th><th>Losses</th><th>Loss %</th>';
+  }
+  h += '</tr></thead><tbody>';
+
+  sorted.forEach(([name, e]) => {
+    h += `<tr><td style="font-weight:500">${esc(name)}</td>`;
+    if (dual) {
+      h += kimTds(e, 0) + kimTds(e, 1);
+    } else {
+      h += kimTds(e, idx);
+    }
+    h += '</tr>';
+  });
+
+  h += '</tbody></table></div>';
+  return h;
+}
+
+function kimTds(e, i) {
+  const w = e[`w${i}`] || 0;
+  const wp = e[`wp${i}`] || 0;
+  const l = e[`l${i}`] || 0;
+  const lp = e[`lp${i}`] || 0;
+  return `<td class="rw">${w || '—'}</td><td>${w ? wp.toFixed(1) + '%' : '—'}</td><td class="rl">${l || '—'}</td><td>${l ? lp.toFixed(1) + '%' : '—'}</td>`;
+}
+
+// ─── Basho Table ──────────────────────────────────────────
+function bashoTable() {
+  const dual = data[0] && data[1];
+  const all = new Map();
+  [0, 1].forEach(i => {
+    if (!data[i]) return;
+    data[i].basho.forEach(b => { const e = all.get(b.date) || {}; e[`r${i}`] = b; all.set(b.date, e); });
+  });
+
+  const sorted = Array.from(all.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  const show = sorted.slice(0, 60);
+
+  let h = '<div class="tbl-wrap"><table class="bt"><thead><tr><th>Basho</th>';
+  if (dual) {
+    h += `<th>${esc(data[0].shikona)} Rank</th><th>Record</th><th>Prizes</th>`;
+    h += `<th>${esc(data[1].shikona)} Rank</th><th>Record</th><th>Prizes</th>`;
+  } else {
+    h += '<th>Rank</th><th>Record</th><th>Prizes</th>';
+  }
+  h += '</tr></thead><tbody>';
+
+  show.forEach(([date, e]) => {
+    h += `<tr><td>${date}</td>`;
+    if (dual) { h += bTds(e.r0) + bTds(e.r1); }
+    else { h += bTds(e.r0 || e.r1); }
+    h += '</tr>';
+  });
+
+  h += '</tbody></table></div>';
+  if (sorted.length > 60) h += `<p style="font-size:0.72rem;color:var(--cream-dim);margin-top:0.5rem;">Showing 60 of ${sorted.length} basho</p>`;
+  return h;
+}
+
+function bTds(b) {
+  if (!b) return '<td>—</td><td>—</td><td></td>';
+  const cls = b.w > b.l ? 'rw' : b.l > b.w ? 'rl' : 'rn';
+  return `<td>${esc(b.rank)}</td><td class="${cls}">${esc(b.record)}</td><td class="prize">${esc(b.prizes)}</td>`;
+}
+</script>
+</body>
+</html>

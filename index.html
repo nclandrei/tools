@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tools — Andrei-Mihai Nicolae</title>
+  <meta name="description" content="Self-contained browser tools by Andrei-Mihai Nicolae — file converters, trackers, sumo stats, and more.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-text: #1a1a1a;
+      --color-text-muted: #666;
+      --color-bg: #fafaf8;
+      --color-border: #e5e5e0;
+      --color-accent: #7c3aed;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-bg);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+    }
+
+    header {
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    header a {
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+
+    header a:hover {
+      color: var(--color-accent);
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 0.6rem 0.8rem;
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--color-text);
+      outline: none;
+      margin-bottom: 2rem;
+      transition: border-color 0.15s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--color-accent);
+    }
+
+    .search-input::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    .category {
+      margin-bottom: 2rem;
+    }
+
+    .category h2 {
+      font-size: 0.8rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      margin-bottom: 0.6rem;
+    }
+
+    .tools-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .tool-card {
+      display: block;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      text-decoration: none;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .tool-card:hover {
+      border-color: var(--color-accent);
+      background: #fff;
+    }
+
+    .tool-title {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--color-text);
+      margin-bottom: 0.15rem;
+    }
+
+    .tool-desc {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      line-height: 1.4;
+    }
+
+    .no-results {
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      display: none;
+    }
+
+    /* Hide category headings during search */
+    .searching .category h2 {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Tools</h1>
+      <a href="https://nicolaeandrei.com">&larr; nicolaeandrei.com</a>
+    </header>
+
+    <input
+      type="text"
+      id="search"
+      class="search-input"
+      placeholder="Search tools..."
+      autocomplete="off"
+      autofocus
+    >
+
+    <div id="categories">
+      <div class="category" data-category="image-media">
+        <h2>Image &amp; media</h2>
+        <div class="tools-list">
+          <a href="/document_scanner.html" class="tool-card"
+             data-title="document scanner"
+             data-desc="scan documents with your phone camera. drag corners to crop, apply b&w/grayscale/color filters, and download as pdf or image."
+             data-keywords="document scanner scan document camera scanner pdf scanner phone scanner scan to pdf perspective correction document crop black and white scan mobile scanner photo to pdf scan receipt scan paper">
+            <span class="tool-title">Document Scanner</span>
+            <span class="tool-desc">Scan documents with your phone camera. Drag corners to crop, apply filters, and download as PDF or image.</span>
+          </a>
+          <a href="/img_to_svg_converter.html" class="tool-card"
+             data-title="image svg converter"
+             data-desc="convert between raster images (png, jpg, webp) and svg. runs entirely in the browser."
+             data-keywords="png to svg jpg to svg svg to png image to vector vectorize image svg converter image tracing raster to vector svg export">
+            <span class="tool-title">Image &#8596; SVG Converter</span>
+            <span class="tool-desc">Convert between raster images (PNG, JPG, WebP) and SVG. Runs entirely in the browser.</span>
+          </a>
+          <a href="/asset_resizer.html" class="tool-card"
+             data-title="asset resizer"
+             data-desc="resize images for app stores, browser extensions, youtube, steam, and more. drop an image, select target platforms, download resized assets."
+             data-keywords="app store screenshot size ios app icon size chrome extension icon size youtube thumbnail size steam capsule image google play feature graphic og image size favicon generator app store asset resizer platform image resizer">
+            <span class="tool-title">Asset Resizer</span>
+            <span class="tool-desc">Resize images for app stores, browser extensions, YouTube, Steam, and more. Download individually or as ZIP.</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="category" data-category="text-document">
+        <h2>Text &amp; document</h2>
+        <div class="tools-list">
+          <a href="/sheet_converter.html" class="tool-card"
+             data-title="sheet converter"
+             data-desc="convert between xlsx, csv, and ods spreadsheet formats. preview sheets before converting."
+             data-keywords="xlsx to csv csv to xlsx ods to csv xlsx to ods spreadsheet converter excel to csv csv to excel ods converter sheet format converter">
+            <span class="tool-title">Sheet Converter</span>
+            <span class="tool-desc">Convert between XLSX, CSV, and ODS spreadsheet formats. Preview sheets before converting.</span>
+          </a>
+          <a href="/docx_to_pdf_converter.html" class="tool-card"
+             data-title="docx pdf converter"
+             data-desc="convert docx files to pdf in the browser."
+             data-keywords="docx to pdf word to pdf document converter">
+            <span class="tool-title">DOCX &#8594; PDF Converter</span>
+            <span class="tool-desc">Convert DOCX files to PDF in the browser.</span>
+          </a>
+          <a href="/markdown_to_pdf.html" class="tool-card"
+             data-title="markdown pdf"
+             data-desc="write or drop a .md file, preview with syntax highlighting, and export to pdf. live editor with split preview."
+             data-keywords="markdown to pdf md to pdf markdown converter markdown editor markdown preview export markdown markdown document md export">
+            <span class="tool-title">Markdown &#8594; PDF</span>
+            <span class="tool-desc">Write or drop a .md file, preview with syntax highlighting, and export to PDF. Live editor with split preview.</span>
+          </a>
+          <a href="/slack_formatter.html" class="tool-card"
+             data-title="terminal slack formatter"
+             data-desc="paste claude code or terminal markdown output and get slack-ready mrkdwn. converts headers, bold, italic, links, lists, and code blocks."
+             data-keywords="markdown to slack slack formatter mrkdwn converter terminal to slack claude code slack copy paste slack formatting iterm to slack slack message formatter">
+            <span class="tool-title">Terminal &#8594; Slack Formatter</span>
+            <span class="tool-desc">Paste terminal or markdown output and get Slack-ready mrkdwn. Converts headers, bold, italic, links, lists, and code blocks.</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="category" data-category="data-health">
+        <h2>Data &amp; health</h2>
+        <div class="tools-list">
+          <a href="/apple_health_analyzer.html" class="tool-card"
+             data-title="apple health explorer"
+             data-desc="analyze your apple health export with interactive charts. track weight trends, step counts, workouts, heart rate, and correlations over time."
+             data-keywords="apple health export analyzer health data dashboard weight trend chart step counter analysis workout history viewer heart rate tracker health export zip apple health xml parser fitness data visualization health metrics correlation">
+            <span class="tool-title">Apple Health Explorer</span>
+            <span class="tool-desc">Analyze your Apple Health export with interactive charts. Track weight, steps, workouts, heart rate, and correlations.</span>
+          </a>
+          <a href="/calorie_tracker.html" class="tool-card"
+             data-title="fuel log"
+             data-desc="plain text calorie and macro tracker. type what you ate, get instant nutrition estimates. supports natural language input, usda lookup, and food photo recognition."
+             data-keywords="calorie tracker macro tracker protein tracker food log nutrition calculator plain text food tracker usda nutrition lookup food photo recognition carbs fat protein counter meal logger">
+            <span class="tool-title">Fuel Log</span>
+            <span class="tool-desc">Plain text calorie and macro tracker. Type what you ate, get instant nutrition estimates with USDA lookup.</span>
+          </a>
+          <a href="/workout_tracker.html" class="tool-card"
+             data-title="gym tracker"
+             data-desc="log sets, reps, and weight for any exercise. track progress with per-exercise charts, personal records, and working/deload week tagging."
+             data-keywords="gym tracker workout log weight training tracker exercise logger set rep tracker strength progress personal record tracker gym log weightlifting tracker deload week training journal barbell tracker">
+            <span class="tool-title">Gym Tracker</span>
+            <span class="tool-desc">Log sets, reps, and weight. Track progress with charts, personal records, and deload week tagging.</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="category" data-category="sumo">
+        <h2>Sumo</h2>
+        <div class="tools-list">
+          <a href="/sumo_day.html" class="tool-card"
+             data-title="sumo day companion"
+             data-desc="daily sumo tournament companion. follow live basho day-by-day with bout cards, win/loss tracking, and match reveals for every division."
+             data-keywords="sumo day companion sumo daily results sumo bout card sumo basho tracker sumo match results sumo spoiler free sumo live basho sumo win loss sumo division results ozumo daily sumo tournament day torikumi viewer">
+            <span class="tool-title">Sumo Day Companion</span>
+            <span class="tool-desc">Daily sumo tournament companion. Follow live basho with bout cards, win/loss tracking, and spoiler-free match reveals.</span>
+          </a>
+          <a href="/sumo_stats.html" class="tool-card"
+             data-title="sumo stats rikishi statistics explorer"
+             data-desc="look up any sumo wrestler's career stats, basho results, and rank progression. compare two rikishi side by side."
+             data-keywords="sumo wrestling statistics rikishi stats sumo wrestler lookup sumo basho results sumo rank progression sumo career record sumo wrestler comparison sumodb viewer ozumo stats sumo win rate banzuke history yusho tracker grand sumo statistics">
+            <span class="tool-title">Sumo Stats</span>
+            <span class="tool-desc">Look up any wrestler's career stats, basho results, and rank progression. Compare two rikishi side by side.</span>
+          </a>
+          <a href="/sumo_calendar.html" class="tool-card"
+             data-title="grand sumo tournament calendar"
+             data-desc="downloadable ics calendar for every grand sumo tournament honbasho. covers all six basho with dates, venues, and cities."
+             data-keywords="sumo schedule 2026 2027 sumo wrestling calendar sumo basho dates sumo tournament ical ozumo schedule sumo ics file download ryogoku kokugikan schedule when is the next sumo tournament sumo season dates honbasho calendar hatsu haru natsu nagoya aki kyushu">
+            <span class="tool-title">Grand Sumo Calendar</span>
+            <span class="tool-desc">Downloadable ICS calendar for every honbasho. All six basho with dates, venues, and cities.</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="category" data-category="travel-social">
+        <h2>Travel &amp; social</h2>
+        <div class="tools-list">
+          <a href="/wanderlog.html" class="tool-card"
+             data-title="wanderlog"
+             data-desc="travel guide aggregator for any city. auto-generated walking tours with architecture and landmarks, plus curated research links."
+             data-keywords="walking tour generator city walk planner urban exploration sightseeing route travel itinerary self-guided tour city explorer walking route map architecture tour travel planner explore new city specialty coffee city craft beer city atlas obscura hidden gems travel research trip planner google maps walking route">
+            <span class="tool-title">Wanderlog</span>
+            <span class="tool-desc">Travel guide aggregator. Auto-generated walking tours, curated research links for coffee, beer, and hidden gems.</span>
+          </a>
+          <a href="/federated_media_exporter.html" class="tool-card"
+             data-title="fedi media extractor"
+             data-desc="extract all images and videos from any bluesky or mastodon profile. browse media in a gallery, open full-size originals, and copy all urls."
+             data-keywords="bluesky media downloader mastodon image extractor fediverse media gallery bluesky image gallery mastodon media download atproto media viewer bluesky video download mastodon profile images fedi media scraper bluesky profile gallery activitypub media extractor social media image downloader bsky media">
+            <span class="tool-title">Fedi Media Extractor</span>
+            <span class="tool-desc">Extract all images and videos from any Bluesky or Mastodon profile. Browse in a gallery, copy URLs.</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="category" data-category="developer">
+        <h2>Developer</h2>
+        <div class="tools-list">
+          <a href="/agent_session_converter.html" class="tool-card"
+             data-title="ai agent session converter"
+             data-desc="convert coding agent session files between claude code, codex cli, cursor, pi, and opencode. auto-detects formats, maps tool names, preserves message chains."
+             data-keywords="convert claude code session to codex codex rollout jsonl to claude code coding agent session format converter jsonl session file converter claude code jsonl viewer codex cli session export convert cursor agent transcript converter pi coding agent session format opencode session json export coding agent interoperability ai terminal agent session migration vibe coding session converter">
+            <span class="tool-title">AI Agent Session Converter</span>
+            <span class="tool-desc">Convert coding agent sessions between Claude Code, Codex CLI, Cursor, Pi, and OpenCode.</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <p id="no-results" class="no-results">No tools match your search.</p>
+  </div>
+
+  <script>
+    const search = document.getElementById('search');
+    const categoriesEl = document.getElementById('categories');
+    const noResults = document.getElementById('no-results');
+    const cards = Array.from(document.querySelectorAll('.tool-card'));
+
+    function fuzzyScore(query, text) {
+      if (!query) return 1;
+      const q = query.toLowerCase();
+      const t = text.toLowerCase();
+      if (t.includes(q)) return 3;
+      let qi = 0;
+      let consecutive = 0;
+      let maxConsecutive = 0;
+      for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+        if (t[ti] === q[qi]) {
+          qi++;
+          consecutive++;
+          if (consecutive > maxConsecutive) maxConsecutive = consecutive;
+        } else {
+          consecutive = 0;
+        }
+      }
+      if (qi === q.length) return 1 + maxConsecutive / q.length;
+      return 0;
+    }
+
+    search.addEventListener('input', () => {
+      const query = search.value.trim();
+      const isSearching = query.length > 0;
+      categoriesEl.classList.toggle('searching', isSearching);
+
+      let anyVisible = false;
+
+      if (!isSearching) {
+        // Reset: show all cards in original positions
+        cards.forEach(c => c.style.display = '');
+        cards.forEach(c => c.style.order = '');
+        noResults.style.display = 'none';
+        return;
+      }
+
+      const scored = cards.map(card => {
+        const title = card.dataset.title || '';
+        const desc = card.dataset.desc || '';
+        const kw = card.dataset.keywords || '';
+        const titleScore = fuzzyScore(query, title) * 3;
+        const kwScore = fuzzyScore(query, kw) * 2;
+        const descScore = fuzzyScore(query, desc);
+        return { card, score: Math.max(titleScore, kwScore, descScore) };
+      });
+
+      scored.sort((a, b) => b.score - a.score);
+
+      scored.forEach(({ card, score }, i) => {
+        const show = score > 0;
+        card.style.display = show ? '' : 'none';
+        card.style.order = i;
+        if (show) anyVisible = true;
+      });
+
+      noResults.style.display = anyVisible ? 'none' : '';
+    });
+  </script>
+</body>
+</html>

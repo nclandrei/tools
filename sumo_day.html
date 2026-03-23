@@ -1,0 +1,1682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>相撲 Sumo Day Companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0c11;
+  --surface: #15151e;
+  --surface-2: #1c1c28;
+  --surface-3: #242432;
+  --border: #2a2a3a;
+  --text: #e4e4ec;
+  --text-muted: #7a7a8e;
+  --text-dim: #55556a;
+  --gold: #c9a84c;
+  --gold-dim: #8a7235;
+  --red: #d04040;
+  --red-dim: #3a1818;
+  --green: #3aa86a;
+  --blue: #4a8ad4;
+  --east-bg: #1a1520;
+  --west-bg: #151a20;
+  --reveal-bg: #1a1a10;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-jp: 'Noto Sans JP', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  font-family: var(--font);
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  padding-bottom: 4rem;
+}
+
+/* === HEADER === */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+}
+
+.header-row {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+
+.logo .jp { font-family: var(--font-jp); color: var(--gold); margin-right: 0.35rem; }
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+  align-items: center;
+}
+
+select, button {
+  font-family: var(--font);
+  font-size: 0.8rem;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+select:hover, button:hover { border-color: var(--gold-dim); }
+select:focus, button:focus { outline: none; border-color: var(--gold); }
+
+.day-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.day-nav button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.day-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 4.5rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.day-label strong { color: var(--text); }
+
+/* === PROGRESS === */
+.progress-bar-container {
+  max-width: 640px;
+  margin: 0.75rem auto 0;
+  padding: 0 1rem;
+}
+
+.progress-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.progress-track {
+  flex: 1;
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+
+.progress-text {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.progress-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.progress-actions button {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+
+.progress-actions button:hover {
+  color: var(--text-muted);
+  border-color: var(--text-dim);
+}
+
+/* === MAIN === */
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* === LOADING / ERROR === */
+.state-msg {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: var(--text-muted);
+}
+
+.state-msg .icon { font-size: 2rem; margin-bottom: 0.75rem; }
+.state-msg h2 { font-size: 1rem; margin-bottom: 0.35rem; color: var(--text); }
+.state-msg p { font-size: 0.85rem; }
+
+.spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-bottom: 0.75rem;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* === BOUT CARD === */
+.bout-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.bout-card.watched {
+  opacity: 0.55;
+  border-color: var(--surface-3);
+}
+
+.bout-card.watched:hover { opacity: 0.8; }
+
+.bout-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0.75rem;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bout-header:hover { background: var(--surface-2); }
+
+.bout-matchno {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.55rem;
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bout-header { position: relative; }
+
+.rikishi-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.rikishi-side.east { text-align: right; }
+.rikishi-side.west { text-align: left; }
+
+.rikishi-name {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.rikishi-name-jp {
+  font-family: var(--font-jp);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.rikishi-rank {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.vs-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Winner highlight */
+.rikishi-side.winner .rikishi-name { color: var(--gold); }
+.rikishi-side::after {
+  content: '●';
+  font-size: 0.45rem;
+  color: transparent;
+  display: block;
+  margin-top: 0.1rem;
+}
+.rikishi-side.winner::after { color: var(--gold); }
+.rikishi-side.east::after { text-align: right; }
+.rikishi-side.west::after { text-align: left; }
+
+/* === RESULT REVEAL === */
+.result-strip {
+  padding: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.result-hidden {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-2);
+  cursor: pointer;
+  gap: 0.5rem;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.result-hidden:hover { background: var(--surface-3); }
+
+.result-hidden .label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.result-hidden .eye-icon {
+  font-size: 0.9rem;
+  opacity: 0.4;
+}
+
+.result-revealed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.75rem;
+  background: var(--reveal-bg);
+  gap: 0.5rem;
+  border-top: 1px solid #2a2a1a;
+}
+
+.result-winner {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--gold);
+}
+
+.result-kimarite {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.result-watched-btn {
+  margin-left: auto;
+  font-size: 0.65rem;
+  padding: 0.2rem 0.45rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.result-watched-btn:hover { border-color: var(--green); color: var(--green); }
+.result-watched-btn.is-watched { border-color: var(--green); color: var(--green); }
+
+/* === EXPANDABLE DETAIL === */
+.bout-detail {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+}
+
+.bout-detail.open { max-height: 2000px; }
+
+.detail-tabs {
+  display: flex;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.detail-tab {
+  flex: 1;
+  padding: 0.45rem;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: color 0.15s, background 0.15s;
+  border-right: 1px solid var(--border);
+}
+
+.detail-tab:last-child { border-right: none; }
+.detail-tab:hover { color: var(--text-muted); background: var(--surface-3); }
+.detail-tab.active { color: var(--gold); background: var(--surface); }
+
+.detail-panel {
+  padding: 0.75rem;
+  min-height: 100px;
+}
+
+.detail-panel .loading {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+/* === COMPARE VIEW === */
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.compare-grid .label {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.3rem 0;
+}
+
+.compare-grid .east-val { text-align: right; font-weight: 600; }
+.compare-grid .west-val { text-align: left; font-weight: 600; }
+.compare-grid .better { color: var(--gold); }
+
+.compare-section-title {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 700;
+  margin: 0.75rem 0 0.4rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-section-title:first-child { margin-top: 0; }
+
+/* === RIKISHI PROFILE === */
+.rikishi-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.profile-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.profile-name-jp {
+  font-family: var(--font-jp);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.profile-rank {
+  font-size: 0.75rem;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.3rem 0.5rem;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+.stat-item .stat-label { color: var(--text-muted); }
+.stat-item .stat-value { font-weight: 600; }
+
+.profile-links {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.profile-links a {
+  font-size: 0.7rem;
+  padding: 0.3rem 0.6rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--blue);
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+.profile-links a:hover { border-color: var(--blue); }
+
+/* === HEAD TO HEAD === */
+.h2h-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+}
+
+.h2h-score {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.h2h-score.leading { color: var(--gold); }
+.h2h-score.trailing { color: var(--text-dim); }
+
+.h2h-vs {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.h2h-name {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.h2h-kimarite-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.kimarite-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+}
+
+.kimarite-row .name { color: var(--text-muted); font-style: italic; }
+.kimarite-row .count { font-weight: 600; color: var(--text); }
+
+.h2h-recent {
+  margin-top: 0.75rem;
+}
+
+.h2h-recent-title {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.recent-bout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.recent-bout:last-child { border-bottom: none; }
+.recent-bout .basho { color: var(--text-dim); }
+.recent-bout .winner { font-weight: 600; }
+.recent-bout .technique { color: var(--text-muted); font-style: italic; }
+
+/* === TWO-COLUMN PROFILES === */
+.profiles-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.profiles-row .rikishi-profile {
+  padding: 0.5rem;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+
+.profiles-row .stat-grid {
+  grid-template-columns: 1fr;
+}
+
+/* === KIMARITE TOOLTIP === */
+.kimarite-info {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-left: 0.25rem;
+}
+
+/* === NO BASHO === */
+.basho-info {
+  text-align: center;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.5rem;
+}
+
+.basho-info .location { font-size: 0.8rem; color: var(--text-muted); }
+.basho-info .dates { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.15rem; }
+
+/* === DIVISION TABS === */
+.division-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 1rem;
+  max-width: 640px;
+  margin: 0.5rem auto 0;
+}
+
+.division-tab {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.division-tab:hover { color: var(--text-muted); border-color: var(--text-dim); }
+.division-tab.active { color: var(--gold); border-color: var(--gold-dim); background: var(--surface-2); }
+
+/* === RESPONSIVE === */
+@media (max-width: 480px) {
+  .header-row { gap: 0.4rem; flex-wrap: wrap; }
+  .logo { font-size: 1rem; }
+  .controls { flex-wrap: wrap; width: 100%; }
+  #basho-select { flex: 1; min-width: 0; }
+  .rikishi-name { font-size: 0.9rem; }
+  .bout-header { padding: 0.6rem; }
+  .compare-grid { font-size: 0.75rem; gap: 0.3rem 0.5rem; }
+  .profiles-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <div class="logo"><span class="jp">相撲</span> Sumo Day</div>
+    <div class="controls">
+      <select id="basho-select"></select>
+      <div class="day-nav">
+        <button id="day-prev" title="Previous day">‹</button>
+        <div class="day-label" id="day-label">Day <strong>1</strong></div>
+        <button id="day-next" title="Next day">›</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="division-tabs" id="division-tabs">
+  <button class="division-tab active" data-div="Makuuchi">Makuuchi</button>
+  <button class="division-tab" data-div="Juryo">Juryo</button>
+</div>
+
+<div class="progress-bar-container" id="progress-section">
+  <div class="progress-bar-wrap">
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="progress-text" id="progress-text">0 / 0 revealed</div>
+  </div>
+  <div class="progress-actions">
+    <button id="reveal-next-btn" onclick="revealNext()">Reveal next</button>
+    <button id="reveal-all-btn" onclick="revealAll()">Reveal all</button>
+    <button id="hide-all-btn" onclick="hideAll()">Hide all</button>
+  </div>
+</div>
+
+<main id="bouts"></main>
+
+<script>
+// ============================================================
+// CONFIG & STATE
+// ============================================================
+const API = 'https://www.sumo-api.com/api';
+
+const state = {
+  bashoId: null,
+  day: 1,
+  division: 'Makuuchi',
+  torikumi: [],
+  revealed: new Set(),
+  watched: new Set(),
+  expanded: new Set(),
+  activeTab: {},       // matchId -> tab name
+  detailCache: {},     // rikishiId -> { rikishi, stats }
+  h2hCache: {},        // "id1-id2" -> data
+  bashoInfo: {},       // bashoId -> { startDate, endDate, ... }
+  loading: false,
+};
+
+// ============================================================
+// KIMARITE DICTIONARY (common ones)
+// ============================================================
+const KIMARITE = {
+  yorikiri: 'frontal force out',
+  oshidashi: 'frontal push out',
+  hatakikomi: 'slap down',
+  uwatenage: 'overarm throw',
+  shitatenage: 'underarm throw',
+  oshitaoshi: 'frontal push down',
+  tsukiotoshi: 'thrust down',
+  hikiotoshi: 'hand pull down',
+  kotenage: 'arm lock throw',
+  sukuinage: 'beltless arm throw',
+  uwatedashinage: 'pulling overarm throw',
+  yoritaoshi: 'frontal crush out',
+  tsukidashi: 'frontal thrust out',
+  okuridashi: 'rear push out',
+  okurinage: 'rear throw down',
+  kubinage: 'headlock throw',
+  makiotoshi: 'twist down',
+  katasukashi: 'under-shoulder swing down',
+  kimedashi: 'arm barring force out',
+  sotogake: 'outside leg trip',
+  uchigake: 'inside leg trip',
+  kakenage: 'hooking inner thigh throw',
+  kekaeshi: 'tripping kick',
+  isamiashi: 'backward walking loss',
+  tsukiotoshi: 'thrust down',
+  okuritaoshi: 'rear push down',
+  dashinage: 'pulling body throw',
+  tottari: 'arm bar throw',
+  kainahineri: 'arm twist',
+  ashitori: 'leg pick',
+  komatasukui: 'inner thigh pick',
+  utchari: 'backward body drop at the edge',
+  tsuriotoshi: 'lifting body slam',
+  tsuridashi: 'frontal lift out',
+};
+
+// ============================================================
+// BASHO HELPERS
+// ============================================================
+const BASHO_MONTHS = [1, 3, 5, 7, 9, 11];
+const BASHO_LOCATIONS = {
+  '01': 'Tokyo (Ryōgoku)',
+  '03': 'Osaka',
+  '05': 'Tokyo (Ryōgoku)',
+  '07': 'Nagoya',
+  '09': 'Tokyo (Ryōgoku)',
+  '11': 'Fukuoka',
+};
+
+function getBashoIds() {
+  const now = new Date();
+  const ids = [];
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  // Generate next 2 upcoming bashos
+  let fy = currentYear, fm = currentMonth;
+  for (let i = 0; i < 2; i++) {
+    let nextBm = BASHO_MONTHS.find(b => b > fm);
+    if (!nextBm) { fy++; nextBm = 1; }
+    const id = `${fy}${String(nextBm).padStart(2, '0')}`;
+    if (!ids.includes(id)) ids.unshift(id); // prepend (future first)
+    fm = nextBm;
+  }
+  ids.reverse(); // future bashos in ascending order at top
+
+  // Generate current + past ~2 years
+  let y = currentYear, m = currentMonth;
+  for (let i = 0; i < 14; i++) {
+    let bm = BASHO_MONTHS.slice().reverse().find(b => b <= m);
+    if (!bm) { y--; bm = 11; m = 12; }
+    const id = `${y}${String(bm).padStart(2, '0')}`;
+    if (!ids.includes(id)) ids.push(id);
+    m = bm - 1;
+    if (m <= 0) { m = 12; y--; }
+  }
+  return ids;
+}
+
+function bashoLabel(id) {
+  const y = id.slice(0, 4);
+  const m = id.slice(4);
+  const months = { '01': 'January', '03': 'March', '05': 'May', '07': 'July', '09': 'September', '11': 'November' };
+  const loc = BASHO_LOCATIONS[m] || '';
+  return `${months[m] || m} ${y}${loc ? ' · ' + loc : ''}`;
+}
+
+// Calculate the 2nd Sunday of a given month (typical basho start)
+function secondSunday(year, month) {
+  const first = new Date(year, month - 1, 1);
+  const dayOfWeek = first.getDay(); // 0=Sun
+  const firstSunday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+  return new Date(year, month - 1, firstSunday + 7);
+}
+
+// Given a basho ID, estimate start date (2nd Sunday of that month)
+function estimateBashoStart(bashoId) {
+  const y = parseInt(bashoId.slice(0, 4));
+  const m = parseInt(bashoId.slice(4));
+  return secondSunday(y, m);
+}
+
+// Determine which day of the basho today falls on (1-15), or null if outside
+function bashoDay(bashoId) {
+  const start = estimateBashoStart(bashoId);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.floor((today - start) / 86400000);
+  if (diff >= 0 && diff < 15) return diff + 1;
+  return null;
+}
+
+// Try to fetch real basho info from API, cache it
+async function fetchBashoInfo(bashoId) {
+  if (state.bashoInfo[bashoId]) return state.bashoInfo[bashoId];
+  try {
+    const info = await apiFetch(`/basho/${bashoId}`);
+    state.bashoInfo[bashoId] = info;
+    return info;
+  } catch {
+    return null;
+  }
+}
+
+// Determine the best basho + day to show on open
+async function autoDetect() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+
+  // Find the current or most recent basho month
+  let bestMonth = BASHO_MONTHS[0];
+  for (const bm of BASHO_MONTHS) {
+    if (bm <= m) bestMonth = bm;
+  }
+  let candidateId = `${y}${String(bestMonth).padStart(2, '0')}`;
+
+  // Check if we're in a basho right now
+  let day = bashoDay(candidateId);
+  if (day) return { bashoId: candidateId, day };
+
+  // Maybe we're between bashos. Try fetching this basho to see if it has data.
+  const info = await fetchBashoInfo(candidateId);
+  if (info && info.startDate) {
+    const start = new Date(info.startDate);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diff = Math.floor((today - start) / 86400000);
+    if (diff >= 0 && diff < 15) return { bashoId: candidateId, day: diff + 1 };
+    if (diff >= 15) return { bashoId: candidateId, day: 15 }; // basho over, show last day
+    // Basho hasn't started yet — fall back to previous basho
+  }
+
+  // Fall back to the previous basho
+  const idx = BASHO_MONTHS.indexOf(bestMonth);
+  if (idx > 0) {
+    candidateId = `${y}${String(BASHO_MONTHS[idx - 1]).padStart(2, '0')}`;
+  } else {
+    candidateId = `${y - 1}11`; // November of last year
+  }
+  return { bashoId: candidateId, day: 15 };
+}
+
+// ============================================================
+// URL STATE
+// ============================================================
+function readURL() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    basho: params.get('basho'),
+    day: params.has('day') ? parseInt(params.get('day')) : null,
+    division: params.get('div'),
+  };
+}
+
+function syncURL() {
+  const params = new URLSearchParams();
+  if (state.bashoId) params.set('basho', state.bashoId);
+  if (state.day) params.set('day', String(state.day));
+  if (state.division && state.division !== 'Makuuchi') params.set('div', state.division);
+  const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+  if (newUrl !== window.location.pathname + window.location.search) {
+    history.replaceState({ basho: state.bashoId, day: state.day, div: state.division }, '', newUrl);
+  }
+}
+
+// ============================================================
+// RANK HELPERS
+// ============================================================
+function shortRank(rank) {
+  if (!rank) return '';
+  return rank
+    .replace('Yokozuna', 'Y')
+    .replace('Ozeki', 'O')
+    .replace('Sekiwake', 'S')
+    .replace('Komusubi', 'K')
+    .replace('Maegashira', 'M')
+    .replace('Juryo', 'J')
+    .replace('East', 'e')
+    .replace('West', 'w');
+}
+
+function rankWeight(rank) {
+  if (!rank) return 999;
+  const order = ['Yokozuna', 'Ozeki', 'Sekiwake', 'Komusubi', 'Maegashira', 'Juryo'];
+  for (let i = 0; i < order.length; i++) {
+    if (rank.includes(order[i])) {
+      const num = parseInt(rank.match(/\d+/)?.[0] || '0');
+      return i * 100 + num;
+    }
+  }
+  return 999;
+}
+
+// ============================================================
+// API LAYER
+// ============================================================
+async function apiFetch(path) {
+  const resp = await fetch(`${API}${path}`);
+  if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+  return resp.json();
+}
+
+async function fetchTorikumi(bashoId, division, day) {
+  return apiFetch(`/basho/${bashoId}/torikumi/${division}/${day}`);
+}
+
+async function fetchRikishi(id) {
+  if (state.detailCache[id]) return state.detailCache[id];
+  const [rikishi, stats] = await Promise.all([
+    apiFetch(`/rikishi/${id}`),
+    apiFetch(`/rikishi/${id}/stats`),
+  ]);
+  state.detailCache[id] = { rikishi, stats };
+  return state.detailCache[id];
+}
+
+async function fetchH2H(id1, id2) {
+  const key = `${id1}-${id2}`;
+  if (state.h2hCache[key]) return state.h2hCache[key];
+  const data = await apiFetch(`/rikishi/${id1}/matches/${id2}`);
+  state.h2hCache[key] = data;
+  return data;
+}
+
+async function fetchHighestRank(id) {
+  const cacheKey = `rank-${id}`;
+  if (state.detailCache[cacheKey]) return state.detailCache[cacheKey];
+  try {
+    const ranks = await apiFetch(`/ranks?rikishiId=${id}`);
+    if (!Array.isArray(ranks) || ranks.length === 0) return null;
+    const best = ranks.reduce((min, r) => r.rankValue < min.rankValue ? r : min, ranks[0]);
+    state.detailCache[cacheKey] = best.rank;
+    return best.rank;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================
+// LOCALSTORAGE
+// ============================================================
+function storageKey(type) {
+  return `sumo-${type}-${state.bashoId}-${state.division}-${state.day}`;
+}
+
+function loadState() {
+  try {
+    const r = JSON.parse(localStorage.getItem(storageKey('revealed')) || '[]');
+    const w = JSON.parse(localStorage.getItem(storageKey('watched')) || '[]');
+    state.revealed = new Set(r);
+    state.watched = new Set(w);
+  } catch { state.revealed = new Set(); state.watched = new Set(); }
+}
+
+function saveState() {
+  localStorage.setItem(storageKey('revealed'), JSON.stringify([...state.revealed]));
+  localStorage.setItem(storageKey('watched'), JSON.stringify([...state.watched]));
+}
+
+function saveLastSelection() {
+  localStorage.setItem('sumo-last-basho', state.bashoId);
+  localStorage.setItem('sumo-last-day', String(state.day));
+  localStorage.setItem('sumo-last-division', state.division);
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderBouts() {
+  const main = document.getElementById('bouts');
+
+  if (state.loading) {
+    main.innerHTML = '<div class="state-msg"><div class="spinner"></div><h2>Loading bouts...</h2></div>';
+    return;
+  }
+
+  if (state.error) {
+    main.innerHTML = `<div class="state-msg"><div class="icon">⚠</div><h2>Could not load bouts</h2><p>${escHtml(state.error)}</p></div>`;
+    return;
+  }
+
+  if (!state.torikumi.length) {
+    main.innerHTML = '<div class="state-msg"><div class="icon">📋</div><h2>No bouts available</h2><p>The torikumi for this day may not be posted yet.</p></div>';
+    return;
+  }
+
+  main.innerHTML = state.torikumi.map(renderBoutCard).join('');
+  updateProgress();
+
+  // Re-load panels for expanded cards with active tabs (data is cached so this is instant)
+  for (const matchId of state.expanded) {
+    const tab = state.activeTab[matchId];
+    if (tab) loadPanel(matchId, tab);
+  }
+}
+
+function renderBoutCard(bout) {
+  const matchId = bout.id || `${bout.matchNo}`;
+  const isRevealed = state.revealed.has(matchId);
+  const isWatched = state.watched.has(matchId);
+  const isExpanded = state.expanded.has(matchId);
+
+  const eastWinner = isRevealed && bout.winnerId === bout.eastId;
+  const westWinner = isRevealed && bout.winnerId === bout.westId;
+  const noResult = !bout.winnerId;
+
+  const activeTab = state.activeTab[matchId] || null;
+
+  return `
+    <div class="bout-card ${isWatched ? 'watched' : ''}" data-match="${matchId}">
+      <div class="bout-header" onclick="toggleExpand('${matchId}')">
+        <div class="bout-matchno">Match ${bout.matchNo}</div>
+        <div class="rikishi-side east ${eastWinner ? 'winner' : ''}">
+          <div class="rikishi-name">${escHtml(bout.eastShikona)}</div>
+          <div class="rikishi-rank">${escHtml(shortRank(bout.eastRank))}</div>
+        </div>
+        <div class="vs-badge">vs</div>
+        <div class="rikishi-side west ${westWinner ? 'winner' : ''}">
+          <div class="rikishi-name">${escHtml(bout.westShikona)}</div>
+          <div class="rikishi-rank">${escHtml(shortRank(bout.westRank))}</div>
+        </div>
+      </div>
+      ${noResult ? '' : renderResultStrip(bout, matchId, isRevealed, isWatched)}
+      <div class="bout-detail ${isExpanded ? 'open' : ''}" id="detail-${matchId}">
+        ${isExpanded ? renderDetailTabs(bout, matchId, activeTab) : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderResultStrip(bout, matchId, isRevealed, isWatched) {
+  if (!isRevealed) {
+    return `
+      <div class="result-strip">
+        <div class="result-hidden" onclick="revealResult('${matchId}')">
+          <span class="eye-icon">👁</span>
+          <span class="label">Tap to reveal result</span>
+        </div>
+      </div>
+    `;
+  }
+
+  const winnerName = bout.winnerId === bout.eastId ? bout.eastShikona : bout.westShikona;
+  const kimarite = bout.kimarite || '';
+  const kimariteEn = KIMARITE[kimarite] || '';
+
+  return `
+    <div class="result-strip">
+      <div class="result-revealed">
+        <span class="result-winner">${escHtml(winnerName)}</span>
+        <span class="result-kimarite">${escHtml(kimarite)}${kimariteEn ? ` (${kimariteEn})` : ''}</span>
+        <button class="result-watched-btn ${isWatched ? 'is-watched' : ''}"
+                onclick="toggleWatched('${matchId}')">
+          ${isWatched ? '✓ Watched' : 'Mark watched'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDetailTabs(bout, matchId, activeTab) {
+  const tabs = ['Compare', 'Head-to-Head', `${bout.eastShikona}`, `${bout.westShikona}`];
+  return `
+    <div class="detail-tabs">
+      ${tabs.map((t, i) => `
+        <button class="detail-tab ${activeTab === t ? 'active' : ''}"
+                onclick="switchTab('${matchId}', '${escAttr(t)}')">
+          ${escHtml(t)}
+        </button>
+      `).join('')}
+    </div>
+    <div class="detail-panel" id="panel-${matchId}">
+      ${activeTab ? '<div class="loading"><div class="spinner"></div> Loading...</div>' : '<div class="loading" style="color:var(--text-dim)">Select a tab above to explore</div>'}
+    </div>
+  `;
+}
+
+// ============================================================
+// DETAIL PANELS
+// ============================================================
+async function loadPanel(matchId, tab) {
+  const bout = state.torikumi.find(b => (b.id || `${b.matchNo}`) === matchId);
+  if (!bout) return;
+
+  const panel = document.getElementById(`panel-${matchId}`);
+  if (!panel) return;
+  panel.innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+  try {
+    if (tab === 'Compare') {
+      const [eastData, westData, h2h, eastHighest, westHighest] = await Promise.all([
+        fetchRikishi(bout.eastId),
+        fetchRikishi(bout.westId),
+        fetchH2H(bout.eastId, bout.westId),
+        fetchHighestRank(bout.eastId),
+        fetchHighestRank(bout.westId),
+      ]);
+      panel.innerHTML = renderCompare(bout, eastData, westData, h2h, eastHighest, westHighest);
+    } else if (tab === 'Head-to-Head') {
+      const h2h = await fetchH2H(bout.eastId, bout.westId);
+      panel.innerHTML = renderH2HPanel(bout, h2h);
+    } else if (tab === bout.eastShikona) {
+      const [data, highestRank] = await Promise.all([fetchRikishi(bout.eastId), fetchHighestRank(bout.eastId)]);
+      panel.innerHTML = renderProfile(data, bout.eastId, highestRank);
+    } else if (tab === bout.westShikona) {
+      const [data, highestRank] = await Promise.all([fetchRikishi(bout.westId), fetchHighestRank(bout.westId)]);
+      panel.innerHTML = renderProfile(data, bout.westId, highestRank);
+    }
+  } catch (e) {
+    panel.innerHTML = `<div class="loading">Failed to load: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderCompare(bout, eastData, westData, h2h, eastHighest, westHighest) {
+  const e = eastData.rikishi, es = eastData.stats;
+  const w = westData.rikishi, ws = westData.stats;
+
+  const rows = [
+    { label: 'Rank', ev: bout.eastRank || e.currentRank, wv: bout.westRank || w.currentRank },
+    { label: 'Highest Rank', ev: eastHighest || '—', wv: westHighest || '—', cmp: 'rank', eraw: eastHighest, wraw: westHighest },
+    { label: 'Stable', ev: e.heya || '—', wv: w.heya || '—' },
+    { label: 'Height', ev: e.height ? `${e.height} cm` : '—', wv: w.height ? `${w.height} cm` : '—', cmp: 'num', eraw: e.height, wraw: w.height },
+    { label: 'Weight', ev: e.weight ? `${e.weight} kg` : '—', wv: w.weight ? `${w.weight} kg` : '—', cmp: 'num', eraw: e.weight, wraw: w.weight },
+    { label: 'Age', ev: calcAge(e.birthDate), wv: calcAge(w.birthDate), cmp: 'none' },
+    { label: 'Career W-L', ev: `${es.totalWins}-${es.totalLosses}`, wv: `${ws.totalWins}-${ws.totalLosses}` },
+    { label: 'Win %', ev: pct(es.totalWins, es.totalMatches), wv: pct(ws.totalWins, ws.totalMatches), cmp: 'pct', eraw: es.totalWins / (es.totalMatches || 1), wraw: ws.totalWins / (ws.totalMatches || 1) },
+    { label: 'Yūshō (Makuuchi)', ev: es.yushoByDivision?.Makuuchi || 0, wv: ws.yushoByDivision?.Makuuchi || 0, cmp: 'num', eraw: es.yushoByDivision?.Makuuchi || 0, wraw: ws.yushoByDivision?.Makuuchi || 0 },
+    { label: 'Tournaments', ev: es.basho || 0, wv: ws.basho || 0, cmp: 'none' },
+  ];
+
+  // Add sansho if any
+  const sanshoTypes = ['Shukun-sho', 'Kanto-sho', 'Gino-sho'];
+  const sanshoLabels = { 'Shukun-sho': 'Outstanding', 'Kanto-sho': 'Fighting Spirit', 'Gino-sho': 'Technique' };
+  for (const s of sanshoTypes) {
+    const ev = es.sansho?.[s] || 0, wv = ws.sansho?.[s] || 0;
+    if (ev || wv) {
+      rows.push({ label: sanshoLabels[s], ev, wv, cmp: 'num', eraw: ev, wraw: wv });
+    }
+  }
+
+  const h2hText = h2h ? `${h2h.rikishiWins}-${h2h.opponentWins}` : '';
+
+  let html = '<div class="compare-section-title">Profile</div><div class="compare-grid">';
+  for (const r of rows) {
+    let eClass = '', wClass = '';
+    if (r.cmp === 'num') {
+      if (r.eraw > r.wraw) eClass = 'better';
+      else if (r.wraw > r.eraw) wClass = 'better';
+    } else if (r.cmp === 'pct') {
+      if (r.eraw > r.wraw) eClass = 'better';
+      else if (r.wraw > r.eraw) wClass = 'better';
+    } else if (r.cmp === 'rank' && r.eraw && r.wraw) {
+      const ew = rankWeight(r.eraw), ww = rankWeight(r.wraw);
+      if (ew < ww) eClass = 'better';
+      else if (ww < ew) wClass = 'better';
+    }
+    html += `
+      <div class="east-val ${eClass}">${escHtml(String(r.ev))}</div>
+      <div class="label">${escHtml(r.label)}</div>
+      <div class="west-val ${wClass}">${escHtml(String(r.wv))}</div>
+    `;
+  }
+  html += '</div>';
+
+  if (h2h && h2h.total > 0) {
+    // Filter current bout from H2H if result not revealed
+    const matchId = bout.id || `${bout.matchNo}`;
+    const isRevealed = state.revealed.has(matchId);
+    let rWins = h2h.rikishiWins, oWins = h2h.opponentWins, hTotal = h2h.total;
+    if (!isRevealed && bout.winnerId && h2h.matches) {
+      const cur = h2h.matches.find(m => m.bashoId === state.bashoId && m.day === state.day);
+      if (cur) {
+        if (cur.winnerId === bout.eastId) rWins--;
+        else oWins--;
+        hTotal--;
+      }
+    }
+    if (hTotal > 0) {
+      html += `<div class="compare-section-title">Head-to-Head (${hTotal} bouts)</div>`;
+      html += `<div class="compare-grid">
+        <div class="east-val ${rWins > oWins ? 'better' : ''}">${rWins} wins</div>
+        <div class="label">Record</div>
+        <div class="west-val ${oWins > rWins ? 'better' : ''}">${oWins} wins</div>
+      </div>`;
+    }
+  }
+
+  return html;
+}
+
+function renderH2HPanel(bout, h2h) {
+  if (!h2h || h2h.total === 0) {
+    return '<div class="loading">No previous meetings</div>';
+  }
+
+  const matchId = bout.id || `${bout.matchNo}`;
+  const isRevealed = state.revealed.has(matchId);
+
+  // If result not revealed, exclude the current bout from H2H data
+  let rikishiWins = h2h.rikishiWins;
+  let opponentWins = h2h.opponentWins;
+  let totalBouts = h2h.total;
+  let filteredMatches = h2h.matches || [];
+
+  if (!isRevealed && bout.winnerId && filteredMatches.length > 0) {
+    const currentMatch = filteredMatches.find(m => m.bashoId === state.bashoId && m.day === state.day);
+    if (currentMatch) {
+      if (currentMatch.winnerId === bout.eastId) rikishiWins--;
+      else opponentWins--;
+      totalBouts--;
+      filteredMatches = filteredMatches.filter(m => !(m.bashoId === state.bashoId && m.day === state.day));
+    }
+  }
+
+  if (totalBouts === 0) {
+    return '<div class="loading">No previous meetings</div>';
+  }
+
+  const eastLeading = rikishiWins > opponentWins;
+  const tied = rikishiWins === opponentWins;
+
+  let html = `
+    <div class="h2h-summary">
+      <div style="text-align:right">
+        <div class="h2h-name">${escHtml(bout.eastShikona)}</div>
+        <div class="h2h-score ${eastLeading ? 'leading' : tied ? '' : 'trailing'}">${rikishiWins}</div>
+      </div>
+      <div class="h2h-vs">—</div>
+      <div style="text-align:left">
+        <div class="h2h-name">${escHtml(bout.westShikona)}</div>
+        <div class="h2h-score ${!eastLeading && !tied ? 'leading' : tied ? '' : 'trailing'}">${opponentWins}</div>
+      </div>
+    </div>
+  `;
+
+  // Winning kimarite breakdown for east
+  if (h2h.kimariteWins && Object.keys(h2h.kimariteWins).length > 0) {
+    html += `<div class="compare-section-title">${escHtml(bout.eastShikona)}'s winning techniques</div>`;
+    html += '<div class="h2h-kimarite-list">';
+    const sorted = Object.entries(h2h.kimariteWins).sort((a, b) => b[1] - a[1]);
+    for (const [k, count] of sorted) {
+      const en = KIMARITE[k] || '';
+      html += `<div class="kimarite-row"><span class="name">${escHtml(k)}${en ? ` (${en})` : ''}</span><span class="count">${count}</span></div>`;
+    }
+    html += '</div>';
+  }
+
+  if (h2h.kimariteLosses && Object.keys(h2h.kimariteLosses).length > 0) {
+    html += `<div class="compare-section-title">${escHtml(bout.westShikona)}'s winning techniques</div>`;
+    html += '<div class="h2h-kimarite-list">';
+    const sorted = Object.entries(h2h.kimariteLosses).sort((a, b) => b[1] - a[1]);
+    for (const [k, count] of sorted) {
+      const en = KIMARITE[k] || '';
+      html += `<div class="kimarite-row"><span class="name">${escHtml(k)}${en ? ` (${en})` : ''}</span><span class="count">${count}</span></div>`;
+    }
+    html += '</div>';
+  }
+
+  // Recent bouts
+  if (filteredMatches.length > 0) {
+    const recent = filteredMatches.slice(0, 10);
+    html += '<div class="h2h-recent"><div class="h2h-recent-title">Recent bouts</div>';
+    for (const m of recent) {
+      const winner = m.winnerId === bout.eastId ? bout.eastShikona : bout.westShikona;
+      html += `<div class="recent-bout">
+        <span class="basho">${escHtml(formatBashoShort(m.bashoId))} D${m.day}</span>
+        <span class="winner" style="color: ${m.winnerId === bout.eastId ? 'var(--gold)' : 'var(--text)'}">${escHtml(winner)}</span>
+        <span class="technique">${escHtml(m.kimarite || '')}</span>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  // Link to SumoDB h2h
+  html += `<div class="profile-links" style="margin-top:0.75rem;justify-content:center">
+    <a href="https://sumodb.sumogames.de/Rikishi_opp.aspx?r=${bout.eastSumodbId || ''}&r2=${bout.westSumodbId || ''}" target="_blank" rel="noopener">Full history on SumoDB ↗</a>
+  </div>`;
+
+  return html;
+}
+
+function renderProfile(data, rikishiId, highestRank) {
+  const r = data.rikishi, s = data.stats;
+
+  const stats = [
+    ['Rank', r.currentRank || '—'],
+    ['Highest Rank', highestRank || '—'],
+    ['Stable', r.heya || '—'],
+    ['Height', r.height ? `${r.height} cm` : '—'],
+    ['Weight', r.weight ? `${r.weight} kg` : '—'],
+    ['Born', r.birthDate ? formatDate(r.birthDate) : '—'],
+    ['Age', calcAge(r.birthDate)],
+    ['From', r.shusshin || '—'],
+    ['Debut', r.debut || '—'],
+    ['Career', `${s.totalWins}W - ${s.totalLosses}L`],
+    ['Win %', pct(s.totalWins, s.totalMatches)],
+    ['Tournaments', s.basho || 0],
+    ['Yūshō (Makuuchi)', s.yushoByDivision?.Makuuchi || 0],
+  ];
+
+  // Sansho
+  const sanshoLabels = { 'Shukun-sho': 'Outstanding Performance', 'Kanto-sho': 'Fighting Spirit', 'Gino-sho': 'Technique' };
+  if (s.sansho) {
+    for (const [key, label] of Object.entries(sanshoLabels)) {
+      if (s.sansho[key]) stats.push([label, s.sansho[key]]);
+    }
+  }
+
+  let html = '<div class="rikishi-profile">';
+  html += `<div class="profile-header">
+    <div>
+      <div class="profile-name">${escHtml(r.shikonaEn || '—')}</div>
+      ${r.shikonaJp ? `<div class="profile-name-jp">${escHtml(r.shikonaJp)}</div>` : ''}
+      <div class="profile-rank">${escHtml(r.currentRank || '—')}</div>
+    </div>
+  </div>`;
+
+  html += '<div class="stat-grid">';
+  for (const [label, value] of stats) {
+    html += `<div class="stat-item"><span class="stat-label">${escHtml(label)}</span><span class="stat-value">${escHtml(String(value))}</span></div>`;
+  }
+  html += '</div>';
+
+  // Division breakdown
+  if (s.winsByDivision) {
+    const divs = ['Makuuchi', 'Juryo', 'Makushita', 'Sandanme', 'Jonidan', 'Jonokuchi'];
+    const activeDivs = divs.filter(d => s.totalByDivision?.[d] > 0);
+    if (activeDivs.length > 0) {
+      html += '<div class="compare-section-title">By Division</div><div class="stat-grid">';
+      for (const d of activeDivs) {
+        const w = s.winsByDivision?.[d] || 0;
+        const l = s.lossByDivision?.[d] || 0;
+        html += `<div class="stat-item"><span class="stat-label">${escHtml(d)}</span><span class="stat-value">${w}W-${l}L</span></div>`;
+      }
+      html += '</div>';
+    }
+  }
+
+  html += '<div class="profile-links">';
+  if (r.sumodbId) {
+    html += `<a href="https://sumodb.sumogames.de/Rikishi.aspx?r=${r.sumodbId}" target="_blank" rel="noopener">SumoDB ↗</a>`;
+  }
+  if (r.nskId) {
+    html += `<a href="https://www.sumo.or.jp/EnSumoDataRikishi/profile/${r.nskId}/" target="_blank" rel="noopener">Official NSK ↗</a>`;
+  }
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+// ============================================================
+// ACTIONS
+// ============================================================
+function revealResult(matchId) {
+  state.revealed.add(matchId);
+  saveState();
+  renderBouts();
+}
+
+function toggleWatched(matchId) {
+  if (state.watched.has(matchId)) {
+    state.watched.delete(matchId);
+  } else {
+    state.watched.add(matchId);
+  }
+  saveState();
+  renderBouts();
+}
+
+function toggleExpand(matchId) {
+  if (state.expanded.has(matchId)) {
+    state.expanded.delete(matchId);
+    delete state.activeTab[matchId];
+  } else {
+    state.expanded.add(matchId);
+  }
+  renderBouts();
+}
+
+function switchTab(matchId, tab) {
+  state.activeTab[matchId] = tab;
+  // Re-render just the tabs area
+  const bout = state.torikumi.find(b => (b.id || `${b.matchNo}`) === matchId);
+  if (!bout) return;
+  const detail = document.getElementById(`detail-${matchId}`);
+  if (detail) {
+    detail.innerHTML = renderDetailTabs(bout, matchId, tab);
+    loadPanel(matchId, tab);
+  }
+}
+
+function revealNext() {
+  for (const bout of state.torikumi) {
+    const matchId = bout.id || `${bout.matchNo}`;
+    if (!state.revealed.has(matchId) && bout.winnerId) {
+      revealResult(matchId);
+      // Scroll to it
+      setTimeout(() => {
+        const card = document.querySelector(`[data-match="${matchId}"]`);
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
+      return;
+    }
+  }
+}
+
+function revealAll() {
+  for (const bout of state.torikumi) {
+    if (bout.winnerId) {
+      state.revealed.add(bout.id || `${bout.matchNo}`);
+    }
+  }
+  saveState();
+  renderBouts();
+}
+
+function hideAll() {
+  state.revealed.clear();
+  state.watched.clear();
+  saveState();
+  renderBouts();
+}
+
+function updateProgress() {
+  const total = state.torikumi.filter(b => b.winnerId).length;
+  const revealed = state.torikumi.filter(b => state.revealed.has(b.id || `${b.matchNo}`) && b.winnerId).length;
+  const watched = state.torikumi.filter(b => state.watched.has(b.id || `${b.matchNo}`)).length;
+
+  const pctVal = total > 0 ? (revealed / total * 100) : 0;
+  document.getElementById('progress-fill').style.width = `${pctVal}%`;
+  document.getElementById('progress-text').textContent = `${revealed} / ${total} revealed · ${watched} watched`;
+}
+
+// ============================================================
+// DATA LOADING
+// ============================================================
+async function loadDay() {
+  state.loading = true;
+  state.error = null;
+  state.torikumi = [];
+  state.expanded.clear();
+  state.activeTab = {};
+  renderBouts();
+
+  try {
+    const data = await fetchTorikumi(state.bashoId, state.division, state.day);
+    let bouts = data.torikumi || [];
+
+    // Sort by match number (last match = musubi no ichiban at bottom)
+    bouts.sort((a, b) => a.matchNo - b.matchNo);
+
+    // Enrich with sumodbId from rikishi cache
+    for (const bout of bouts) {
+      if (state.detailCache[bout.eastId]) {
+        bout.eastSumodbId = state.detailCache[bout.eastId].rikishi.sumodbId;
+      }
+      if (state.detailCache[bout.westId]) {
+        bout.westSumodbId = state.detailCache[bout.westId].rikishi.sumodbId;
+      }
+    }
+
+    state.torikumi = bouts;
+    loadState();
+  } catch (e) {
+    // If 404 or error, could be a future day with no data yet
+    if (e.message.includes('404') || e.message.includes('500')) {
+      state.error = null; // show "no bouts" instead of error
+    } else {
+      state.error = e.message;
+    }
+  }
+
+  state.loading = false;
+  renderBouts();
+  syncURL();
+  saveLastSelection();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function escAttr(s) {
+  return s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function calcAge(birthDate) {
+  if (!birthDate) return '—';
+  const born = new Date(birthDate);
+  const now = new Date();
+  let age = now.getFullYear() - born.getFullYear();
+  if (now.getMonth() < born.getMonth() || (now.getMonth() === born.getMonth() && now.getDate() < born.getDate())) {
+    age--;
+  }
+  return age;
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  try {
+    return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch { return d; }
+}
+
+function formatBashoShort(bashoId) {
+  if (!bashoId) return '';
+  const m = bashoId.slice(4);
+  const y = bashoId.slice(2, 4);
+  const months = { '01': 'Jan', '03': 'Mar', '05': 'May', '07': 'Jul', '09': 'Sep', '11': 'Nov' };
+  return `${months[m] || m} '${y}`;
+}
+
+function pct(wins, total) {
+  if (!total) return '—';
+  return (wins / total * 100).toFixed(1) + '%';
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function populateBashoSelect() {
+  const bashoSelect = document.getElementById('basho-select');
+  const ids = getBashoIds();
+  bashoSelect.innerHTML = ids.map(id => `<option value="${id}">${bashoLabel(id)}</option>`).join('');
+  return ids;
+}
+
+function navigate(bashoId, day, division) {
+  state.bashoId = bashoId;
+  state.day = Math.max(1, Math.min(15, day || 1));
+  if (division) state.division = division;
+  document.getElementById('basho-select').value = bashoId;
+  updateDayLabel();
+  updateDivisionTabs();
+  loadDay();
+}
+
+function setupControls() {
+  document.getElementById('basho-select').addEventListener('change', (e) => {
+    navigate(e.target.value, 1, state.division);
+  });
+
+  document.getElementById('day-prev').addEventListener('click', () => {
+    if (state.day > 1) navigate(state.bashoId, state.day - 1, state.division);
+  });
+
+  document.getElementById('day-next').addEventListener('click', () => {
+    if (state.day < 15) navigate(state.bashoId, state.day + 1, state.division);
+  });
+
+  // Division tabs
+  document.querySelectorAll('.division-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      navigate(state.bashoId, state.day, tab.dataset.div);
+    });
+  });
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+    if (e.key === 'ArrowLeft' && state.day > 1) navigate(state.bashoId, state.day - 1, state.division);
+    if (e.key === 'ArrowRight' && state.day < 15) navigate(state.bashoId, state.day + 1, state.division);
+    if (e.key === 'r' || e.key === 'R') revealNext();
+  });
+
+  // Handle browser back/forward
+  window.addEventListener('popstate', (e) => {
+    if (e.state) {
+      navigate(e.state.basho, e.state.day, e.state.div);
+    }
+  });
+}
+
+function updateDayLabel() {
+  document.getElementById('day-label').innerHTML = `Day <strong>${state.day}</strong>`;
+  document.getElementById('day-prev').disabled = state.day <= 1;
+  document.getElementById('day-next').disabled = state.day >= 15;
+}
+
+function updateDivisionTabs() {
+  document.querySelectorAll('.division-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.div === state.division);
+  });
+}
+
+// Boot
+async function boot() {
+  const ids = populateBashoSelect();
+  setupControls();
+
+  // Priority: URL params > auto-detect (fetches API for current basho)
+  const url = readURL();
+
+  if (url.basho && ids.includes(url.basho)) {
+    // URL has explicit state — use it directly
+    state.bashoId = url.basho;
+    state.day = url.day || 1;
+    state.division = url.division || 'Makuuchi';
+  } else {
+    // Auto-detect: figure out which basho is live or most recent
+    const detected = await autoDetect();
+    state.bashoId = detected.bashoId;
+    state.day = detected.day;
+    state.division = url.division || 'Makuuchi';
+  }
+
+  // Ensure the detected basho is in the selector (add it if needed)
+  const bashoSelect = document.getElementById('basho-select');
+  if (!ids.includes(state.bashoId)) {
+    const opt = document.createElement('option');
+    opt.value = state.bashoId;
+    opt.textContent = bashoLabel(state.bashoId);
+    bashoSelect.prepend(opt);
+  }
+  bashoSelect.value = state.bashoId;
+
+  updateDayLabel();
+  updateDivisionTabs();
+  loadDay();
+}
+
+boot();
+</script>
+</body>
+</html>

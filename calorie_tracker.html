@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Log</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0b0b0b;
+    --surface: #141414;
+    --surface-2: #1a1a1a;
+    --border: #252525;
+    --border-focus: #383838;
+    --text: #e2ddd5;
+    --text-dim: #65615a;
+    --text-mid: #98938a;
+    --accent: #c8ff00;
+    --accent-dim: rgba(200,255,0,0.07);
+    --protein: #00d4aa;
+    --protein-dim: rgba(0,212,170,0.08);
+    --warn: #ff6b5a;
+    --warn-dim: rgba(255,107,90,0.08);
+    --blue: #5b9cf5;
+    --blue-dim: rgba(91,156,245,0.08);
+    --carbs: #f0a050;
+    --fat: #c084fc;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  body::after {
+    content:'';position:fixed;inset:0;pointer-events:none;opacity:0.02;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .app { max-width:660px; margin:0 auto; padding:48px 20px 120px; }
+
+  /* ── HEADER ── */
+  header { margin-bottom:36px; }
+  .title-row {
+    display:flex; align-items:center; gap:10px; margin-bottom:20px;
+  }
+  .title-row h1 {
+    font-family:'JetBrains Mono',monospace;
+    font-weight:300; font-size:12px;
+    letter-spacing:4px; text-transform:uppercase;
+    color:var(--text-dim);
+  }
+  .title-dot {
+    width:6px;height:6px;border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 8px rgba(200,255,0,0.4);
+  }
+
+  .totals {
+    display:flex; gap:24px; align-items:baseline;
+    padding:20px 0;
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  .tot { display:flex; align-items:baseline; gap:7px; }
+  .tot-val {
+    font-family:'JetBrains Mono',monospace;
+    font-size:30px; font-weight:400;
+    letter-spacing:-1.5px;
+    transition: all 0.3s ease;
+  }
+  .tot-val.cal { color:var(--accent); }
+  .tot-val.pro { color:var(--protein); }
+  .tot-unit {
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; color:var(--text-dim);
+    letter-spacing:1.5px; text-transform:uppercase;
+  }
+
+  /* ── INPUT ZONE ── */
+  .input-zone { margin:28px 0; }
+  .input-wrap {
+    position:relative;
+  }
+  .input-zone textarea {
+    width:100%; background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:14px 52px 14px 16px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px; line-height:1.8;
+    resize:vertical; min-height:96px;
+    outline:none;
+    transition:border-color 0.2s;
+  }
+  .input-zone textarea:focus { border-color:var(--border-focus); }
+  .input-zone textarea::placeholder { color:var(--text-dim); font-style:italic; }
+
+  /* Camera button inside textarea */
+  .btn-cam {
+    position:absolute; top:10px; right:10px;
+    width:34px; height:34px;
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:5px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:all 0.15s;
+    color:var(--text-dim);
+  }
+  .btn-cam:hover { border-color:var(--blue); color:var(--blue); }
+  .btn-cam svg { width:18px; height:18px; }
+  #photoInput { display:none; }
+
+  .input-foot {
+    display:flex; justify-content:space-between;
+    align-items:center; margin-top:10px;
+  }
+  .hint {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; color:var(--text-dim);
+    letter-spacing:0.3px;
+  }
+  .btn-log {
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; font-weight:600;
+    letter-spacing:2.5px; text-transform:uppercase;
+    background:var(--accent); color:var(--bg);
+    border:none; padding:9px 26px;
+    border-radius:3px; cursor:pointer;
+    transition:all 0.15s;
+  }
+  .btn-log:hover { opacity:0.85; transform:translateY(-1px); }
+  .btn-log:active { transform:translateY(0); }
+  .btn-log:disabled { opacity:0.25; cursor:not-allowed; transform:none; }
+
+  .error-bar {
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px; color:var(--warn);
+    background:var(--warn-dim);
+    padding:9px 14px; border-radius:4px;
+    margin-top:8px; display:none;
+    line-height:1.5;
+  }
+
+  /* ── CLIP RESULTS PANEL ── */
+  .clip-panel {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:6px;
+    margin-top:10px;
+    overflow:hidden;
+    display:none;
+    animation:slideIn 0.22s ease-out;
+  }
+  .clip-panel.active { display:block; }
+
+  .clip-header {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 14px;
+    border-bottom:1px solid var(--border);
+  }
+  .clip-header-left {
+    display:flex; align-items:center; gap:8px;
+  }
+  .clip-title {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--blue);
+  }
+  .clip-model-status {
+    font-family:'JetBrains Mono',monospace;
+    font-size:9.5px; color:var(--text-dim);
+    letter-spacing:0.5px;
+  }
+  .btn-clip-close {
+    background:none; border:none; color:var(--text-dim);
+    cursor:pointer; font-size:14px; padding:2px 4px;
+    transition:color 0.15s;
+  }
+  .btn-clip-close:hover { color:var(--warn); }
+
+  .clip-preview {
+    display:flex; gap:14px; padding:12px 14px;
+    align-items:flex-start;
+  }
+  .clip-thumb {
+    width:80px; height:80px; border-radius:4px;
+    object-fit:cover; flex-shrink:0;
+    border:1px solid var(--border);
+  }
+  .clip-matches { flex:1; display:flex; flex-direction:column; gap:4px; }
+
+  .clip-match {
+    display:flex; align-items:center; gap:6px;
+    padding:6px 8px;
+    border-radius:3px;
+    cursor:pointer;
+    transition:all 0.12s;
+    border:1px solid transparent;
+    flex-wrap:wrap;
+  }
+  .clip-match:hover { background:var(--accent-dim); border-color:var(--border); }
+  .clip-match.selected { background:var(--accent-dim); border-color:var(--accent); }
+
+  .clip-match-top {
+    display:flex; align-items:center; gap:6px; width:100%;
+  }
+  .clip-match-name {
+    font-size:13px; color:var(--text); flex:1;
+  }
+  .clip-match-score {
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; color:var(--text-dim);
+    flex-shrink:0;
+  }
+  .clip-match-controls {
+    display:flex; align-items:center; gap:5px;
+    width:100%; padding-left:22px;
+  }
+  .clip-size-btns {
+    display:flex; gap:2px;
+  }
+  .clip-size-btn {
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px; font-weight:600;
+    letter-spacing:0.5px;
+    padding:2px 6px;
+    border-radius:2px;
+    border:1px solid var(--border);
+    background:none; color:var(--text-dim);
+    cursor:pointer; transition:all 0.12s;
+  }
+  .clip-size-btn:hover { border-color:var(--text-mid); color:var(--text); }
+  .clip-size-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+  .clip-qty-input {
+    width:48px; padding:2px 4px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; color:var(--accent);
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:3px; text-align:right;
+    outline:none;
+    -moz-appearance:textfield;
+  }
+  .clip-qty-input::-webkit-inner-spin-button,
+  .clip-qty-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  .clip-qty-input:focus { border-color:var(--accent); }
+  .clip-qty-unit {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; color:var(--text-dim);
+  }
+  .clip-portion-hint {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; color:var(--text-dim);
+    margin-left:auto;
+    white-space:nowrap;
+  }
+  .clip-match-check {
+    width:14px; height:14px; border-radius:3px;
+    border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; color:var(--accent);
+    flex-shrink:0;
+  }
+  .clip-match.selected .clip-match-check {
+    border-color:var(--accent);
+    background:var(--accent-dim);
+  }
+
+  .clip-actions {
+    padding:8px 14px 12px;
+    display:flex; justify-content:flex-end; gap:8px;
+  }
+  .btn-clip-add {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; font-weight:500;
+    letter-spacing:1.5px; text-transform:uppercase;
+    background:var(--accent); color:var(--bg);
+    border:none; padding:7px 18px;
+    border-radius:3px; cursor:pointer;
+    transition:all 0.15s;
+  }
+  .btn-clip-add:hover { opacity:0.85; }
+  .btn-clip-add:disabled { opacity:0.25; cursor:not-allowed; }
+
+  /* ── CLIP LOADING STATE ── */
+  .clip-loading {
+    padding:16px 14px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .clip-loading .spin {
+    width:14px;height:14px;
+    border:2px solid var(--border);
+    border-top-color:var(--blue);
+    border-radius:50%;
+    animation:sp 0.6s linear infinite;
+  }
+  .clip-loading span {
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px; color:var(--text-dim);
+  }
+
+  .clip-progress {
+    padding:0 14px 12px;
+  }
+  .clip-progress-bar {
+    height:3px; background:var(--border); border-radius:2px;
+    overflow:hidden;
+  }
+  .clip-progress-fill {
+    height:100%; background:var(--blue);
+    border-radius:2px; transition:width 0.3s;
+    width:0%;
+  }
+
+  /* ── ENTRIES ── */
+  .sec-head {
+    display:flex; justify-content:space-between;
+    align-items:center; margin:36px 0 12px;
+  }
+  .sec-label {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; letter-spacing:2.5px;
+    text-transform:uppercase; color:var(--text-dim);
+  }
+  .btn-clear {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; letter-spacing:1px;
+    text-transform:uppercase; color:var(--text-dim);
+    background:none; border:1px solid var(--border);
+    padding:5px 12px; border-radius:3px;
+    cursor:pointer; transition:all 0.15s;
+  }
+  .btn-clear:hover { border-color:var(--warn); color:var(--warn); }
+
+  .entries { display:flex; flex-direction:column; gap:5px; }
+
+  .entry {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:5px;
+    padding:13px 16px;
+    animation:slideIn 0.22s ease-out;
+  }
+  @keyframes slideIn {
+    from { opacity:0; transform:translateY(-6px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .entry-head {
+    display:flex; justify-content:space-between;
+    align-items:center; margin-bottom:8px;
+  }
+  .entry-time {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; color:var(--text-dim);
+  }
+  .btn-rm {
+    background:none; border:none; color:var(--text-dim);
+    cursor:pointer; font-size:15px; line-height:1;
+    padding:2px 4px; opacity:0; transition:all 0.15s;
+  }
+  .entry:hover .btn-rm { opacity:1; }
+  .btn-rm:hover { color:var(--warn); }
+
+  .entry-rows { display:flex; flex-direction:column; gap:4px; }
+  .erow {
+    display:flex; justify-content:space-between;
+    align-items:baseline; gap:12px; padding:2px 0;
+  }
+  .erow-name {
+    font-size:13.5px; color:var(--text);
+    flex:1; min-width:0;
+    white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .erow-match {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; color:var(--text-dim);
+    max-width:180px; min-width:0;
+    white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; text-align:center;
+  }
+  .erow-macros { display:flex; gap:10px; flex-shrink:0; }
+  .pill {
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px; white-space:nowrap;
+  }
+  .pill.c { color:var(--accent); }
+  .pill.p { color:var(--protein); }
+  .pill.cb { color:var(--carbs); }
+  .pill.f { color:var(--fat); }
+
+  .entry-foot {
+    margin-top:8px; padding-top:7px;
+    border-top:1px solid var(--border);
+    display:flex; justify-content:flex-end; gap:18px;
+  }
+  .entry-foot .pill { font-weight:500; font-size:12.5px; }
+
+  .loading {
+    display:flex; align-items:center; gap:10px;
+    padding:14px 16px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:5px; margin-bottom:5px;
+  }
+  .spin {
+    width:14px;height:14px;
+    border:2px solid var(--border);
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:sp 0.6s linear infinite;
+  }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  .loading span {
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px; color:var(--text-dim);
+  }
+
+  .empty {
+    text-align:center; padding:52px 20px;
+    color:var(--text-dim);
+  }
+  .empty .ico { font-size:24px; margin-bottom:14px; opacity:0.35; }
+  .empty p {
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px; line-height:2; letter-spacing:0.3px;
+  }
+
+  @media (max-width:500px) {
+    .totals { gap:24px; }
+    .tot-val { font-size:28px; }
+    .erow-match { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="title-row">
+      <div class="title-dot"></div>
+      <h1>Fuel Log</h1>
+    </div>
+    <div class="totals">
+      <div class="tot">
+        <span class="tot-val cal" id="tCal">0</span>
+        <span class="tot-unit">kcal</span>
+      </div>
+      <div class="tot">
+        <span class="tot-val pro" id="tPro">0</span>
+        <span class="tot-unit">g pro</span>
+      </div>
+      <div class="tot">
+        <span class="tot-val" style="color:var(--carbs)" id="tCarb">0</span>
+        <span class="tot-unit">g carb</span>
+      </div>
+      <div class="tot">
+        <span class="tot-val" style="color:var(--fat)" id="tFat">0</span>
+        <span class="tot-unit">g fat</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="input-zone">
+    <div class="input-wrap">
+      <textarea id="inp" placeholder="200g chicken breast&#10;1 cup white rice&#10;2 eggs&#10;a scoop of whey protein"></textarea>
+      <button class="btn-cam" onclick="document.getElementById('photoInput').click()" title="Snap or upload a food photo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" onchange="handlePhoto(this)">
+    </div>
+
+    <div id="clipPanel" class="clip-panel"></div>
+    <div class="error-bar" id="err"></div>
+
+    <div class="input-foot">
+      <span class="hint">text or photo · ctrl+enter to log</span>
+      <button class="btn-log" id="logBtn" onclick="doLog()">Log</button>
+    </div>
+  </div>
+
+  <div class="sec-head" id="secHead" style="display:none">
+    <span class="sec-label">Entries</span>
+    <button class="btn-clear" onclick="clearAll()">Clear day</button>
+  </div>
+  <div id="loadZone"></div>
+  <div class="entries" id="entries"></div>
+  <div class="empty" id="empty">
+    <div class="ico">&#9671;</div>
+    <p>Type what you ate or snap a photo.<br>Quantities, brands, rough guesses — all fine.<br>USDA primary · offline cache · CLIP vision.</p>
+  </div>
+
+</div>
+
+<script type="module">
+// ═══════════════════════════════════════════════════
+// TRANSFORMERS.JS — lazy loaded on first photo
+// ═══════════════════════════════════════════════════
+let pipeline = null;
+let clipClassifier = null;
+let modelLoading = false;
+
+async function loadCLIP(progressCb) {
+  if (clipClassifier) return clipClassifier;
+  if (modelLoading) return null;
+  modelLoading = true;
+
+  try {
+    const { pipeline: createPipeline, env } = await import(
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.1'
+    );
+    // Use wasm backend, cache models in browser
+    env.allowLocalModels = false;
+
+    progressCb('Loading CLIP model (~90MB)…', 10);
+
+    clipClassifier = await createPipeline(
+      'zero-shot-image-classification',
+      'Xenova/clip-vit-base-patch16',
+      {
+        progress_callback: (p) => {
+          if (p.status === 'progress' && p.total) {
+            const pct = Math.round((p.loaded / p.total) * 100);
+            progressCb(`Downloading: ${pct}%`, pct);
+          } else if (p.status === 'ready') {
+            progressCb('Model ready', 100);
+          }
+        }
+      }
+    );
+
+    modelLoading = false;
+    return clipClassifier;
+  } catch (err) {
+    modelLoading = false;
+    throw err;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// BUILT-IN FOOD DATABASE  (per 100g: [kcal, protein, carbs, fat])
+// ═══════════════════════════════════════════════════
+const DB = {
+  // ── MEAT & POULTRY ──
+  'chicken breast':[165,31,0,3.6],'chicken thigh':[209,26,0,11],'chicken drumstick':[172,28,0,6],
+  'chicken wing':[203,30,0,8],'chicken':[190,28,0,8],'turkey breast':[135,30,0,1],
+  'turkey':[170,28,0,6],'ground turkey':[170,20,0,10],'ground beef':[250,26,0,15],
+  'ground beef lean':[200,26,0,10],'beef':[250,26,0,15],'beef steak':[271,26,0,18],
+  'steak':[271,26,0,18],'ribeye':[291,24,0,21],'sirloin':[207,27,0,10],
+  'filet mignon':[267,26,0,17],'pork':[242,27,0,14],'pork chop':[231,26,0,13],
+  'pork tenderloin':[143,26,0,4],'pork loin':[196,27,0,9],'bacon':[541,37,1,42],
+  'ham':[145,21,1.5,6],'lamb':[294,25,0,21],'lamb chop':[294,25,0,21],
+  'duck':[337,19,0,28],'venison':[158,30,0,3],'bison':[143,28,0,2.4],
+  'sausage':[301,18,2,24],'hot dog':[290,10,2,26],'pepperoni':[494,23,0,44],
+  'salami':[378,23,1,31],'liver':[135,21,4,4],'beef jerky':[410,33,11,25],
+  // ── FISH & SEAFOOD ──
+  'salmon':[208,20,0,13],'tuna':[130,29,0,1],'tuna canned':[116,26,0,1],
+  'cod':[82,18,0,0.7],'tilapia':[96,20,0,1.7],'shrimp':[85,20,0,0.5],
+  'prawns':[85,20,0,0.5],'sardines':[208,25,0,11],'mackerel':[205,19,0,14],
+  'trout':[190,20,0,12],'sea bass':[97,18,0,2],'halibut':[111,23,0,1.6],
+  'swordfish':[144,24,0,5],'catfish':[105,18,0,3],'crab':[83,18,0,0.7],
+  'lobster':[89,19,0,0.9],'scallops':[69,12,3,0.5],'mussels':[86,12,4,2.2],
+  'oysters':[68,7,4,2.5],'squid':[92,16,3,1.4],'calamari':[175,18,8,7],
+  'octopus':[82,15,2,1],'anchovies':[210,29,0,10],
+  // ── EGGS & DAIRY ──
+  'egg':[143,13,1,10],'eggs':[143,13,1,10],'egg white':[52,11,0.7,0.2],
+  'egg whites':[52,11,0.7,0.2],'egg yolk':[322,16,4,27],
+  'milk':[61,3.2,5,3.3],'whole milk':[61,3.2,5,3.3],'skim milk':[35,3.4,5,0.1],
+  'cream':[340,2.1,3,37],'heavy cream':[340,2.1,3,37],'butter':[717,0.9,0,81],
+  'cheese':[402,25,1.3,33],'cheddar':[403,25,1.3,33],'mozzarella':[280,28,3,17],
+  'parmesan':[431,38,4,29],'swiss cheese':[380,27,5,28],'cream cheese':[342,6,4,34],
+  'cottage cheese':[98,11,3.4,4.3],'ricotta':[174,11,3,13],'feta':[264,14,4,21],
+  'brie':[334,21,0.5,28],'gouda':[356,25,2,27],'greek yogurt':[97,9,4,5],
+  'yogurt':[63,5,7,1.5],'sour cream':[198,2.4,5,19],
+  'whey protein':[400,80,8,3],'whey':[400,80,8,3],
+  'protein powder':[400,75,10,5],'casein':[370,80,4,2],
+  // ── GRAINS & CARBS ──
+  'rice':[130,2.7,28,0.3],'white rice':[130,2.7,28,0.3],'brown rice':[123,2.6,26,1],
+  'pasta':[158,5.8,31,0.9],'spaghetti':[158,5.8,31,0.9],'noodles':[138,4.5,25,2],
+  'macaroni':[158,5.8,31,0.9],'bread':[265,9,49,3.2],'white bread':[265,9,49,3.2],
+  'whole wheat bread':[247,13,41,3.4],'toast':[265,9,49,3.2],'bagel':[257,10,50,1.5],
+  'tortilla':[312,8,52,8],'pita':[275,9,56,1.2],'naan':[290,9,50,5],
+  'oats':[389,17,66,7],'oatmeal':[68,2.5,12,1.4],'cereal':[379,7,84,1],
+  'granola':[471,10,64,20],'quinoa':[120,4.4,21,1.9],'couscous':[112,3.8,23,0.2],
+  'barley':[123,2.3,28,0.4],'pancake':[227,6,28,10],'pancakes':[227,6,28,10],
+  'waffle':[291,8,33,14],'waffles':[291,8,33,14],'croissant':[406,8,46,21],
+  'muffin':[296,5,46,10],
+  // ── LEGUMES ──
+  'lentils':[116,9,20,0.4],'chickpeas':[164,8.9,27,2.6],'black beans':[132,8.9,24,0.5],
+  'kidney beans':[127,8.7,23,0.5],'beans':[127,8.7,23,0.5],'pinto beans':[143,9,26,0.6],
+  'edamame':[121,12,9,5],'tofu':[76,8,1.9,4.8],'tempeh':[192,20,8,11],
+  'hummus':[166,8,14,10],
+  // ── VEGETABLES ──
+  'broccoli':[34,2.8,7,0.4],'spinach':[23,2.9,3.6,0.4],'kale':[49,4.3,9,0.9],
+  'lettuce':[15,1.4,2.9,0.2],'tomato':[18,0.9,3.9,0.2],'cucumber':[15,0.7,3.6,0.1],
+  'carrot':[41,0.9,10,0.2],'carrots':[41,0.9,10,0.2],'bell pepper':[31,1,6,0.3],
+  'onion':[40,1.1,9,0.1],'garlic':[149,6.4,33,0.5],'mushroom':[22,3.1,3.3,0.3],
+  'mushrooms':[22,3.1,3.3,0.3],'potato':[77,2,17,0.1],'potatoes':[77,2,17,0.1],
+  'sweet potato':[86,1.6,20,0.1],'corn':[96,3.4,21,1.5],'peas':[81,5.4,14,0.4],
+  'green beans':[31,1.8,7,0.1],'asparagus':[20,2.2,3.9,0.1],'cauliflower':[25,1.9,5,0.3],
+  'zucchini':[17,1.2,3.1,0.3],'celery':[16,0.7,3,0.2],'cabbage':[25,1.3,6,0.1],
+  'brussels sprouts':[43,3.4,9,0.3],'eggplant':[25,1,6,0.2],'avocado':[160,2,9,15],
+  'beet':[43,1.6,10,0.2],
+  // ── FRUITS ──
+  'banana':[89,1.1,23,0.3],'apple':[52,0.3,14,0.2],'orange':[47,0.9,12,0.1],
+  'strawberries':[32,0.7,8,0.3],'blueberries':[57,0.7,14,0.3],'grapes':[69,0.7,18,0.2],
+  'watermelon':[30,0.6,8,0.2],'mango':[60,0.8,15,0.4],'pineapple':[50,0.5,13,0.1],
+  'peach':[39,0.9,10,0.3],'pear':[57,0.4,15,0.1],'cherries':[63,1,16,0.2],
+  'kiwi':[61,1.1,15,0.5],'raspberries':[52,1.2,12,0.7],'raisins':[299,3.1,79,0.5],
+  'dates':[277,1.8,75,0.2],
+  // ── NUTS & SEEDS ──
+  'almonds':[579,21,22,50],'peanuts':[567,26,16,49],'peanut butter':[588,25,20,50],
+  'cashews':[553,18,30,44],'walnuts':[654,15,14,65],'pecans':[691,9,14,72],
+  'pistachios':[560,20,28,45],'macadamia':[718,8,14,76],'hazelnuts':[628,15,17,61],
+  'brazil nuts':[659,14,12,67],'mixed nuts':[607,20,21,54],
+  'sunflower seeds':[584,21,20,51],'pumpkin seeds':[559,30,11,49],
+  'chia seeds':[486,17,42,31],'flax seeds':[534,18,29,42],
+  'hemp seeds':[553,32,9,49],'tahini':[595,17,21,54],
+  // ── FATS & OILS ──
+  'olive oil':[884,0,0,100],'coconut oil':[862,0,0,100],'vegetable oil':[884,0,0,100],
+  'mayo':[680,1,1,75],'mayonnaise':[680,1,1,75],
+  // ── COMMON PREPARED ──
+  'pizza':[266,11,33,10],'pizza slice':[285,12,36,11],'burger':[295,17,24,15],
+  'hamburger':[295,17,24,15],'cheeseburger':[303,17,24,16],
+  'french fries':[312,3.4,41,15],'fries':[312,3.4,41,15],
+  'fried rice':[163,4.3,24,6],'burrito':[206,9,27,7],'taco':[226,11,20,12],
+  'sushi':[143,6,26,2],'sandwich':[250,12,28,10],'wrap':[220,12,25,8],
+  'soup':[50,3,6,1.5],'chicken soup':[55,5,5,2],
+  'salad':[20,1.5,3.5,0.2],'caesar salad':[127,7,7,9],'stir fry':[120,8,10,5],
+  'curry':[150,8,12,8],'pad thai':[170,8,24,5],'ramen':[436,10,62,16],
+  'mac and cheese':[164,7,17,8],'lasagna':[135,9,13,5],'mashed potatoes':[83,1.9,14,2],
+  'fried chicken':[246,19,9,14],'grilled cheese':[366,14,28,22],
+  'quesadilla':[255,12,24,13],'nachos':[306,8,32,17],'popcorn':[375,11,74,4],
+  // ── SNACKS & SWEETS ──
+  'chocolate':[546,5,60,31],'dark chocolate':[598,8,46,43],'ice cream':[207,3.5,24,11],
+  'cookie':[488,5,65,23],'cookies':[488,5,65,23],'cake':[257,3,37,11],
+  'brownie':[405,5,50,21],'donut':[452,5,51,25],'chips':[536,7,53,35],
+  'potato chips':[536,7,53,35],'protein bar':[350,20,40,12],
+  'trail mix':[462,14,45,27],'granola bar':[471,7,64,20],'rice cake':[387,8,81,3],
+  'crackers':[484,8,60,23],'pretzels':[380,9,80,3],
+  // ── DRINKS ──
+  'orange juice':[45,0.7,10,0.2],'apple juice':[46,0.1,11,0.1],
+  'protein shake':[120,25,6,2],'smoothie':[60,2,13,0.5],
+  'beer':[43,0.5,3.6,0],'wine':[83,0.1,2.6,0],'cola':[42,0,11,0],'soda':[42,0,11,0],
+  'coffee':[2,0.3,0,0],'latte':[56,3,5,2.4],'cappuccino':[45,3,4,2],
+  // ── CONDIMENTS ──
+  'ketchup':[112,1.7,26,0.1],'mustard':[66,4,6,3],'soy sauce':[53,8,5,0.1],
+  'honey':[304,0.3,82,0],'sugar':[387,0,100,0],'maple syrup':[260,0,67,0.1],
+  'jam':[250,0.4,66,0.1],'salsa':[36,1.5,7,0.2],
+  'bbq sauce':[172,0.8,41,0.6],'ranch dressing':[450,1.5,6,47],
+};
+
+// ═══════════════════════════════════════════
+// TYPICAL SERVING SIZES (grams) — used by CLIP results
+// ═══════════════════════════════════════════
+const TYPICAL_SERVING = {
+  // Meat & poultry
+  'chicken breast':175,'chicken thigh':115,'chicken drumstick':90,'chicken wing':60,
+  'chicken':150,'turkey breast':150,'turkey':150,'ground turkey':150,'ground beef':150,
+  'ground beef lean':150,'beef':150,'beef steak':200,'steak':200,'ribeye':225,
+  'sirloin':200,'filet mignon':175,'pork':150,'pork chop':175,'pork tenderloin':175,
+  'pork loin':150,'bacon':30,'ham':80,'lamb':150,'lamb chop':120,'duck':150,
+  'venison':150,'bison':150,'sausage':75,'hot dog':100,'pepperoni':30,'salami':30,
+  'liver':120,'beef jerky':40,
+  // Fish & seafood
+  'salmon':170,'tuna':140,'tuna canned':120,'cod':170,'tilapia':170,'shrimp':120,
+  'prawns':120,'sardines':85,'mackerel':150,'trout':170,'sea bass':170,'halibut':170,
+  'swordfish':170,'catfish':170,'crab':120,'lobster':140,'scallops':100,'mussels':120,
+  'oysters':85,'squid':100,'calamari':120,'octopus':100,'anchovies':20,
+  // Eggs & dairy
+  'egg':50,'eggs':100,'egg white':33,'egg whites':66,'egg yolk':17,
+  'milk':250,'whole milk':250,'skim milk':250,'cream':30,'heavy cream':30,'butter':14,
+  'cheese':30,'cheddar':30,'mozzarella':30,'parmesan':15,'swiss cheese':30,
+  'cream cheese':30,'cottage cheese':120,'ricotta':60,'feta':30,'brie':30,'gouda':30,
+  'greek yogurt':170,'yogurt':170,'sour cream':30,
+  'whey protein':30,'whey':30,'protein powder':30,'casein':30,
+  // Grains & carbs
+  'rice':200,'white rice':200,'brown rice':200,'pasta':200,'spaghetti':200,
+  'noodles':200,'macaroni':200,'bread':60,'white bread':60,'whole wheat bread':60,
+  'toast':30,'bagel':105,'tortilla':45,'pita':60,'naan':90,
+  'oats':40,'oatmeal':240,'cereal':40,
+  // Fruits
+  'banana':120,'apple':180,'orange':130,'strawberry':150,'blueberry':75,
+  'raspberry':65,'grape':80,'watermelon':200,'mango':165,'pineapple':165,
+  'peach':150,'pear':175,'kiwi':75,'cherry':90,'avocado':70,
+  // Vegetables
+  'broccoli':90,'spinach':85,'kale':67,'lettuce':85,'tomato':125,'carrot':60,
+  'potato':150,'sweet potato':130,'corn':90,'green beans':85,'cucumber':100,
+  'bell pepper':120,'onion':110,'mushroom':70,'zucchini':130,'cauliflower':85,
+  // Nuts & seeds
+  'almonds':30,'peanuts':30,'walnuts':30,'cashews':30,'pistachios':30,
+  'pecans':30,'macadamia':30,'peanut butter':32,'almond butter':32,
+  'chia seeds':15,'flax seeds':15,'sunflower seeds':30,'pumpkin seeds':30,
+  // Oils & fats
+  'olive oil':15,'coconut oil':14,'vegetable oil':14,
+  // Prepared foods
+  'pizza':200,'pizza slice':125,'burger':200,'hamburger':200,'cheeseburger':200,
+  'taco':80,'burrito':300,'sushi':180,'fried rice':250,'pad thai':300,
+  'ramen':400,'pho':400,'lasagna':250,'mac and cheese':250,'grilled cheese':150,
+  'fish and chips':300,'chicken nuggets':100,'french fries':115,'mashed potatoes':210,
+  // Snacks & sweets
+  'popcorn':30,'chips':30,'chocolate':40,'dark chocolate':30,'ice cream':100,
+  'cookie':30,'cookies':60,'brownie':60,'cake':125,'pie':150,'donut':60,'doughnut':60,
+  'pancake':75,'pancakes':150,'waffle':75,'waffles':150,'granola bar':40,
+  'protein bar':60,'rice cake':9,'trail mix':40,
+  // Drinks
+  'orange juice':250,'apple juice':250,'coffee':240,'latte':360,'cappuccino':240,
+  'smoothie':350,'protein shake':350,'beer':355,'wine':150,'soda':355,'coconut water':250,
+};
+
+// ═══════════════════════════════════════════
+// PORTION HINTS — plain-language descriptions of what a serving looks like
+// ═══════════════════════════════════════════
+const PORTION_HINTS = {
+  // Meat & poultry
+  'chicken breast':'1 breast','chicken thigh':'1 thigh','chicken drumstick':'1 drumstick',
+  'chicken wing':'2 wings','chicken':'1 palm','turkey breast':'1 palm','turkey':'1 palm',
+  'ground turkey':'1 palm','ground beef':'1 palm','ground beef lean':'1 palm',
+  'beef':'1 palm','beef steak':'1 steak','steak':'1 steak','ribeye':'1 steak',
+  'sirloin':'1 steak','filet mignon':'1 fillet','pork':'1 palm','pork chop':'1 chop',
+  'pork tenderloin':'1 palm','pork loin':'1 palm','bacon':'2 strips','ham':'3 slices',
+  'lamb':'1 palm','lamb chop':'2 chops','duck':'1 palm','venison':'1 palm','bison':'1 palm',
+  'sausage':'1 link','hot dog':'1 dog','pepperoni':'~10 slices','salami':'3 slices',
+  'liver':'1 palm','beef jerky':'1 handful',
+  // Fish & seafood
+  'salmon':'1 fillet','tuna':'1 fillet','tuna canned':'1 can','cod':'1 fillet',
+  'tilapia':'1 fillet','shrimp':'~12 medium','prawns':'~12 medium','sardines':'1 can',
+  'mackerel':'1 fillet','trout':'1 fillet','sea bass':'1 fillet','halibut':'1 fillet',
+  'swordfish':'1 fillet','catfish':'1 fillet','crab':'1 cup meat','lobster':'1 tail',
+  'scallops':'~5 large','mussels':'~15 medium','oysters':'6 medium',
+  'squid':'1 cup','calamari':'1 cup','octopus':'1 cup','anchovies':'~5 fillets',
+  // Eggs & dairy
+  'egg':'1 large','eggs':'2 large','egg white':'1 white','egg whites':'2 whites','egg yolk':'1 yolk',
+  'milk':'1 cup','whole milk':'1 cup','skim milk':'1 cup','cream':'2 tbsp','heavy cream':'2 tbsp',
+  'butter':'1 tbsp','cheese':'1 slice','cheddar':'1 slice','mozzarella':'1 slice',
+  'parmesan':'1 tbsp grated','swiss cheese':'1 slice','cream cheese':'2 tbsp',
+  'cottage cheese':'½ cup','ricotta':'¼ cup','feta':'1 oz crumbled','brie':'1 wedge','gouda':'1 slice',
+  'greek yogurt':'1 container','yogurt':'1 container','sour cream':'2 tbsp',
+  'whey protein':'1 scoop','whey':'1 scoop','protein powder':'1 scoop','casein':'1 scoop',
+  // Grains & carbs
+  'rice':'1 cup cooked','white rice':'1 cup cooked','brown rice':'1 cup cooked',
+  'pasta':'1 cup cooked','spaghetti':'1 cup cooked','noodles':'1 cup cooked',
+  'macaroni':'1 cup cooked','bread':'2 slices','white bread':'2 slices',
+  'whole wheat bread':'2 slices','toast':'1 slice','bagel':'1 bagel',
+  'tortilla':'1 medium','pita':'1 pita','naan':'1 piece',
+  'oats':'½ cup dry','oatmeal':'1 bowl','cereal':'1 bowl',
+  // Fruits
+  'banana':'1 medium','apple':'1 medium','orange':'1 medium','strawberry':'1 cup',
+  'blueberry':'½ cup','raspberry':'½ cup','grape':'small bunch','watermelon':'1 wedge',
+  'mango':'1 cup diced','pineapple':'1 cup diced','peach':'1 medium','pear':'1 medium',
+  'kiwi':'1 medium','cherry':'½ cup','avocado':'½ medium',
+  // Vegetables
+  'broccoli':'1 cup','spinach':'2 cups raw','kale':'2 cups raw','lettuce':'2 cups',
+  'tomato':'1 medium','carrot':'1 medium','potato':'1 medium','sweet potato':'1 medium',
+  'corn':'1 ear','green beans':'1 cup','cucumber':'½ medium','bell pepper':'1 medium',
+  'onion':'1 medium','mushroom':'1 cup sliced','zucchini':'1 medium','cauliflower':'1 cup',
+  // Nuts & seeds
+  'almonds':'small handful','peanuts':'small handful','walnuts':'small handful',
+  'cashews':'small handful','pistachios':'small handful','pecans':'small handful',
+  'macadamia':'small handful','peanut butter':'2 tbsp','almond butter':'2 tbsp',
+  'chia seeds':'1 tbsp','flax seeds':'1 tbsp','sunflower seeds':'small handful',
+  'pumpkin seeds':'small handful',
+  // Oils
+  'olive oil':'1 tbsp','coconut oil':'1 tbsp','vegetable oil':'1 tbsp',
+  // Prepared foods
+  'pizza':'2 slices','pizza slice':'1 slice','burger':'1 burger','hamburger':'1 burger',
+  'cheeseburger':'1 burger','taco':'1 taco','burrito':'1 burrito','sushi':'8 pieces',
+  'fried rice':'1 bowl','pad thai':'1 plate','ramen':'1 bowl','pho':'1 bowl',
+  'lasagna':'1 square','mac and cheese':'1 bowl','grilled cheese':'1 sandwich',
+  'fish and chips':'1 serving','chicken nuggets':'6 pieces','french fries':'small bag',
+  'mashed potatoes':'1 cup',
+  // Snacks & sweets
+  'popcorn':'small bag','chips':'small bag','chocolate':'1 bar','dark chocolate':'3 squares',
+  'ice cream':'1 scoop','cookie':'1 cookie','cookies':'2 cookies','brownie':'1 brownie',
+  'cake':'1 slice','pie':'1 slice','donut':'1 donut','doughnut':'1 donut',
+  'pancake':'1 pancake','pancakes':'2 pancakes','waffle':'1 waffle','waffles':'2 waffles',
+  'granola bar':'1 bar','protein bar':'1 bar','rice cake':'1 cake','trail mix':'small handful',
+  // Drinks
+  'orange juice':'1 glass','apple juice':'1 glass','coffee':'1 cup','latte':'1 tall',
+  'cappuccino':'1 cup','smoothie':'1 glass','protein shake':'1 shake',
+  'beer':'1 can','wine':'1 glass','soda':'1 can','coconut water':'1 cup',
+};
+
+function getPortionHint(food) {
+  const f = food.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
+  if (PORTION_HINTS[f]) return PORTION_HINTS[f];
+  for (const [k,v] of Object.entries(PORTION_HINTS)) {
+    if (f.includes(k) || k.includes(f)) return v;
+  }
+  return '1 serving';
+}
+
+// Default serving when no specific match
+function getTypicalServing(food) {
+  const f = food.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
+  if (TYPICAL_SERVING[f]) return TYPICAL_SERVING[f];
+  // Partial match
+  for (const [k,v] of Object.entries(TYPICAL_SERVING)) {
+    if (f.includes(k) || k.includes(f)) return v;
+  }
+  return 100; // fallback
+}
+
+// Deduplicated label set for CLIP (no plurals/duplicates)
+const CLIP_LABELS = [...new Set(Object.keys(DB))].map(k => `a photo of ${k}`);
+const CLIP_LABEL_MAP = [...new Set(Object.keys(DB))];
+
+// ═══════════════════════════════════════════
+// UNIT → GRAMS
+// ═══════════════════════════════════════════
+const UNIT_G = {
+  g:1,gram:1,grams:1,kg:1000,kilogram:1000,kilograms:1000,
+  oz:28.35,ounce:28.35,ounces:28.35,
+  lb:453.6,lbs:453.6,pound:453.6,pounds:453.6,
+  cup:240,cups:240,tbsp:15,tablespoon:15,tablespoons:15,
+  tsp:5,teaspoon:5,teaspoons:5,
+  ml:1,milliliter:1,milliliters:1,
+  l:1000,liter:1000,liters:1000,litre:1000,litres:1000,
+  scoop:30,scoops:30,slice:35,slices:35,
+  piece:120,pieces:120,strip:15,strips:15,
+  fillet:170,fillets:170,breast:175,breasts:175,
+  thigh:115,thighs:115,can:355,cans:355,
+  handful:30,handfuls:30,serving:100,servings:100,
+  bowl:350,bowls:350,plate:300,plates:300,
+  large:75,medium:60,small:45,
+};
+
+const PIECE_WEIGHTS = {
+  'egg':50,'eggs':50,'banana':120,'apple':180,'orange':130,
+  'tortilla':45,'bagel':105,'croissant':60,'muffin':115,
+  'cookie':30,'cookies':30,'donut':60,'doughnut':60,
+  'pancake':75,'pancakes':75,'waffle':75,'waffles':75,
+  'pizza slice':125,'slice of pizza':125,
+  'protein bar':60,'granola bar':40,'rice cake':9,
+  'taco':80,'burger':200,'hamburger':200,'cheeseburger':200,
+  'hot dog':100,'sausage':75,'brownie':60,'slice of cake':125,
+};
+
+// ═══════════════════════════════════════════
+// FUZZY MATCH
+// ═══════════════════════════════════════════
+function fuzzyMatch(query) {
+  const q = query.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
+  if (DB[q]) return { key:q, data:DB[q] };
+  const qWords = q.split(/\s+/);
+  let best = null, bestScore = 0;
+  for (const key of Object.keys(DB)) {
+    const kWords = key.split(/\s+/);
+    let score = 0;
+    if (q.includes(key)) score += 10 + key.length;
+    if (key.includes(q)) score += 8 + q.length;
+    for (const kw of kWords) {
+      for (const qw of qWords) {
+        if (qw === kw) score += 5;
+        else if (qw.length > 3 && kw.length > 3 && (qw.includes(kw) || kw.includes(qw))) score += 3;
+      }
+    }
+    if (score > bestScore) { bestScore = score; best = { key, data:DB[key] }; }
+  }
+  return bestScore >= 3 ? best : null;
+}
+
+// ═══════════════════════════════════════════
+// TEXT PARSER
+// ═══════════════════════════════════════════
+function parseLine(raw) {
+  let line = raw.trim();
+  if (!line) return null;
+  const unitKeys = Object.keys(UNIT_G).sort((a,b) => b.length - a.length);
+  const unitPat = unitKeys.join('|');
+
+  // Pattern 1: qty first — "200g chicken breast" / "2 cups rice"
+  const re1 = new RegExp(`^(\\d+\\.?\\d*)\\s*(${unitPat})?\\s*(?:of\\s+)?(.+)$`,'i');
+  let m = line.match(re1);
+  if (m) {
+    const qty = parseFloat(m[1]);
+    const unit = (m[2] || '').toLowerCase();
+    const food = m[3].trim();
+    let grams;
+    if (unit && UNIT_G[unit]) { grams = qty * UNIT_G[unit]; }
+    else { const pw = findPieceWeight(food); grams = pw ? qty * pw : qty; }
+    return { qty, unit: unit || 'g', grams, food, original:line };
+  }
+
+  // Pattern 2: word qty first — "a scoop of whey" / "two eggs"
+  const wordNums = {a:1,an:1,one:1,single:1,two:2,three:3,four:4,five:5,six:6,half:0.5};
+  const wordPat = Object.keys(wordNums).join('|');
+  const re2 = new RegExp(`^(${wordPat})\\s+(${unitPat})?\\s*(?:of\\s+)?(.+)$`,'i');
+  m = line.match(re2);
+  if (m) {
+    const qty = wordNums[m[1].toLowerCase()] || 1;
+    const unit = (m[2] || '').toLowerCase();
+    const food = m[3].trim();
+    let grams;
+    if (unit && UNIT_G[unit]) { grams = qty * UNIT_G[unit]; }
+    else { const pw = findPieceWeight(food); grams = pw ? qty * pw : qty * 100; }
+    return { qty, unit: unit || 'pc', grams, food, original:line };
+  }
+
+  // Pattern 3: qty at end — "chicken breast 200g" / "rice 60g" / "salmon 150 grams"
+  const re3 = new RegExp(`^(.+?)\\s+(\\d+\\.?\\d*)\\s*(${unitPat})?\\s*$`,'i');
+  m = line.match(re3);
+  if (m) {
+    const food = m[1].trim();
+    const qty = parseFloat(m[2]);
+    const unit = (m[3] || '').toLowerCase();
+    let grams;
+    if (unit && UNIT_G[unit]) { grams = qty * UNIT_G[unit]; }
+    else { const pw = findPieceWeight(food); grams = pw ? qty * pw : qty; }
+    return { qty, unit: unit || 'g', grams, food, original:line };
+  }
+
+  // No quantity — default 100g
+  return { qty:1, unit:'serving', grams:100, food:line, original:line };
+}
+
+function findPieceWeight(food) {
+  const f = food.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
+  if (PIECE_WEIGHTS[f]) return PIECE_WEIGHTS[f];
+  for (const [k,v] of Object.entries(PIECE_WEIGHTS)) {
+    if (f.includes(k) || k.includes(f)) return v;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════
+// USDA API (primary source)
+// ═══════════════════════════════════════════
+const API_KEY = 'DEMO_KEY';
+const API_BASE = 'https://api.nal.usda.gov/fdc/v1/foods/search';
+
+async function usdaSearch(query) {
+  try {
+    const url = `${API_BASE}?query=${encodeURIComponent(query)}&pageSize=5&dataType=Foundation,SR%20Legacy&api_key=${API_KEY}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const foods = data.foods || [];
+    if (!foods.length) return null;
+    const f = foods[0];
+    const cal = (f.foodNutrients || []).find(n => n.nutrientId === 1008);
+    const pro = (f.foodNutrients || []).find(n => n.nutrientId === 1003);
+    const carb = (f.foodNutrients || []).find(n => n.nutrientId === 1005);
+    const fat = (f.foodNutrients || []).find(n => n.nutrientId === 1004);
+    return { name: f.description || query,
+      calPer100: cal ? cal.value : 0, proPer100: pro ? pro.value : 0,
+      carbPer100: carb ? carb.value : 0, fatPer100: fat ? fat.value : 0 };
+  } catch { return null; }
+}
+
+// ═══════════════════════════════════════════
+// LOOKUP: USDA first → local DB cache
+// ═══════════════════════════════════════════
+async function lookupItem(parsed) {
+  // 1) Try USDA API (primary, 300k+ foods)
+  const usda = await usdaSearch(parsed.food);
+  if (usda) {
+    const scale = parsed.grams / 100;
+    return { name: parsed.original, match: '⬡ ' + usda.name.toLowerCase(),
+      calories: Math.round(usda.calPer100 * scale),
+      protein: Math.round(usda.proPer100 * scale * 2) / 2,
+      carbs: Math.round(usda.carbPer100 * scale * 2) / 2,
+      fat: Math.round(usda.fatPer100 * scale * 2) / 2 };
+  }
+  // 2) Offline fallback: local DB
+  const match = fuzzyMatch(parsed.food);
+  if (match) {
+    const [calPer100, proPer100, carbPer100, fatPer100] = match.data;
+    const scale = parsed.grams / 100;
+    return { name: parsed.original, match: '⊙ ' + match.key,
+      calories: Math.round(calPer100 * scale),
+      protein: Math.round(proPer100 * scale * 2) / 2,
+      carbs: Math.round(carbPer100 * scale * 2) / 2,
+      fat: Math.round(fatPer100 * scale * 2) / 2 };
+  }
+  return { name: parsed.original, match: '⚠ not found', calories: 0, protein: 0, carbs: 0, fat: 0 };
+}
+
+// ═══════════════════════════════════════════
+// PHOTO HANDLING + CLIP
+// ═══════════════════════════════════════════
+let clipSelectedItems = new Map(); // label → { qty: number, unit: 'g', size: 'S'|'M'|'L'|null }
+let clipResults = [];
+let clipImageUrl = null;
+
+async function handlePhoto(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  input.value = ''; // reset so same file can be re-selected
+
+  const panel = $('clipPanel');
+  panel.classList.add('active');
+  clipSelectedItems = new Map();
+  clipResults = [];
+
+  // Show thumbnail + loading
+  clipImageUrl = URL.createObjectURL(file);
+
+  panel.innerHTML = `
+    <div class="clip-header">
+      <div class="clip-header-left">
+        <span class="clip-title">CLIP Vision</span>
+        <span class="clip-model-status" id="clipStatus">initializing…</span>
+      </div>
+      <button class="btn-clip-close" onclick="closeClip()">&#10005;</button>
+    </div>
+    <div class="clip-loading">
+      <div class="spin"></div>
+      <span id="clipLoadMsg">Loading model…</span>
+    </div>
+    <div class="clip-progress"><div class="clip-progress-bar"><div class="clip-progress-fill" id="clipBar"></div></div></div>
+  `;
+
+  try {
+    const classifier = await loadCLIP((msg, pct) => {
+      const loadMsg = $('clipLoadMsg');
+      const bar = $('clipBar');
+      if (loadMsg) loadMsg.textContent = msg;
+      if (bar) bar.style.width = pct + '%';
+    });
+
+    if (!classifier) {
+      panel.innerHTML = `<div style="padding:14px;color:var(--warn);font-family:'JetBrains Mono',monospace;font-size:12px;">Model is already loading, try again in a moment.</div>`;
+      return;
+    }
+
+    // Update status
+    const status = $('clipStatus');
+    if (status) status.textContent = 'classifying…';
+    const loadMsg = $('clipLoadMsg');
+    if (loadMsg) loadMsg.textContent = 'Analyzing image…';
+
+    // Run CLIP classification against all DB labels
+    const results = await classifier(clipImageUrl, CLIP_LABELS, {
+      hypothesis_template: '{}'
+    });
+
+    // Map back to food names and sort by score
+    clipResults = results
+      .map((r, i) => ({
+        label: CLIP_LABEL_MAP[CLIP_LABELS.indexOf(r.label)],
+        score: r.score,
+      }))
+      .filter(r => r.label)
+      .sort((a,b) => b.score - a.score)
+      .slice(0, 8);
+
+    // Auto-select top result with typical serving size (Medium)
+    if (clipResults.length) {
+      const lbl = clipResults[0].label;
+      clipSelectedItems.set(lbl, { qty: getTypicalServing(lbl), unit: 'g', size: 'M' });
+    }
+
+    renderClipResults();
+
+  } catch (err) {
+    panel.innerHTML = `
+      <div class="clip-header">
+        <div class="clip-header-left"><span class="clip-title">CLIP Vision</span></div>
+        <button class="btn-clip-close" onclick="closeClip()">&#10005;</button>
+      </div>
+      <div style="padding:14px;color:var(--warn);font-family:'JetBrains Mono',monospace;font-size:12px;">
+        Failed to load model: ${esc(err.message)}<br>
+        <span style="color:var(--text-dim);">Needs ~90MB download on first use. Check network/CORS.</span>
+      </div>`;
+  }
+}
+
+function renderClipResults() {
+  const panel = $('clipPanel');
+  panel.innerHTML = `
+    <div class="clip-header">
+      <div class="clip-header-left">
+        <span class="clip-title">CLIP Vision</span>
+        <span class="clip-model-status">top matches</span>
+      </div>
+      <button class="btn-clip-close" onclick="closeClip()">&#10005;</button>
+    </div>
+    <div class="clip-preview">
+      <img class="clip-thumb" src="${clipImageUrl}" alt="Food photo">
+      <div class="clip-matches">
+        ${clipResults.map((r, i) => {
+          const sel = clipSelectedItems.has(r.label);
+          const item = sel ? clipSelectedItems.get(r.label) : null;
+          const hint = getPortionHint(r.label);
+          return `
+          <div class="clip-match ${sel ? 'selected' : ''}"
+               onclick="toggleClipItem('${esc(r.label)}', event)">
+            <div class="clip-match-top">
+              <div class="clip-match-check">${sel ? '✓' : ''}</div>
+              <span class="clip-match-name">${esc(r.label)}</span>
+              <span class="clip-match-score">${(r.score * 100).toFixed(1)}%</span>
+            </div>
+            ${sel ? `<div class="clip-match-controls" onclick="event.stopPropagation()">
+              <div class="clip-size-btns">
+                <button class="clip-size-btn ${item.size==='S'?'active':''}" onclick="setClipSize('${esc(r.label)}','S')">S</button>
+                <button class="clip-size-btn ${item.size==='M'?'active':''}" onclick="setClipSize('${esc(r.label)}','M')">M</button>
+                <button class="clip-size-btn ${item.size==='L'?'active':''}" onclick="setClipSize('${esc(r.label)}','L')">L</button>
+              </div>
+              <input type="number" class="clip-qty-input" value="${item.qty}"
+                     onchange="updateClipQty('${esc(r.label)}', this.value)"
+                     min="1" step="5">
+              <span class="clip-qty-unit">g</span>
+              <span class="clip-portion-hint">${esc(hint)}</span>
+            </div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="clip-actions">
+      <button class="btn-clip-add" onclick="addClipToInput()" ${clipSelectedItems.size === 0 ? 'disabled' : ''}>
+        Add to input
+      </button>
+    </div>
+  `;
+}
+
+window.toggleClipItem = function(label, event) {
+  if (event && (event.target.closest('.clip-match-controls'))) return;
+  if (clipSelectedItems.has(label)) clipSelectedItems.delete(label);
+  else clipSelectedItems.set(label, { qty: getTypicalServing(label), unit: 'g', size: 'M' });
+  renderClipResults();
+};
+
+window.updateClipQty = function(label, value) {
+  const qty = Math.max(1, parseInt(value) || 100);
+  if (clipSelectedItems.has(label)) {
+    clipSelectedItems.set(label, { qty, unit: 'g', size: null }); // manual override clears size
+  }
+};
+
+window.setClipSize = function(label, size) {
+  const base = getTypicalServing(label);
+  const multipliers = { S: 0.5, M: 1, L: 1.5 };
+  const qty = Math.round(base * (multipliers[size] || 1));
+  clipSelectedItems.set(label, { qty, unit: 'g', size });
+  renderClipResults();
+};
+
+window.addClipToInput = function() {
+  const textarea = $('inp');
+  const existing = textarea.value.trim();
+  const newLines = [...clipSelectedItems.entries()]
+    .map(([label, s]) => `${s.qty}g ${label}`)
+    .join('\n');
+  textarea.value = existing ? existing + '\n' + newLines : newLines;
+  closeClip();
+  textarea.focus();
+};
+
+window.closeClip = function() {
+  const panel = $('clipPanel');
+  panel.classList.remove('active');
+  panel.innerHTML = '';
+  clipSelectedItems = new Map();
+  if (clipImageUrl) { URL.revokeObjectURL(clipImageUrl); clipImageUrl = null; }
+};
+
+window.handlePhoto = handlePhoto;
+
+// ═══════════════════════════════════════════
+// STATE & ACTIONS
+// ═══════════════════════════════════════════
+const S = { entries: [] };
+const $ = id => document.getElementById(id);
+
+$('inp').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doLog(); }
+});
+
+async function doLog() {
+  const text = $('inp').value.trim();
+  if (!text) return;
+  hideErr();
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const parsed = lines.map(parseLine).filter(Boolean);
+  if (!parsed.length) return;
+
+  $('logBtn').disabled = true;
+  $('loadZone').innerHTML = `<div class="loading"><div class="spin"></div><span>Looking up ${parsed.length} item${parsed.length>1?'s':''} …</span></div>`;
+
+  try {
+    const items = await Promise.all(parsed.map(lookupItem));
+    const misses = items.filter(i => i.calories === 0);
+
+    const entry = {
+      id: Date.now(), time: new Date(), items,
+      totalCal: items.reduce((s,i) => s + i.calories, 0),
+      totalPro: items.reduce((s,i) => s + i.protein, 0),
+      totalCarb: items.reduce((s,i) => s + i.carbs, 0),
+      totalFat: items.reduce((s,i) => s + i.fat, 0),
+    };
+    S.entries.unshift(entry);
+    $('inp').value = '';
+    if (misses.length) showErr(`No match: ${misses.map(i=>i.name).join(', ')}. Logged as 0.`);
+    render();
+  } catch (err) {
+    showErr('Something went wrong: ' + err.message);
+  } finally {
+    $('logBtn').disabled = false;
+    $('loadZone').innerHTML = '';
+  }
+}
+
+window.doLog = doLog;
+window.clearAll = function() { S.entries = []; render(); };
+window.rmEntry = function(id) { S.entries = S.entries.filter(e => e.id !== id); render(); };
+
+// ═══════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════
+function render() {
+  const tc = S.entries.reduce((s,e) => s + e.totalCal, 0);
+  const tp = S.entries.reduce((s,e) => s + e.totalPro, 0);
+  const tcb = S.entries.reduce((s,e) => s + e.totalCarb, 0);
+  const tf = S.entries.reduce((s,e) => s + e.totalFat, 0);
+  $('tCal').textContent = tc.toLocaleString();
+  $('tPro').textContent = fmtNum(tp);
+  $('tCarb').textContent = fmtNum(tcb);
+  $('tFat').textContent = fmtNum(tf);
+
+  if (!S.entries.length) {
+    $('entries').innerHTML = '';
+    $('secHead').style.display = 'none';
+    $('empty').style.display = '';
+    return;
+  }
+  $('secHead').style.display = '';
+  $('empty').style.display = 'none';
+
+  $('entries').innerHTML = S.entries.map(e => `
+    <div class="entry">
+      <div class="entry-head">
+        <span class="entry-time">${fmtTime(e.time)}</span>
+        <button class="btn-rm" onclick="rmEntry(${e.id})" title="Remove">&#10005;</button>
+      </div>
+      <div class="entry-rows">
+        ${e.items.map(it => `
+          <div class="erow">
+            <span class="erow-name">${esc(it.name)}</span>
+            <span class="erow-match" title="${esc(it.match)}">${esc(it.match)}</span>
+            <div class="erow-macros">
+              <span class="pill c">${it.calories}</span>
+              <span class="pill p">${it.protein}g</span>
+              <span class="pill cb">${it.carbs}g</span>
+              <span class="pill f">${it.fat}g</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      ${e.items.length > 1 ? `
+        <div class="entry-foot">
+          <span class="pill c">${e.totalCal} kcal</span>
+          <span class="pill p">${fmtNum(e.totalPro)}p</span>
+          <span class="pill cb">${fmtNum(e.totalCarb)}c</span>
+          <span class="pill f">${fmtNum(e.totalFat)}f</span>
+        </div>` : ''}
+    </div>
+  `).join('');
+}
+
+function fmtTime(d) {
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function fmtNum(n) { return n % 1 === 0 ? n : n.toFixed(1); }
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function showErr(msg) { const el = $('err'); el.textContent = msg; el.style.display = 'block'; }
+function hideErr() { $('err').style.display = 'none'; }
+</script>
+</body>
+</html>
