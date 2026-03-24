@@ -57,6 +57,25 @@
       color: var(--color-accent);
     }
 
+    .intro {
+      font-size: 0.88rem;
+      color: var(--color-text-muted);
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .intro p {
+      margin-bottom: 0.5rem;
+    }
+
+    .intro .tip {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      border-left: 2px solid var(--color-border);
+      padding-left: 0.75rem;
+      margin-top: 0.75rem;
+    }
+
     .search-input {
       width: 100%;
       padding: 0.6rem 0.8rem;
@@ -142,6 +161,11 @@
       <h1>Tools</h1>
       <a href="https://nicolaeandrei.com">&larr; nicolaeandrei.com</a>
     </header>
+
+    <div class="intro">
+      <p>A collection of self-contained browser tools &mdash; no sign-ups, no servers, no tracking. Each tool is a single HTML file built with <a href="https://claude.ai/code" style="color: var(--color-accent); text-decoration: none;">Claude Code</a> and <a href="https://chatgpt.com/codex" style="color: var(--color-accent); text-decoration: none;">Codex</a>, running entirely in your browser.</p>
+      <p class="tip">Tip: On iOS, tap Share &rarr; Add to Home Screen for an app-like experience.</p>
+    </div>
 
     <input
       type="text"
