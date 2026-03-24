@@ -35,7 +35,7 @@ When searching, cards are pulled out of their category containers into a flat ra
 
 Tools are grouped into themed sections:
 - **Image & media** — Document Scanner, Image ↔ SVG Converter, Asset Resizer
-- **Text & document** — Sheet Converter, DOCX → PDF, Markdown → PDF, Terminal → Slack Formatter
+- **Text & document** — Sheet Converter, DOCX → PDF, Markdown → PDF, Paste Formatter
 - **Data & health** — Apple Health Explorer, Fuel Log, Gym Tracker
 - **Sumo** — Sumo Day Companion, Sumo Stats, Grand Sumo Calendar
 - **Travel & social** — Wanderlog, Fedi Media Extractor

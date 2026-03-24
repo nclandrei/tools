@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Terminal → Slack Formatter</title>
+<title>Paste Formatter</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -250,8 +250,8 @@
 
 <div class="container">
   <div>
-    <h1>Terminal → Slack Formatter</h1>
-    <p class="subtitle">Paste Claude Code / terminal markdown output, get Slack-ready mrkdwn</p>
+    <h1>Paste Formatter</h1>
+    <p class="subtitle">Paste markdown or terminal output, get clean text for Slack, LinkedIn, or anywhere</p>
   </div>
 
   <div>
@@ -273,12 +273,12 @@ const hash = await argon2.hash(password);
   </div>
 
   <div class="btn-row">
-    <button class="btn-convert" onclick="convert()">Convert to Slack</button>
+    <button class="btn-convert" onclick="convert()">Format</button>
     <button class="btn-clear" onclick="clearAll()">Clear</button>
   </div>
 
   <div>
-    <label for="output">Output (Slack mrkdwn)</label>
+    <label for="output">Output</label>
     <div class="output-wrap">
       <textarea id="output" readonly placeholder="Converted output will appear here..."></textarea>
     </div>
@@ -290,7 +290,7 @@ const hash = await argon2.hash(password);
 
   <div class="preview-section">
     <label>Preview</label>
-    <div class="preview-box" id="preview">Slack preview will appear here...</div>
+    <div class="preview-box" id="preview">Preview will appear here...</div>
   </div>
 
   <details class="ref-table">
@@ -459,7 +459,7 @@ function copyOutput() {
 function clearAll() {
   document.getElementById('input').value = '';
   document.getElementById('output').value = '';
-  document.getElementById('preview').innerHTML = 'Slack preview will appear here...';
+  document.getElementById('preview').innerHTML = 'Preview will appear here...';
 }
 
 function renderPreview(slackMrkdwn) {
@@ -488,7 +488,7 @@ function renderPreview(slackMrkdwn) {
   // Blockquotes
   html = html.replace(/^&gt; (.+)$/gm, '<span class="blockquote">$1</span>');
 
-  preview.innerHTML = html || 'Slack preview will appear here...';
+  preview.innerHTML = html || 'Preview will appear here...';
 }
 
 function escapeHtml(str) {

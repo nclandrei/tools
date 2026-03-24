@@ -19,7 +19,7 @@ No Markdown mirrors are published; all pages are HTML only.
 - [Sheet Converter](https://tools.nicolaeandrei.com/sheet_converter.html): Convert between XLSX, CSV, and ODS formats
 - [DOCX → PDF Converter](https://tools.nicolaeandrei.com/docx_to_pdf_converter.html): Convert Word documents to PDF in the browser
 - [Markdown → PDF](https://tools.nicolaeandrei.com/markdown_to_pdf.html): Write or drop Markdown, preview, and export to PDF
-- [Terminal → Slack Formatter](https://tools.nicolaeandrei.com/slack_formatter.html): Convert terminal/markdown output to Slack mrkdwn
+- [Paste Formatter](https://tools.nicolaeandrei.com/slack_formatter.html): Convert markdown/terminal output to clean text for Slack, LinkedIn, or anywhere
 
 ## Data & Health
 
