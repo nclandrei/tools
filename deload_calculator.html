@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deload Calculator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #1a1a1e;
+    --surface: #24242a;
+    --border: #35353d;
+    --text: #e0e0e4;
+    --text-dim: #8888a0;
+    --accent: #e8c44a;
+    --accent-dim: #e8c44a22;
+    --green: #5caa6c;
+    --red: #c45c5c;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem 1rem;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.25rem;
+  }
+
+  .subtitle {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 2rem;
+  }
+
+  .inputs {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+  }
+
+  .field label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 0.5rem 0.6rem 0;
+  }
+
+  .field input {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem 0.5rem;
+    width: 100%;
+    outline: none;
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+  .field input::-webkit-inner-spin-button,
+  .field input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .field input:focus { background: var(--accent-dim); }
+
+  .output {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: none;
+  }
+
+  .output.visible { display: block; }
+
+  .output-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 0.75rem;
+  }
+
+  .prescription {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .rx-item { text-align: center; }
+
+  .rx-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+
+  .rx-unit {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .rx-delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--red);
+    margin-top: 0.15rem;
+  }
+
+  .volume-line {
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+  }
+  .volume-line strong { color: var(--text); }
+
+  .note {
+    margin-top: 1.5rem;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Deload Calculator</h1>
+  <p class="subtitle">Half the volume, keep the weight.</p>
+
+  <div class="inputs">
+    <div class="field">
+      <label>Sets</label>
+      <input type="number" id="sets" min="1" max="20" value="3" oninput="calc()">
+    </div>
+    <div class="field">
+      <label>Reps</label>
+      <input type="number" id="reps" min="1" max="30" value="8" oninput="calc()">
+    </div>
+    <div class="field">
+      <label>kg</label>
+      <input type="number" id="weight" min="0" step="2.5" value="80" oninput="calc()">
+    </div>
+  </div>
+
+  <div class="output" id="output">
+    <div class="output-label">▸ Deload</div>
+    <div class="prescription">
+      <div class="rx-item">
+        <div class="rx-value" id="rx-sets"></div>
+        <div class="rx-unit">sets</div>
+        <div class="rx-delta" id="delta-sets"></div>
+      </div>
+      <div class="rx-item">
+        <div class="rx-value" id="rx-reps"></div>
+        <div class="rx-unit">reps</div>
+        <div class="rx-delta" id="delta-reps"></div>
+      </div>
+      <div class="rx-item">
+        <div class="rx-value" id="rx-weight"></div>
+        <div class="rx-unit">kg</div>
+        <div class="rx-delta" id="delta-weight"></div>
+      </div>
+    </div>
+    <div class="volume-line" id="vol-line"></div>
+  </div>
+
+  <div class="note">
+    Sets halved (round up). Reps −2. Weight unchanged. No sets near failure.
+  </div>
+</div>
+
+<script>
+  function calc() {
+    const sets = parseInt(document.getElementById('sets').value);
+    const reps = parseInt(document.getElementById('reps').value);
+    const weight = parseInt(document.getElementById('weight').value);
+
+    if (!sets || !reps || !weight) {
+      document.getElementById('output').classList.remove('visible');
+      return;
+    }
+
+    const dSets = Math.max(1, Math.ceil(sets / 2));
+    const dReps = Math.max(1, reps - 2);
+    const dWeight = weight;
+
+    const workVol = sets * reps * weight;
+    const deloadVol = dSets * dReps * dWeight;
+    const reduction = Math.round((1 - deloadVol / workVol) * 100);
+
+    document.getElementById('rx-sets').textContent = dSets;
+    document.getElementById('rx-reps').textContent = dReps;
+    document.getElementById('rx-weight').textContent = dWeight;
+
+    const sd = dSets - sets;
+    const rd = dReps - reps;
+    document.getElementById('delta-sets').textContent = sd !== 0 ? sd : '';
+    document.getElementById('delta-reps').textContent = rd !== 0 ? rd : '';
+    document.getElementById('delta-weight').textContent = '';
+
+    document.getElementById('vol-line').innerHTML = 'Volume: <strong>−' + reduction + '%</strong>';
+    document.getElementById('output').classList.add('visible');
+  }
+
+  calc();
+</script>
+
+</body>
+</html>
