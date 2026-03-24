@@ -1,0 +1,43 @@
+# tools.nicolaeandrei.com
+
+> Collection of self-contained browser tools by Andrei-Mihai Nicolae — file converters, health trackers, sumo stats, and more. Each tool is a single HTML file with no server-side processing.
+
+No Markdown mirrors are published; all pages are HTML only.
+
+## Main
+
+- [Tools Home](https://tools.nicolaeandrei.com/): Searchable index of all tools, grouped by category
+
+## Image & Media
+
+- [Document Scanner](https://tools.nicolaeandrei.com/document_scanner.html): Scan documents with phone camera, crop, apply filters, export as PDF
+- [Image ↔ SVG Converter](https://tools.nicolaeandrei.com/img_to_svg_converter.html): Convert between raster images and SVG in the browser
+- [Asset Resizer](https://tools.nicolaeandrei.com/asset_resizer.html): Resize images for app stores, browser extensions, YouTube, Steam
+
+## Text & Document
+
+- [Sheet Converter](https://tools.nicolaeandrei.com/sheet_converter.html): Convert between XLSX, CSV, and ODS formats
+- [DOCX → PDF Converter](https://tools.nicolaeandrei.com/docx_to_pdf_converter.html): Convert Word documents to PDF in the browser
+- [Markdown → PDF](https://tools.nicolaeandrei.com/markdown_to_pdf.html): Write or drop Markdown, preview, and export to PDF
+- [Terminal → Slack Formatter](https://tools.nicolaeandrei.com/slack_formatter.html): Convert terminal/markdown output to Slack mrkdwn
+
+## Data & Health
+
+- [Apple Health Explorer](https://tools.nicolaeandrei.com/apple_health_analyzer.html): Analyze Apple Health exports with interactive charts
+- [Fuel Log](https://tools.nicolaeandrei.com/calorie_tracker.html): Plain text calorie and macro tracker with USDA lookup
+- [Gym Tracker](https://tools.nicolaeandrei.com/workout_tracker.html): Log sets, reps, and weight with progress charts
+
+## Sumo
+
+- [Sumo Day Companion](https://tools.nicolaeandrei.com/sumo_day.html): Follow live basho with bout cards and spoiler-free match reveals
+- [Sumo Stats](https://tools.nicolaeandrei.com/sumo_stats.html): Wrestler career stats, basho results, and rikishi comparison
+- [Grand Sumo Calendar](https://tools.nicolaeandrei.com/sumo_calendar.html): Downloadable ICS calendar for all six honbasho
+
+## Travel & Social
+
+- [Wanderlog](https://tools.nicolaeandrei.com/wanderlog.html): Travel guide aggregator with auto-generated walking tours
+- [Fedi Media Extractor](https://tools.nicolaeandrei.com/federated_media_exporter.html): Extract images and videos from Bluesky or Mastodon profiles
+
+## Developer
+
+- [AI Agent Session Converter](https://tools.nicolaeandrei.com/agent_session_converter.html): Convert coding agent sessions between Claude Code, Codex CLI, Cursor, Pi, and OpenCode
