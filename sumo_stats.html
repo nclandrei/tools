@@ -649,7 +649,7 @@ table.bt tr.h2h-r2 td { background: rgba(109,179,196,0.06); }
 <script>
 const BASE = 'https://sumodb.sumogames.de';
 const PROXIES = {
-  self: u => `/api/sumodb-proxy?url=${encodeURIComponent(u)}`,
+  self: u => `/api/proxy?url=${encodeURIComponent(u)}`,
   corsproxy: u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   allorigins: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   none: u => u,
