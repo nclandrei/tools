@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baby Diaper Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e0e;
+    --surface: #171717;
+    --surface-2: #1e1e1e;
+    --surface-3: #262626;
+    --border: #2a2a2a;
+    --border-hover: #3a3a3a;
+    --text: #e8e8e8;
+    --text-mid: #a0a0a0;
+    --text-dim: #606060;
+    --accent: #e8c547;
+    --accent-dim: rgba(232, 197, 71, 0.12);
+    --pee: #f0c040;
+    --pee-dim: rgba(240, 192, 64, 0.12);
+    --poo: #8b6914;
+    --poo-dim: rgba(139, 105, 20, 0.15);
+    --danger: #c45b5b;
+    --danger-dim: rgba(196, 91, 91, 0.12);
+    --radius: 6px;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Instrument Sans', system-ui, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 24px 16px 80px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+
+  header h1 span { color: var(--accent); }
+
+  .header-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .icon-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all 0.15s;
+  }
+
+  .icon-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--text-mid);
+  }
+
+  /* Baby selector */
+  .baby-selector {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .baby-tab {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .baby-tab:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .baby-tab.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .baby-tab.add-baby {
+    border-style: dashed;
+    color: var(--text-dim);
+    font-size: 16px;
+    padding: 6px 10px;
+  }
+
+  /* Date nav */
+  .date-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .date-nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .date-nav button:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .date-nav .date-label {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--text);
+    min-width: 140px;
+    text-align: center;
+  }
+
+  .date-nav .date-label .today-badge {
+    font-size: 11px;
+    color: var(--accent);
+    font-family: var(--sans);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Counter cards */
+  .counters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .counter-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 16px;
+    text-align: center;
+  }
+
+  .counter-card.pee { border-color: rgba(240, 192, 64, 0.25); }
+  .counter-card.poo { border-color: rgba(139, 105, 20, 0.3); }
+
+  .counter-label {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+  }
+
+  .counter-card.pee .counter-label { color: var(--pee); }
+  .counter-card.poo .counter-label { color: var(--poo); }
+
+  .counter-value {
+    font-family: var(--mono);
+    font-size: 48px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .counter-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .counter-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 22px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    font-family: var(--mono);
+  }
+
+  .counter-btn.plus {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .counter-btn.plus:hover {
+    background: var(--surface-3);
+    border-color: var(--border-hover);
+  }
+
+  .counter-btn.minus {
+    background: var(--surface);
+    color: var(--text-dim);
+  }
+
+  .counter-btn.minus:hover {
+    color: var(--text-mid);
+    border-color: var(--border-hover);
+  }
+
+  /* Log section */
+  .log-section {
+    margin-bottom: 32px;
+  }
+
+  .log-section h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .log-empty {
+    font-size: 14px;
+    color: var(--text-dim);
+    padding: 16px;
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .log-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+  }
+
+  .log-entry .log-type {
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .log-entry .log-type.pee { color: var(--pee); }
+  .log-entry .log-type.poo { color: var(--poo); }
+
+  .log-entry .log-time {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-mid);
+  }
+
+  .log-entry .log-delete {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .log-entry .log-delete:hover {
+    color: var(--danger);
+    background: var(--danger-dim);
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 90%;
+    max-width: 340px;
+  }
+
+  .modal h3 {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .modal input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    outline: none;
+    margin-bottom: 16px;
+  }
+
+  .modal input:focus { border-color: var(--accent); }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .modal-btn {
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .modal-btn.cancel {
+    background: var(--surface-2);
+    color: var(--text-mid);
+  }
+
+  .modal-btn.confirm {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .modal-btn:hover { opacity: 0.85; }
+
+  .modal-btn.danger {
+    background: var(--danger-dim);
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  /* Summary */
+  .summary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 32px;
+  }
+
+  .summary h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    color: var(--text-mid);
+    padding: 4px 0;
+  }
+
+  .summary-row span:last-child {
+    font-family: var(--mono);
+    color: var(--text);
+  }
+
+  /* Context menu for baby tabs */
+  .baby-tab { position: relative; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>diaper<span>.</span>tracker</h1>
+    <div class="header-actions">
+      <button class="icon-btn" id="exportBtn" title="Export data">&#8595;</button>
+      <button class="icon-btn" id="importBtn" title="Import data">&#8593;</button>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+    </div>
+  </header>
+
+  <div class="baby-selector" id="babySelector"></div>
+
+  <div class="date-nav">
+    <button id="prevDay">&#8249;</button>
+    <div class="date-label" id="dateLabel"></div>
+    <button id="nextDay">&#8250;</button>
+  </div>
+
+  <div class="counters">
+    <div class="counter-card pee">
+      <div class="counter-label">Pee</div>
+      <div class="counter-value" id="peeCount">0</div>
+      <div class="counter-actions">
+        <button class="counter-btn minus" id="peeMinus">&minus;</button>
+        <button class="counter-btn plus" id="peePlus">+</button>
+      </div>
+    </div>
+    <div class="counter-card poo">
+      <div class="counter-label">Poo</div>
+      <div class="counter-value" id="pooCount">0</div>
+      <div class="counter-actions">
+        <button class="counter-btn minus" id="pooMinus">&minus;</button>
+        <button class="counter-btn plus" id="pooPlus">+</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <h2>Today's log</h2>
+    <div id="logList"></div>
+  </div>
+
+  <div class="summary" id="weeklySummary">
+    <h2>Last 7 days</h2>
+    <div id="summaryContent"></div>
+  </div>
+</div>
+
+<!-- Add/Rename baby modal -->
+<div class="modal-overlay" id="babyModal">
+  <div class="modal">
+    <h3 id="babyModalTitle">Add baby</h3>
+    <input type="text" id="babyNameInput" placeholder="Baby's name" maxlength="30" autocomplete="off">
+    <div class="modal-actions">
+      <button class="modal-btn danger" id="babyDeleteBtn" style="display:none;margin-right:auto">Delete</button>
+      <button class="modal-btn cancel" id="babyCancelBtn">Cancel</button>
+      <button class="modal-btn confirm" id="babyConfirmBtn">Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const STORAGE_KEY = 'diaper-tracker';
+
+  // --- State ---
+  let state = loadState();
+  let currentDate = todayStr();
+  let editingBabyId = null;
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function formatDate(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    const date = new Date(y, m-1, d);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${d}`;
+  }
+
+  function defaultState() {
+    const id = generateId();
+    return {
+      babies: [{ id, name: 'Baby' }],
+      activeBaby: id,
+      logs: {}
+    };
+  }
+
+  function generateId() {
+    return Math.random().toString(36).substr(2, 9);
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.babies && s.babies.length > 0) return s;
+      }
+    } catch(e) {}
+    return defaultState();
+  }
+
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function getLogsForDay(babyId, dateStr) {
+    const key = `${babyId}:${dateStr}`;
+    return state.logs[key] || [];
+  }
+
+  function setLogsForDay(babyId, dateStr, logs) {
+    const key = `${babyId}:${dateStr}`;
+    if (logs.length === 0) {
+      delete state.logs[key];
+    } else {
+      state.logs[key] = logs;
+    }
+    saveState();
+  }
+
+  function addLog(type) {
+    const babyId = state.activeBaby;
+    const logs = getLogsForDay(babyId, currentDate);
+    const now = new Date();
+    logs.push({
+      type,
+      time: now.toTimeString().slice(0,5),
+      ts: now.getTime()
+    });
+    setLogsForDay(babyId, currentDate, logs);
+    render();
+  }
+
+  function removeLog(index) {
+    const babyId = state.activeBaby;
+    const logs = getLogsForDay(babyId, currentDate);
+    logs.splice(index, 1);
+    setLogsForDay(babyId, currentDate, logs);
+    render();
+  }
+
+  function countType(logs, type) {
+    return logs.filter(l => l.type === type).length;
+  }
+
+  // --- Date navigation ---
+  function shiftDate(offset) {
+    const [y, m, d] = currentDate.split('-').map(Number);
+    const date = new Date(y, m-1, d);
+    date.setDate(date.getDate() + offset);
+    currentDate = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    render();
+  }
+
+  // --- Baby management ---
+  function addBaby(name) {
+    const id = generateId();
+    state.babies.push({ id, name });
+    state.activeBaby = id;
+    saveState();
+    render();
+  }
+
+  function renameBaby(id, name) {
+    const baby = state.babies.find(b => b.id === id);
+    if (baby) {
+      baby.name = name;
+      saveState();
+      render();
+    }
+  }
+
+  function deleteBaby(id) {
+    if (state.babies.length <= 1) return;
+    state.babies = state.babies.filter(b => b.id !== id);
+    // Remove logs for this baby
+    const keysToDelete = Object.keys(state.logs).filter(k => k.startsWith(id + ':'));
+    keysToDelete.forEach(k => delete state.logs[k]);
+    if (state.activeBaby === id) {
+      state.activeBaby = state.babies[0].id;
+    }
+    saveState();
+    render();
+  }
+
+  // --- Render ---
+  function render() {
+    renderBabySelector();
+    renderDateNav();
+    renderCounters();
+    renderLog();
+    renderSummary();
+  }
+
+  function renderBabySelector() {
+    const el = document.getElementById('babySelector');
+    el.innerHTML = '';
+    state.babies.forEach(baby => {
+      const tab = document.createElement('button');
+      tab.className = 'baby-tab' + (baby.id === state.activeBaby ? ' active' : '');
+      tab.textContent = baby.name;
+      tab.addEventListener('click', () => {
+        state.activeBaby = baby.id;
+        saveState();
+        render();
+      });
+      tab.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        openBabyModal(baby.id);
+      });
+      // Long press for mobile
+      let pressTimer;
+      tab.addEventListener('touchstart', (e) => {
+        pressTimer = setTimeout(() => {
+          e.preventDefault();
+          openBabyModal(baby.id);
+        }, 500);
+      });
+      tab.addEventListener('touchend', () => clearTimeout(pressTimer));
+      tab.addEventListener('touchmove', () => clearTimeout(pressTimer));
+      el.appendChild(tab);
+    });
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'baby-tab add-baby';
+    addBtn.textContent = '+';
+    addBtn.title = 'Add baby';
+    addBtn.addEventListener('click', () => openBabyModal(null));
+    el.appendChild(addBtn);
+  }
+
+  function renderDateNav() {
+    const label = document.getElementById('dateLabel');
+    const isToday = currentDate === todayStr();
+    label.innerHTML = formatDate(currentDate) + (isToday ? '<br><span class="today-badge">today</span>' : '');
+  }
+
+  function renderCounters() {
+    const logs = getLogsForDay(state.activeBaby, currentDate);
+    document.getElementById('peeCount').textContent = countType(logs, 'pee');
+    document.getElementById('pooCount').textContent = countType(logs, 'poo');
+  }
+
+  function renderLog() {
+    const container = document.getElementById('logList');
+    const logs = getLogsForDay(state.activeBaby, currentDate);
+
+    if (logs.length === 0) {
+      container.innerHTML = '<div class="log-empty">No entries yet</div>';
+      return;
+    }
+
+    const sorted = logs.map((l, i) => ({ ...l, idx: i })).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    container.innerHTML = '';
+    const list = document.createElement('div');
+    list.className = 'log-list';
+
+    sorted.forEach(entry => {
+      const row = document.createElement('div');
+      row.className = 'log-entry';
+      row.innerHTML = `
+        <span class="log-type ${entry.type}">${entry.type === 'pee' ? 'Pee' : 'Poo'}</span>
+        <span class="log-time">${entry.time}</span>
+        <button class="log-delete" title="Remove">&times;</button>
+      `;
+      row.querySelector('.log-delete').addEventListener('click', () => removeLog(entry.idx));
+      list.appendChild(row);
+    });
+    container.appendChild(list);
+  }
+
+  function renderSummary() {
+    const container = document.getElementById('summaryContent');
+    container.innerHTML = '';
+    const babyId = state.activeBaby;
+    let totalPee = 0, totalPoo = 0, days = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const logs = getLogsForDay(babyId, ds);
+      if (logs.length > 0) days++;
+      totalPee += countType(logs, 'pee');
+      totalPoo += countType(logs, 'poo');
+    }
+
+    const rows = [
+      ['Total pees', totalPee],
+      ['Total poos', totalPoo],
+      ['Days tracked', days],
+      ['Avg pees/day', days ? (totalPee / days).toFixed(1) : '—'],
+      ['Avg poos/day', days ? (totalPoo / days).toFixed(1) : '—'],
+    ];
+
+    rows.forEach(([label, value]) => {
+      const row = document.createElement('div');
+      row.className = 'summary-row';
+      row.innerHTML = `<span>${label}</span><span>${value}</span>`;
+      container.appendChild(row);
+    });
+  }
+
+  // --- Modal ---
+  function openBabyModal(babyId) {
+    editingBabyId = babyId;
+    const modal = document.getElementById('babyModal');
+    const title = document.getElementById('babyModalTitle');
+    const input = document.getElementById('babyNameInput');
+    const confirmBtn = document.getElementById('babyConfirmBtn');
+    const deleteBtn = document.getElementById('babyDeleteBtn');
+
+    if (babyId) {
+      const baby = state.babies.find(b => b.id === babyId);
+      title.textContent = 'Edit baby';
+      input.value = baby ? baby.name : '';
+      confirmBtn.textContent = 'Save';
+      deleteBtn.style.display = state.babies.length > 1 ? '' : 'none';
+    } else {
+      title.textContent = 'Add baby';
+      input.value = '';
+      confirmBtn.textContent = 'Add';
+      deleteBtn.style.display = 'none';
+    }
+
+    modal.classList.add('open');
+    setTimeout(() => input.focus(), 50);
+  }
+
+  function closeBabyModal() {
+    document.getElementById('babyModal').classList.remove('open');
+    editingBabyId = null;
+  }
+
+  document.getElementById('babyCancelBtn').addEventListener('click', closeBabyModal);
+  document.getElementById('babyModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeBabyModal();
+  });
+
+  document.getElementById('babyConfirmBtn').addEventListener('click', () => {
+    const name = document.getElementById('babyNameInput').value.trim();
+    if (!name) return;
+    if (editingBabyId) {
+      renameBaby(editingBabyId, name);
+    } else {
+      addBaby(name);
+    }
+    closeBabyModal();
+  });
+
+  document.getElementById('babyDeleteBtn').addEventListener('click', () => {
+    if (editingBabyId && state.babies.length > 1) {
+      if (confirm('Delete this baby and all their data?')) {
+        deleteBaby(editingBabyId);
+        closeBabyModal();
+      }
+    }
+  });
+
+  document.getElementById('babyNameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('babyConfirmBtn').click();
+    if (e.key === 'Escape') closeBabyModal();
+  });
+
+  // --- Counter buttons ---
+  document.getElementById('peePlus').addEventListener('click', () => addLog('pee'));
+  document.getElementById('pooPlus').addEventListener('click', () => addLog('poo'));
+  document.getElementById('peeMinus').addEventListener('click', () => {
+    const logs = getLogsForDay(state.activeBaby, currentDate);
+    const lastPee = logs.map((l, i) => ({ ...l, idx: i })).filter(l => l.type === 'pee').pop();
+    if (lastPee) removeLog(lastPee.idx);
+  });
+  document.getElementById('pooMinus').addEventListener('click', () => {
+    const logs = getLogsForDay(state.activeBaby, currentDate);
+    const lastPoo = logs.map((l, i) => ({ ...l, idx: i })).filter(l => l.type === 'poo').pop();
+    if (lastPoo) removeLog(lastPoo.idx);
+  });
+
+  // --- Date nav ---
+  document.getElementById('prevDay').addEventListener('click', () => shiftDate(-1));
+  document.getElementById('nextDay').addEventListener('click', () => shiftDate(1));
+
+  // --- Export / Import ---
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `diaper-tracker-${todayStr()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+
+  document.getElementById('importFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const imported = JSON.parse(reader.result);
+        if (imported.babies && imported.logs) {
+          state = imported;
+          saveState();
+          render();
+        } else {
+          alert('Invalid file format.');
+        }
+      } catch(err) {
+        alert('Could not read file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // --- Init ---
+  render();
+})();
+</script>
+</body>
+</html>
