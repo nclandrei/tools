@@ -29,6 +29,10 @@
     --accent-training-dim: rgba(255,107,53,0.15);
     --accent-steps-dim: rgba(78,205,196,0.15);
     --accent-correlation-dim: rgba(168,85,247,0.15);
+    --accent-hr: #ef4444;
+    --accent-hr-dim: rgba(239,68,68,0.15);
+    --accent-sleep: #6366f1;
+    --accent-sleep-dim: rgba(99,102,241,0.15);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -232,6 +236,8 @@
   .tab-btn[data-tab="training"].active { border-bottom-color: var(--accent-training); }
   .tab-btn[data-tab="steps"].active { border-bottom-color: var(--accent-steps); }
   .tab-btn[data-tab="correlation"].active { border-bottom-color: var(--accent-correlation); }
+  .tab-btn[data-tab="heartrate"].active { border-bottom-color: var(--accent-hr); }
+  .tab-btn[data-tab="sleep"].active { border-bottom-color: var(--accent-sleep); }
 
   .tab-indicator {
     display: inline-block;
@@ -562,6 +568,12 @@
     <button class="tab-btn" data-tab="steps" onclick="switchTab('steps')">
       <span class="tab-indicator" style="background:var(--accent-steps)"></span>Steps &amp; Activity
     </button>
+    <button class="tab-btn" data-tab="heartrate" onclick="switchTab('heartrate')">
+      <span class="tab-indicator" style="background:var(--accent-hr)"></span>Heart Rate
+    </button>
+    <button class="tab-btn" data-tab="sleep" onclick="switchTab('sleep')">
+      <span class="tab-indicator" style="background:var(--accent-sleep)"></span>Sleep
+    </button>
     <button class="tab-btn" data-tab="correlation" onclick="switchTab('correlation')">
       <span class="tab-indicator" style="background:var(--accent-correlation)"></span>Correlations
     </button>
@@ -721,6 +733,65 @@
     </div>
   </div>
 
+  <!-- Heart Rate Tab -->
+  <div class="tab-content" id="tab-heartrate">
+    <div class="stats-grid" id="hr-stats"></div>
+    <div class="card fade-in delay-1">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Daily Heart Rate</div>
+          <div class="card-subtitle">Min, average, and max BPM per day</div>
+        </div>
+        <div class="controls-row" style="margin-bottom:0">
+          <select id="hr-range" onchange="renderHRChart()">
+            <option value="90">Last 3 months</option>
+            <option value="180" selected>Last 6 months</option>
+            <option value="365">Last year</option>
+            <option value="0">All time</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-container chart-container-tall">
+        <canvas id="hr-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sleep Tab -->
+  <div class="tab-content" id="tab-sleep">
+    <div class="stats-grid" id="sleep-stats"></div>
+    <div class="card fade-in delay-1">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Nightly Sleep Duration</div>
+          <div class="card-subtitle">Total sleep with stage breakdown</div>
+        </div>
+        <div class="controls-row" style="margin-bottom:0">
+          <select id="sleep-range" onchange="renderSleepChart()">
+            <option value="90">Last 3 months</option>
+            <option value="180" selected>Last 6 months</option>
+            <option value="365">Last year</option>
+            <option value="0">All time</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-container chart-container-tall">
+        <canvas id="sleep-chart"></canvas>
+      </div>
+    </div>
+    <div class="card fade-in delay-2">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Sleep Stage Breakdown</div>
+          <div class="card-subtitle">Average time in each sleep stage</div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="sleep-stages-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
   <!-- Correlation Tab -->
   <div class="tab-content" id="tab-correlation">
     <div class="card fade-in">
@@ -770,6 +841,8 @@ const DATA = {
   distance: [],     // { date, value }
   flights: [],      // { date, value }
   vo2max: [],       // { date, value }
+  heartRate: [],    // { date, min, avg, max } (daily aggregated)
+  sleep: [],        // { date, totalMinutes, inBed, rem, core, deep, awake }
 };
 
 const CHARTS = {};
@@ -866,15 +939,42 @@ function createStreamParser() {
   const dailyActiveEnergy = {};
   const dailyDistance = {};
   const dailyFlights = {};
+  const dailyHR = {};       // { [dayKey]: { sum, count, min, max } }
+  const nightlySleep = {};  // { [nightKey]: { inBed, rem, core, deep, awake } } in minutes
   let buffer = '';
   let recordCount = 0;
 
   function processRecord(attrStr) {
     const attrs = parseAttrs(attrStr);
     const type = attrs.type;
-    const value = parseFloat(attrs.value);
     const dateStr = attrs.startDate;
-    if (!dateStr || isNaN(value)) return;
+    if (!dateStr) return;
+
+    // Handle sleep analysis separately (category type, not numeric)
+    if (type === 'HKCategoryTypeIdentifierSleepAnalysis') {
+      const start = parseHealthDate(dateStr);
+      const end = attrs.endDate ? parseHealthDate(attrs.endDate) : null;
+      if (!start || !end) return;
+      const minutes = (end - start) / 60000;
+      if (minutes <= 0 || minutes > 1440) return;
+      // Assign to the night of: if before 6pm, count as previous day's sleep
+      const nightDate = new Date(start);
+      if (nightDate.getHours() < 18) nightDate.setDate(nightDate.getDate() - 1);
+      const nightKey = toDateKey(nightDate);
+      if (!nightlySleep[nightKey]) nightlySleep[nightKey] = { inBed: 0, rem: 0, core: 0, deep: 0, awake: 0 };
+      const val = attrs.value || '';
+      if (val.includes('InBed')) nightlySleep[nightKey].inBed += minutes;
+      else if (val.includes('AsleepREM')) nightlySleep[nightKey].rem += minutes;
+      else if (val.includes('AsleepDeep')) nightlySleep[nightKey].deep += minutes;
+      else if (val.includes('AsleepCore')) nightlySleep[nightKey].core += minutes;
+      else if (val.includes('Awake')) nightlySleep[nightKey].awake += minutes;
+      else if (val.includes('Asleep')) nightlySleep[nightKey].core += minutes; // older format
+      recordCount++;
+      return;
+    }
+
+    const value = parseFloat(attrs.value);
+    if (isNaN(value)) return;
     const date = parseHealthDate(dateStr);
     if (!date) return;
     const dayKey = toDateKey(date);
@@ -906,6 +1006,13 @@ function createStreamParser() {
         break;
       case 'HKQuantityTypeIdentifierVO2Max':
         DATA.vo2max.push({ date: new Date(dayKey), value });
+        break;
+      case 'HKQuantityTypeIdentifierHeartRate':
+        if (!dailyHR[dayKey]) dailyHR[dayKey] = { sum: 0, count: 0, min: Infinity, max: -Infinity };
+        dailyHR[dayKey].sum += value;
+        dailyHR[dayKey].count++;
+        dailyHR[dayKey].min = Math.min(dailyHR[dayKey].min, value);
+        dailyHR[dayKey].max = Math.max(dailyHR[dayKey].max, value);
         break;
     }
     recordCount++;
@@ -990,6 +1097,30 @@ function createStreamParser() {
     }
     for (const [key, val] of Object.entries(dailyFlights)) {
       DATA.flights.push({ date: new Date(key), value: Math.round(val) });
+    }
+    for (const [key, val] of Object.entries(dailyHR)) {
+      DATA.heartRate.push({
+        date: new Date(key),
+        min: Math.round(val.min),
+        avg: Math.round(val.sum / val.count),
+        max: Math.round(val.max),
+        value: Math.round(val.sum / val.count), // for correlation
+      });
+    }
+    for (const [key, val] of Object.entries(nightlySleep)) {
+      const totalSleep = val.rem + val.core + val.deep;
+      if (totalSleep > 0 || val.inBed > 0) {
+        DATA.sleep.push({
+          date: new Date(key),
+          totalMinutes: Math.round(totalSleep || val.inBed),
+          inBed: Math.round(val.inBed),
+          rem: Math.round(val.rem),
+          core: Math.round(val.core),
+          deep: Math.round(val.deep),
+          awake: Math.round(val.awake),
+          value: Math.round((totalSleep || val.inBed) / 60 * 100) / 100, // hours, for correlation
+        });
+      }
     }
 
     // Sort everything
@@ -1143,7 +1274,8 @@ const CHART_GRID = {
 function buildDashboard() {
   // Topbar stats
   const totalRecords = DATA.weight.length + DATA.steps.length + DATA.workouts.length +
-    DATA.activeEnergy.length + DATA.restingHR.length + DATA.hrv.length;
+    DATA.activeEnergy.length + DATA.restingHR.length + DATA.hrv.length +
+    DATA.heartRate.length + DATA.sleep.length;
   const dates = [...DATA.steps.map(d => d.date), ...DATA.weight.map(d => d.date), ...DATA.workouts.map(d => d.date)];
   const minDate = dates.length ? new Date(Math.min(...dates)) : new Date();
   const maxDate = dates.length ? new Date(Math.max(...dates)) : new Date();
@@ -1157,6 +1289,8 @@ function buildDashboard() {
   renderWeightTab();
   renderTrainingTab();
   renderStepsTab();
+  renderHRTab();
+  renderSleepTab();
   initCorrelation();
 }
 
@@ -1736,6 +1870,278 @@ function renderStepsDOW() {
 }
 
 // ===== CORRELATION TAB =====
+// ===== HEART RATE TAB =====
+function renderHRTab() {
+  if (!DATA.heartRate.length) {
+    document.getElementById('hr-stats').innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#x2764;&#xFE0F;</div>No heart rate data found</div>';
+    return;
+  }
+
+  const last30 = DATA.heartRate.filter(d => d.date >= new Date(Date.now() - 30 * 86400000));
+  const avgHR = last30.length ? Math.round(last30.reduce((s, d) => s + d.avg, 0) / last30.length) : 0;
+  const allAvg = Math.round(DATA.heartRate.reduce((s, d) => s + d.avg, 0) / DATA.heartRate.length);
+  const lowestDay = DATA.heartRate.reduce((a, b) => a.min < b.min ? a : b);
+  const highestDay = DATA.heartRate.reduce((a, b) => a.max > b.max ? a : b);
+
+  document.getElementById('hr-stats').innerHTML = `
+    <div class="stat-card fade-in delay-1">
+      <div class="stat-label">30-Day Avg</div>
+      <div class="stat-value mono" style="color:var(--accent-hr)">${avgHR} <small style="font-size:0.6em;color:var(--text-muted)">bpm</small></div>
+      <div class="stat-detail">${last30.length} days</div>
+    </div>
+    <div class="stat-card fade-in delay-2">
+      <div class="stat-label">All-Time Avg</div>
+      <div class="stat-value mono">${allAvg} <small style="font-size:0.6em;color:var(--text-muted)">bpm</small></div>
+      <div class="stat-detail">${DATA.heartRate.length} days tracked</div>
+    </div>
+    <div class="stat-card fade-in delay-3">
+      <div class="stat-label">Lowest Recorded</div>
+      <div class="stat-value mono">${lowestDay.min} <small style="font-size:0.6em;color:var(--text-muted)">bpm</small></div>
+      <div class="stat-detail">${lowestDay.date.toLocaleDateString()}</div>
+    </div>
+    <div class="stat-card fade-in delay-4">
+      <div class="stat-label">Highest Recorded</div>
+      <div class="stat-value mono">${highestDay.max} <small style="font-size:0.6em;color:var(--text-muted)">bpm</small></div>
+      <div class="stat-detail">${highestDay.date.toLocaleDateString()}</div>
+    </div>
+  `;
+
+  renderHRChart();
+}
+
+function renderHRChart() {
+  const range = parseInt(document.getElementById('hr-range').value);
+  const raw = filterByRange(DATA.heartRate, range);
+
+  if (CHARTS.hr) CHARTS.hr.destroy();
+  CHARTS.hr = new Chart(document.getElementById('hr-chart'), {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Max',
+          data: raw.map(d => ({ x: d.date, y: d.max })),
+          borderColor: 'rgba(239,68,68,0.3)',
+          backgroundColor: 'rgba(239,68,68,0.05)',
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          borderWidth: 1,
+          fill: '+1',
+          tension: 0.3,
+          order: 3,
+        },
+        {
+          label: 'Average',
+          data: raw.map(d => ({ x: d.date, y: d.avg })),
+          borderColor: 'rgba(239,68,68,0.9)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: false,
+          tension: 0.3,
+          order: 1,
+        },
+        {
+          label: 'Min',
+          data: raw.map(d => ({ x: d.date, y: d.min })),
+          borderColor: 'rgba(239,68,68,0.3)',
+          backgroundColor: 'rgba(239,68,68,0.05)',
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          borderWidth: 1,
+          fill: false,
+          tension: 0.3,
+          order: 2,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: range <= 90 ? 'week' : 'month' },
+          grid: CHART_GRID,
+        },
+        y: {
+          grid: CHART_GRID,
+          ticks: { callback: v => v + ' bpm' }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + ' bpm'
+          }
+        }
+      }
+    }
+  });
+}
+
+// ===== SLEEP TAB =====
+function renderSleepTab() {
+  if (!DATA.sleep.length) {
+    document.getElementById('sleep-stats').innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#x1F634;</div>No sleep data found</div>';
+    return;
+  }
+
+  const last30 = DATA.sleep.filter(d => d.date >= new Date(Date.now() - 30 * 86400000));
+  const avg30 = last30.length ? Math.round(last30.reduce((s, d) => s + d.totalMinutes, 0) / last30.length) : 0;
+  const allAvg = Math.round(DATA.sleep.reduce((s, d) => s + d.totalMinutes, 0) / DATA.sleep.length);
+  const best = DATA.sleep.reduce((a, b) => a.totalMinutes > b.totalMinutes ? a : b);
+  const worst = DATA.sleep.reduce((a, b) => a.totalMinutes < b.totalMinutes ? a : b);
+
+  function fmtMin(m) { return Math.floor(m / 60) + 'h ' + (m % 60) + 'm'; }
+
+  document.getElementById('sleep-stats').innerHTML = `
+    <div class="stat-card fade-in delay-1">
+      <div class="stat-label">30-Day Avg</div>
+      <div class="stat-value mono" style="color:var(--accent-sleep)">${fmtMin(avg30)}</div>
+      <div class="stat-detail">${last30.length} nights</div>
+    </div>
+    <div class="stat-card fade-in delay-2">
+      <div class="stat-label">All-Time Avg</div>
+      <div class="stat-value mono">${fmtMin(allAvg)}</div>
+      <div class="stat-detail">${DATA.sleep.length} nights tracked</div>
+    </div>
+    <div class="stat-card fade-in delay-3">
+      <div class="stat-label">Longest Night</div>
+      <div class="stat-value mono">${fmtMin(best.totalMinutes)}</div>
+      <div class="stat-detail">${best.date.toLocaleDateString()}</div>
+    </div>
+    <div class="stat-card fade-in delay-4">
+      <div class="stat-label">Shortest Night</div>
+      <div class="stat-value mono">${fmtMin(worst.totalMinutes)}</div>
+      <div class="stat-detail">${worst.date.toLocaleDateString()}</div>
+    </div>
+  `;
+
+  renderSleepChart();
+  renderSleepStagesChart();
+}
+
+function renderSleepChart() {
+  const range = parseInt(document.getElementById('sleep-range').value);
+  const raw = filterByRange(DATA.sleep, range);
+  const hasStages = raw.some(d => d.rem > 0 || d.deep > 0 || d.core > 0);
+
+  if (CHARTS.sleep) CHARTS.sleep.destroy();
+
+  const datasets = [];
+  if (hasStages) {
+    datasets.push({
+      label: 'Deep',
+      data: raw.map(d => ({ x: d.date, y: d.deep / 60 })),
+      backgroundColor: 'rgba(99,102,241,0.9)',
+      borderRadius: 2,
+      order: 1,
+    });
+    datasets.push({
+      label: 'Core',
+      data: raw.map(d => ({ x: d.date, y: d.core / 60 })),
+      backgroundColor: 'rgba(99,102,241,0.55)',
+      borderRadius: 2,
+      order: 2,
+    });
+    datasets.push({
+      label: 'REM',
+      data: raw.map(d => ({ x: d.date, y: d.rem / 60 })),
+      backgroundColor: 'rgba(168,85,247,0.6)',
+      borderRadius: 2,
+      order: 3,
+    });
+  } else {
+    datasets.push({
+      label: 'Sleep',
+      data: raw.map(d => ({ x: d.date, y: d.totalMinutes / 60 })),
+      backgroundColor: 'rgba(99,102,241,0.6)',
+      borderRadius: 2,
+    });
+  }
+
+  CHARTS.sleep = new Chart(document.getElementById('sleep-chart'), {
+    type: 'bar',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: range <= 90 ? 'week' : 'month' },
+          stacked: hasStages,
+          grid: CHART_GRID,
+        },
+        y: {
+          stacked: hasStages,
+          grid: CHART_GRID,
+          ticks: { callback: v => v.toFixed(1) + 'h' }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + 'h'
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderSleepStagesChart() {
+  const hasStages = DATA.sleep.some(d => d.rem > 0 || d.deep > 0 || d.core > 0);
+  if (!hasStages) {
+    document.getElementById('sleep-stages-chart').parentElement.parentElement.style.display = 'none';
+    return;
+  }
+
+  const avgDeep = DATA.sleep.reduce((s, d) => s + d.deep, 0) / DATA.sleep.length;
+  const avgCore = DATA.sleep.reduce((s, d) => s + d.core, 0) / DATA.sleep.length;
+  const avgREM = DATA.sleep.reduce((s, d) => s + d.rem, 0) / DATA.sleep.length;
+  const avgAwake = DATA.sleep.reduce((s, d) => s + d.awake, 0) / DATA.sleep.length;
+
+  if (CHARTS.sleepStages) CHARTS.sleepStages.destroy();
+  CHARTS.sleepStages = new Chart(document.getElementById('sleep-stages-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Deep', 'Core', 'REM', 'Awake'],
+      datasets: [{
+        data: [avgDeep, avgCore, avgREM, avgAwake].map(v => Math.round(v)),
+        backgroundColor: [
+          'rgba(99,102,241,0.9)',
+          'rgba(99,102,241,0.55)',
+          'rgba(168,85,247,0.6)',
+          'rgba(239,68,68,0.4)',
+        ],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { padding: 12, font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const min = ctx.parsed;
+              return ` ${ctx.label}: ${Math.floor(min / 60)}h ${min % 60}m`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
 const METRIC_DEFS = {
   weight: { label: 'Weight (kg)', color: '#00d4aa' },
   steps: { label: 'Daily Steps', color: '#4ecdc4' },
@@ -1746,6 +2152,8 @@ const METRIC_DEFS = {
   flights: { label: 'Flights Climbed', color: '#f59e0b' },
   vo2max: { label: 'VO2 Max', color: '#14b8a6' },
   workoutDuration: { label: 'Workout Duration (min)', color: '#ec4899' },
+  heartRate: { label: 'Avg Heart Rate (bpm)', color: '#ef4444' },
+  sleep: { label: 'Sleep Duration (hrs)', color: '#6366f1' },
 };
 
 function initCorrelation() {
