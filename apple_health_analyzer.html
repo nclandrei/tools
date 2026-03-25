@@ -817,26 +817,25 @@ async function handleFile(file) {
   fill.style.width = '10%';
   text.textContent = 'Reading file...';
 
-  try {
-    let xmlText;
-    if (file.name.endsWith('.zip')) {
-      text.textContent = 'Extracting ZIP...';
-      fill.style.width = '20%';
-      const zip = await JSZip.loadAsync(file);
-      const xmlFile = zip.file(/export\.xml$/i)[0] || zip.file(/\.xml$/i)[0];
-      if (!xmlFile) throw new Error('No export.xml found in ZIP');
-      text.textContent = 'Decompressing XML...';
-      fill.style.width = '40%';
-      xmlText = await xmlFile.async('string');
-    } else {
-      xmlText = await file.text();
-    }
+  // Reset DATA for fresh parse
+  for (const key of Object.keys(DATA)) DATA[key] = [];
 
-    fill.style.width = '60%';
+  try {
+    fill.style.width = '20%';
     text.textContent = 'Parsing health records...';
     await new Promise(r => setTimeout(r, 50));
 
-    parseXML(xmlText);
+    if (file.name.endsWith('.zip')) {
+      text.textContent = 'Extracting ZIP...';
+      const zip = await JSZip.loadAsync(file);
+      const xmlFile = zip.file(/export\.xml$/i)[0] || zip.file(/\.xml$/i)[0];
+      if (!xmlFile) throw new Error('No export.xml found in ZIP');
+      text.textContent = 'Streaming health records...';
+      fill.style.width = '30%';
+      await parseXMLStreamZip(xmlFile, fill, text);
+    } else {
+      await parseXMLStreamFile(file, fill, text);
+    }
 
     fill.style.width = '90%';
     text.textContent = 'Building dashboard...';
@@ -852,35 +851,32 @@ async function handleFile(file) {
       document.getElementById('dashboard').style.display = 'block';
     }, 300);
   } catch (err) {
-    text.textContent = '❌ Error: ' + err.message;
+    text.textContent = '\u274c Error: ' + err.message;
     fill.style.width = '0%';
     console.error(err);
   }
 }
 
-// ===== XML PARSING =====
-function parseXML(xml) {
-  // Parse Record elements using regex for performance on large files
-  const recordRegex = /<Record\s+([^>]+?)\/>/g;
-  const workoutRegex = /<Workout\s+([^>]+?)(?:\/>|>[\s\S]*?<\/Workout>)/g;
+// ===== STREAMING XML PARSING =====
+// Processes XML in chunks to avoid loading multi-GB files into memory at once.
 
-  let match;
+function createStreamParser() {
   const dailySteps = {};
   const hourlySteps = {};
   const dailyActiveEnergy = {};
   const dailyDistance = {};
   const dailyFlights = {};
+  let buffer = '';
+  let recordCount = 0;
 
-  // Parse Records
-  while ((match = recordRegex.exec(xml)) !== null) {
-    const attrs = parseAttrs(match[1]);
+  function processRecord(attrStr) {
+    const attrs = parseAttrs(attrStr);
     const type = attrs.type;
     const value = parseFloat(attrs.value);
     const dateStr = attrs.startDate;
-    if (!dateStr || isNaN(value)) continue;
-
+    if (!dateStr || isNaN(value)) return;
     const date = parseHealthDate(dateStr);
-    if (!date) continue;
+    if (!date) return;
     const dayKey = toDateKey(date);
 
     switch (type) {
@@ -912,18 +908,18 @@ function parseXML(xml) {
         DATA.vo2max.push({ date: new Date(dayKey), value });
         break;
     }
+    recordCount++;
   }
 
-  // Parse Workouts
-  while ((match = workoutRegex.exec(xml)) !== null) {
-    const attrs = parseAttrs(match[1]);
+  function processWorkout(attrStr) {
+    const attrs = parseAttrs(attrStr);
     const type = attrs.workoutActivityType;
     const duration = parseFloat(attrs.duration) || 0;
     const calories = parseFloat(attrs.totalEnergyBurned) || 0;
     const dateStr = attrs.startDate;
-    if (!dateStr) continue;
+    if (!dateStr) return;
     const date = parseHealthDate(dateStr);
-    if (!date) continue;
+    if (!date) return;
     DATA.workouts.push({
       date: new Date(toDateKey(date)),
       type: friendlyWorkoutType(type || 'Unknown'),
@@ -932,38 +928,140 @@ function parseXML(xml) {
     });
   }
 
-  // Flatten aggregated daily data
-  for (const [key, val] of Object.entries(dailySteps)) {
-    DATA.steps.push({ date: new Date(key), value: Math.round(val) });
-  }
-  for (const [key, val] of Object.entries(hourlySteps)) {
-    const parts = key.split('-');
-    const day = parts.slice(0, 3).join('-');
-    const hour = parseInt(parts[3]);
-    DATA.stepsHourly.push({ date: new Date(day), hour, value: Math.round(val) });
-  }
-  for (const [key, val] of Object.entries(dailyActiveEnergy)) {
-    DATA.activeEnergy.push({ date: new Date(key), value: Math.round(val) });
-  }
-  for (const [key, val] of Object.entries(dailyDistance)) {
-    DATA.distance.push({ date: new Date(key), value: Math.round(val * 100) / 100 });
-  }
-  for (const [key, val] of Object.entries(dailyFlights)) {
-    DATA.flights.push({ date: new Date(key), value: Math.round(val) });
-  }
+  function feedChunk(chunk) {
+    buffer += chunk;
 
-  // Sort everything
-  for (const key of Object.keys(DATA)) {
-    if (Array.isArray(DATA[key])) {
-      DATA[key].sort((a, b) => a.date - b.date);
+    // Extract complete <Record .../> elements
+    const recordRegex = /<Record\s+([^>]+?)\/>/g;
+    let match;
+    let maxEnd = 0;
+    while ((match = recordRegex.exec(buffer)) !== null) {
+      processRecord(match[1]);
+      maxEnd = Math.max(maxEnd, recordRegex.lastIndex);
+    }
+
+    // Extract complete <Workout .../> (self-closing)
+    const workoutSC = /<Workout\s+([^>]+?)\/>/g;
+    while ((match = workoutSC.exec(buffer)) !== null) {
+      processWorkout(match[1]);
+      maxEnd = Math.max(maxEnd, workoutSC.lastIndex);
+    }
+
+    // Extract complete <Workout ...>...</Workout>
+    const workoutBody = /<Workout\s+([^>]+?)>[\s\S]*?<\/Workout>/g;
+    while ((match = workoutBody.exec(buffer)) !== null) {
+      processWorkout(match[1]);
+      maxEnd = Math.max(maxEnd, workoutBody.lastIndex);
+    }
+
+    // Trim buffer: keep only from the last '<' after processed content
+    // to retain any partial element that spans chunk boundaries
+    if (maxEnd > 0) {
+      const tail = buffer.substring(maxEnd);
+      const lastLT = tail.lastIndexOf('<');
+      buffer = lastLT >= 0 ? tail.substring(lastLT) : '';
+    } else if (buffer.length > 500000) {
+      // Safety valve: if no matches found and buffer is large,
+      // keep only from the last '<' to prevent unbounded growth
+      const lastLT = buffer.lastIndexOf('<');
+      buffer = lastLT >= 0 ? buffer.substring(lastLT) : '';
     }
   }
 
-  // Dedupe weight to daily average
-  DATA.weight = dedupeDaily(DATA.weight);
-  DATA.restingHR = dedupeDaily(DATA.restingHR);
-  DATA.hrv = dedupeDaily(DATA.hrv);
-  DATA.vo2max = dedupeDaily(DATA.vo2max);
+  function finalize() {
+    // Process any remaining content in buffer
+    feedChunk('');
+
+    // Flatten aggregated daily data
+    for (const [key, val] of Object.entries(dailySteps)) {
+      DATA.steps.push({ date: new Date(key), value: Math.round(val) });
+    }
+    for (const [key, val] of Object.entries(hourlySteps)) {
+      const parts = key.split('-');
+      const day = parts.slice(0, 3).join('-');
+      const hour = parseInt(parts[3]);
+      DATA.stepsHourly.push({ date: new Date(day), hour, value: Math.round(val) });
+    }
+    for (const [key, val] of Object.entries(dailyActiveEnergy)) {
+      DATA.activeEnergy.push({ date: new Date(key), value: Math.round(val) });
+    }
+    for (const [key, val] of Object.entries(dailyDistance)) {
+      DATA.distance.push({ date: new Date(key), value: Math.round(val * 100) / 100 });
+    }
+    for (const [key, val] of Object.entries(dailyFlights)) {
+      DATA.flights.push({ date: new Date(key), value: Math.round(val) });
+    }
+
+    // Sort everything
+    for (const key of Object.keys(DATA)) {
+      if (Array.isArray(DATA[key])) {
+        DATA[key].sort((a, b) => a.date - b.date);
+      }
+    }
+
+    // Dedupe weight to daily average
+    DATA.weight = dedupeDaily(DATA.weight);
+    DATA.restingHR = dedupeDaily(DATA.restingHR);
+    DATA.hrv = dedupeDaily(DATA.hrv);
+    DATA.vo2max = dedupeDaily(DATA.vo2max);
+  }
+
+  return { feedChunk, finalize, getCount: () => recordCount };
+}
+
+async function parseXMLStreamZip(xmlFile, fill, text) {
+  const parser = createStreamParser();
+
+  return new Promise((resolve, reject) => {
+    const stream = xmlFile.internalStream('string');
+    let bytesRead = 0;
+    let lastUIUpdate = 0;
+
+    stream.on('data', (chunk) => {
+      bytesRead += chunk.length;
+      parser.feedChunk(chunk);
+
+      // Throttle UI updates to every 200ms
+      const now = Date.now();
+      if (now - lastUIUpdate > 200) {
+        lastUIUpdate = now;
+        const mb = (bytesRead / 1048576).toFixed(0);
+        const count = parser.getCount();
+        text.textContent = `Processed ${mb} MB — ${count.toLocaleString()} records...`;
+        fill.style.width = Math.min(30 + (bytesRead / 1048576) * 0.1, 85) + '%';
+      }
+    });
+
+    stream.on('end', () => {
+      parser.finalize();
+      resolve();
+    });
+
+    stream.on('error', (err) => reject(err));
+    stream.resume();
+  });
+}
+
+async function parseXMLStreamFile(file, fill, text) {
+  const parser = createStreamParser();
+  const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB
+  let offset = 0;
+
+  while (offset < file.size) {
+    const slice = file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size));
+    const chunk = await slice.text();
+    parser.feedChunk(chunk);
+    offset += CHUNK_SIZE;
+
+    const pct = Math.min(30 + (offset / file.size) * 55, 85);
+    fill.style.width = pct + '%';
+    const mb = (offset / 1048576).toFixed(0);
+    const count = parser.getCount();
+    text.textContent = `Processed ${mb} MB — ${count.toLocaleString()} records...`;
+    await new Promise(r => setTimeout(r, 0)); // yield to UI
+  }
+
+  parser.finalize();
 }
 
 function parseAttrs(str) {
