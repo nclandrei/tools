@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coffee Brewing Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  :root {
+    --bg: #1a1a1e;
+    --surface: #24242a;
+    --surface-hover: #2a2a32;
+    --border: #35353d;
+    --text: #e0e0e4;
+    --text-dim: #8888a0;
+    --accent: #c4956a;
+    --accent-dim: #c4956a22;
+    --accent-hover: #d4a57a;
+    --green: #5caa6c;
+    --red: #c45c5c;
+    --amber: #e8c44a;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem 1rem;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.25rem;
+  }
+
+  .subtitle {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 1.5rem;
+  }
+
+  /* Method selector */
+  .methods {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .method-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+    color: var(--text);
+  }
+
+  .method-btn:hover { background: var(--surface-hover); border-color: var(--accent); }
+  .method-btn.active { border-color: var(--accent); background: var(--accent-dim); }
+
+  .method-btn .method-icon {
+    font-size: 1.4rem;
+    margin-bottom: 0.25rem;
+    display: block;
+  }
+
+  .method-btn .method-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.1rem;
+  }
+
+  .method-btn .method-time {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+  }
+
+  /* Recipe panel */
+  .recipe-panel {
+    animation: fadeUp 0.3s ease;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Params bar */
+  .params {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+
+  .param {
+    flex: 1;
+    background: var(--surface);
+    padding: 0.5rem 0.6rem;
+    text-align: center;
+  }
+
+  .param-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: block;
+  }
+
+  .param-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    display: block;
+    margin-top: 0.15rem;
+  }
+
+  /* Dose adjuster */
+  .dose-adjuster {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.6rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .dose-adjuster label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+  }
+
+  .dose-adjuster button {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface-hover);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .dose-adjuster button:hover { border-color: var(--accent); color: var(--accent); }
+  .dose-adjuster button:active { transform: scale(0.93); }
+
+  .dose-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 48px;
+    text-align: center;
+  }
+
+  /* Steps */
+  .steps-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+  }
+
+  .step {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.7rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.4rem;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .step.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .step.done {
+    opacity: 0.5;
+  }
+
+  .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-dim);
+    min-width: 20px;
+    padding-top: 0.1rem;
+  }
+
+  .step.active .step-num { color: var(--accent); }
+
+  .step-body { flex: 1; }
+
+  .step-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+  }
+
+  .step-desc {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
+  .step-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    margin-top: 0.2rem;
+    display: block;
+  }
+
+  /* Timer */
+  .timer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-top: 1rem;
+    position: sticky;
+    bottom: 1rem;
+  }
+
+  .timer-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+    min-width: 110px;
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+
+  .timer-display.warning { color: var(--amber); }
+  .timer-display.danger { color: var(--red); }
+
+  .timer-btn {
+    padding: 0.5rem 1.2rem;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .timer-btn:active { transform: scale(0.97); }
+
+  .btn-start {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .btn-start:hover { background: var(--accent-hover); }
+
+  .btn-next {
+    background: var(--green);
+    color: var(--bg);
+  }
+  .btn-next:hover { opacity: 0.9; }
+
+  .btn-reset {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .btn-reset:hover { border-color: var(--red); color: var(--red); }
+
+  /* Progress bar inside step */
+  .step-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: var(--accent);
+    transition: width 0.25s linear;
+  }
+
+  /* Tip */
+  .tip {
+    margin-top: 1rem;
+    padding: 0.65rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .tip strong { color: var(--text); }
+
+  /* Taste guide for espresso */
+  .taste-guide {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+    margin-top: 1rem;
+  }
+
+  .taste-card {
+    padding: 0.6rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .taste-card .taste-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+    display: block;
+  }
+
+  .taste-card.sour .taste-label { color: var(--amber); }
+  .taste-card.bitter .taste-label { color: var(--red); }
+
+  .taste-card .taste-fix {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
+  /* Back button */
+  .back-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    cursor: pointer;
+    padding: 0.3rem 0;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .back-btn:hover { color: var(--accent); }
+
+  @media (max-width: 400px) {
+    .methods { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+    .method-btn { padding: 0.6rem; }
+    .timer-display { font-size: 1.6rem; min-width: 90px; }
+    .params { flex-wrap: wrap; }
+    .param { min-width: 45%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Coffee Brewing Guide</h1>
+  <p class="subtitle">James Hoffmann's recipes with interactive timers</p>
+
+  <!-- Method Selection -->
+  <div id="method-select">
+    <div class="methods">
+      <button class="method-btn" data-method="aeropress">
+        <span class="method-icon">&#9749;</span>
+        <span class="method-name">AeroPress</span>
+        <span class="method-time">~3 min</span>
+      </button>
+      <button class="method-btn" data-method="frenchpress">
+        <span class="method-icon">&#127861;</span>
+        <span class="method-name">French Press</span>
+        <span class="method-time">~10 min</span>
+      </button>
+      <button class="method-btn" data-method="v60">
+        <span class="method-icon">&#9716;</span>
+        <span class="method-name">V60</span>
+        <span class="method-time">~3:30</span>
+      </button>
+      <button class="method-btn" data-method="espresso">
+        <span class="method-icon">&#9679;</span>
+        <span class="method-name">Espresso</span>
+        <span class="method-time">~30 sec</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Recipe View -->
+  <div id="recipe-view" hidden>
+    <button class="back-btn" id="back-btn">&larr; All methods</button>
+    <div id="recipe-content"></div>
+  </div>
+</div>
+
+<script>
+const RECIPES = {
+  aeropress: {
+    name: 'AeroPress',
+    defaultDose: 11,
+    ratio: 18.2,
+    grind: 'Medium-fine',
+    temp: '100°C',
+    tempNote: 'Boiling for light roast, 90-95°C medium, 85-90°C dark',
+    totalTime: 170,
+    hasDoseAdjust: true,
+    equipment: 'AeroPress, paper filter, kettle, scale',
+    steps: [
+      { title: 'Set up', desc: 'Put filter in cap. No need to rinse or preheat.', duration: 0 },
+      { title: 'Add coffee & water', desc: 'Add {dose}g coffee. Pour {water}g water, wetting all grounds.', duration: 10 },
+      { title: 'Seal', desc: 'Insert piston ~1cm into the top to create a vacuum seal. This stops dripping.', duration: 5 },
+      { title: 'Steep', desc: 'Wait. Let the coffee brew undisturbed.', duration: 115 },
+      { title: 'Swirl', desc: 'Gently swirl the brewer to knock down the crust. Don\'t stir.', duration: 5 },
+      { title: 'Settle', desc: 'Wait for grounds to settle.', duration: 30 },
+      { title: 'Press', desc: 'Press gently all the way down. Stop when you hear a hiss.', duration: 15 }
+    ],
+    tip: 'Swirl, don\'t stir — it\'s gentler and avoids pushing fines into the filter. Lighter roasts benefit from hotter water.'
+  },
+  frenchpress: {
+    name: 'French Press',
+    defaultDose: 30,
+    ratio: 16.7,
+    grind: 'Medium-coarse',
+    temp: '100°C',
+    tempNote: 'Use boiling water for best extraction',
+    totalTime: 570,
+    hasDoseAdjust: true,
+    equipment: 'French press, kettle, scale, 2 spoons',
+    steps: [
+      { title: 'Pour water', desc: 'Add {water}g boiling water over {dose}g coffee. Pour quickly to saturate all grounds.', duration: 10 },
+      { title: 'Steep', desc: 'Wait. Let the coffee bloom and steep. Don\'t touch it.', duration: 230 },
+      { title: 'Break the crust', desc: 'Use a spoon to stir and break the crust of grounds floating on top.', duration: 10 },
+      { title: 'Scoop', desc: 'Use two spoons to scoop off the foam and floating grounds from the surface.', duration: 20 },
+      { title: 'Long settle', desc: 'Wait at least 5 minutes. Grounds sink to the bottom — this is the key to a clean cup. Can extend to 8 min.', duration: 300 },
+      { title: 'Plunge gently', desc: 'Lower the plunger just to the surface. Don\'t press it all the way down — it acts as a filter, not a press.', duration: 10 }
+    ],
+    tip: 'The long wait is the secret — it lets grounds settle for a clean, sediment-free cup. Patience is the most important ingredient here.'
+  },
+  v60: {
+    name: 'V60',
+    defaultDose: 15,
+    ratio: 16.67,
+    grind: 'Medium-fine',
+    temp: '100°C',
+    tempNote: 'Boiling for light roast. Wait 15-20s after boiling for dark roast.',
+    totalTime: 210,
+    hasDoseAdjust: true,
+    equipment: 'V60 dripper, paper filter, gooseneck kettle, scale, spoon',
+    steps: [
+      { title: 'Prepare', desc: 'Rinse filter with hot water, discard rinse. Add {dose}g coffee, make a well in the centre. Tare scale.', duration: 0 },
+      { title: 'Bloom', desc: 'Pour {bloom}g water (2x coffee weight) in a spiral from centre outward. Swirl to wet all grounds.', duration: 10, timerStart: true },
+      { title: 'Wait for bloom', desc: 'Let CO₂ escape. The bed should bubble and expand.', duration: 35 },
+      { title: 'First pour (to 60%)', desc: 'Pour steadily to {pour60}g total. Aim for gentle, circular pours with some agitation.', duration: 30 },
+      { title: 'Second pour (to 100%)', desc: 'Pour more gently and slowly to {water}g total. Keep the V60 topped up.', duration: 30 },
+      { title: 'Stir & swirl', desc: 'Stir gently with a spoon — one pass each direction. Then give the V60 a gentle swirl.', duration: 10 },
+      { title: 'Drawdown', desc: 'Let it drain completely. You should see a flat, even coffee bed at the bottom.', duration: 95 }
+    ],
+    tip: 'If brew is too slow (>4 min), grind coarser. Too fast (<2:30), grind finer. James prefers plastic V60s for better heat retention.'
+  },
+  espresso: {
+    name: 'Espresso',
+    defaultDose: 18,
+    ratio: 2,
+    grind: 'Fine (espresso)',
+    temp: '93°C',
+    tempNote: '92-96°C depending on roast level',
+    totalTime: 30,
+    hasDoseAdjust: true,
+    isEspresso: true,
+    equipment: 'Espresso machine, grinder, tamper, scale, WDT tool',
+    steps: [
+      { title: 'Dose', desc: 'Weigh {dose}g coffee into a clean, dry portafilter.', duration: 0 },
+      { title: 'Distribute', desc: 'Use a WDT tool to break up clumps and distribute grounds evenly.', duration: 0 },
+      { title: 'Tamp', desc: 'Tamp with level, consistent pressure (~30 lbs). Clean the rim.', duration: 0 },
+      { title: 'Extract', desc: 'Lock portafilter and start extraction immediately. Target {yield}g out in 25-30 seconds.', duration: 30 },
+      { title: 'Taste & adjust', desc: 'Taste the shot. Adjust one variable at a time — grind size first, then yield.', duration: 0 }
+    ],
+    tip: 'Grind size is your primary variable. If the shot is sour/fast, grind finer. If bitter/slow, grind coarser. Change one thing at a time.'
+  }
+};
+
+let currentMethod = null;
+let currentDose = 0;
+let timerInterval = null;
+let elapsed = 0;
+let currentStep = -1;
+let stepStartTime = 0;
+let isRunning = false;
+
+const methodSelect = document.getElementById('method-select');
+const recipeView = document.getElementById('recipe-view');
+const recipeContent = document.getElementById('recipe-content');
+
+// Method buttons
+document.querySelectorAll('.method-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentMethod = btn.dataset.method;
+    showRecipe(currentMethod);
+  });
+});
+
+document.getElementById('back-btn').addEventListener('click', () => {
+  stopTimer();
+  recipeView.hidden = true;
+  methodSelect.hidden = false;
+  document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
+});
+
+function showRecipe(method) {
+  const r = RECIPES[method];
+  currentDose = r.defaultDose;
+  currentStep = -1;
+  elapsed = 0;
+  isRunning = false;
+  stopTimer();
+
+  methodSelect.hidden = true;
+  recipeView.hidden = false;
+  document.querySelectorAll('.method-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.method === method);
+  });
+
+  renderRecipe();
+}
+
+function getWater() {
+  const r = RECIPES[currentMethod];
+  return r.isEspresso ? Math.round(currentDose * r.ratio) : Math.round(currentDose * r.ratio);
+}
+
+function renderRecipe() {
+  const r = RECIPES[currentMethod];
+  const water = getWater();
+  const bloom = Math.round(currentDose * 2);
+  const pour60 = Math.round(water * 0.6);
+  const yieldG = r.isEspresso ? water : null;
+
+  function fillTemplate(text) {
+    return text
+      .replace('{dose}', currentDose)
+      .replace('{water}', water)
+      .replace('{bloom}', bloom)
+      .replace('{pour60}', pour60)
+      .replace('{yield}', yieldG);
+  }
+
+  let html = '';
+
+  // Params
+  if (r.isEspresso) {
+    html += `<div class="params">
+      <div class="param"><span class="param-label">Dose</span><span class="param-value">${currentDose}g</span></div>
+      <div class="param"><span class="param-label">Yield</span><span class="param-value">${water}g</span></div>
+      <div class="param"><span class="param-label">Ratio</span><span class="param-value">1:${r.ratio}</span></div>
+      <div class="param"><span class="param-label">Temp</span><span class="param-value">${r.temp}</span></div>
+    </div>`;
+  } else {
+    html += `<div class="params">
+      <div class="param"><span class="param-label">Coffee</span><span class="param-value">${currentDose}g</span></div>
+      <div class="param"><span class="param-label">Water</span><span class="param-value">${water}g</span></div>
+      <div class="param"><span class="param-label">Grind</span><span class="param-value" style="font-size:0.75rem">${r.grind}</span></div>
+      <div class="param"><span class="param-label">Temp</span><span class="param-value">${r.temp}</span></div>
+    </div>`;
+  }
+
+  // Dose adjuster
+  if (r.hasDoseAdjust) {
+    html += `<div class="dose-adjuster">
+      <label>Adjust dose</label>
+      <button onclick="adjustDose(-1)">−</button>
+      <span class="dose-display">${currentDose}g</span>
+      <button onclick="adjustDose(1)">+</button>
+    </div>`;
+  }
+
+  // Steps
+  html += `<div class="steps-header">Steps</div>`;
+  r.steps.forEach((step, i) => {
+    const cls = i === currentStep ? 'active' : (currentStep > i && currentStep >= 0) ? 'done' : '';
+    const timeLabel = step.duration > 0 ? formatTime(step.duration) : '';
+    html += `<div class="step ${cls}" data-step="${i}">
+      <div class="step-num">${i + 1}</div>
+      <div class="step-body">
+        <div class="step-title">${step.title}</div>
+        <div class="step-desc">${fillTemplate(step.desc)}</div>
+        ${timeLabel ? `<span class="step-time">${timeLabel}</span>` : ''}
+      </div>
+      <div class="step-progress" style="width:0%"></div>
+    </div>`;
+  });
+
+  // Timer bar
+  const timedSteps = r.steps.filter(s => s.duration > 0);
+  if (timedSteps.length > 0) {
+    html += `<div class="timer-bar">
+      <button class="timer-btn btn-reset" onclick="resetBrew()">Reset</button>
+      <div class="timer-display" id="timer-display">${formatTime(0)}</div>
+      <button class="timer-btn btn-start" id="start-btn" onclick="toggleTimer()">Start</button>
+    </div>`;
+  }
+
+  // Tip
+  html += `<div class="tip"><strong>Tip:</strong> ${r.tip}</div>`;
+
+  // Espresso taste guide
+  if (r.isEspresso) {
+    html += `<div class="taste-guide">
+      <div class="taste-card sour">
+        <span class="taste-label">Sour / Sharp</span>
+        <span class="taste-fix">Grind finer or increase yield by 2-4g</span>
+      </div>
+      <div class="taste-card bitter">
+        <span class="taste-label">Bitter / Dry</span>
+        <span class="taste-fix">Grind coarser or decrease yield by 2-4g</span>
+      </div>
+    </div>`;
+  }
+
+  recipeContent.innerHTML = html;
+}
+
+function adjustDose(delta) {
+  const r = RECIPES[currentMethod];
+  const min = r.isEspresso ? 14 : 5;
+  const max = r.isEspresso ? 22 : 60;
+  currentDose = Math.max(min, Math.min(max, currentDose + delta));
+  renderRecipe();
+}
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function toggleTimer() {
+  if (isRunning) {
+    pauseTimer();
+  } else {
+    startTimer();
+  }
+}
+
+function startTimer() {
+  const r = RECIPES[currentMethod];
+  isRunning = true;
+
+  if (currentStep < 0) {
+    // Find first timed step
+    currentStep = r.steps.findIndex(s => s.duration > 0);
+    if (currentStep < 0) return;
+    stepStartTime = elapsed;
+    renderRecipe();
+  }
+
+  const btn = document.getElementById('start-btn');
+  if (btn) {
+    btn.textContent = 'Pause';
+    btn.classList.remove('btn-start');
+    btn.classList.add('btn-next');
+  }
+
+  timerInterval = setInterval(() => {
+    elapsed += 0.25;
+    updateTimerDisplay();
+    updateStepProgress();
+    checkStepCompletion();
+  }, 250);
+}
+
+function pauseTimer() {
+  isRunning = false;
+  clearInterval(timerInterval);
+  const btn = document.getElementById('start-btn');
+  if (btn) {
+    btn.textContent = 'Resume';
+    btn.classList.remove('btn-next');
+    btn.classList.add('btn-start');
+  }
+}
+
+function stopTimer() {
+  isRunning = false;
+  clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+function resetBrew() {
+  stopTimer();
+  elapsed = 0;
+  currentStep = -1;
+  renderRecipe();
+}
+
+function updateTimerDisplay() {
+  const el = document.getElementById('timer-display');
+  if (!el) return;
+  el.textContent = formatTime(elapsed);
+
+  const r = RECIPES[currentMethod];
+  if (currentStep >= 0 && currentStep < r.steps.length) {
+    const step = r.steps[currentStep];
+    const stepElapsed = elapsed - stepStartTime;
+    const remaining = step.duration - stepElapsed;
+    if (remaining < 5 && remaining > 0) {
+      el.classList.add('warning');
+      el.classList.remove('danger');
+    } else if (remaining <= 0) {
+      el.classList.remove('warning');
+      el.classList.add('danger');
+    } else {
+      el.classList.remove('warning', 'danger');
+    }
+  }
+}
+
+function updateStepProgress() {
+  const r = RECIPES[currentMethod];
+  if (currentStep < 0 || currentStep >= r.steps.length) return;
+
+  const step = r.steps[currentStep];
+  if (step.duration <= 0) return;
+
+  const stepElapsed = elapsed - stepStartTime;
+  const pct = Math.min(100, (stepElapsed / step.duration) * 100);
+
+  const stepEl = document.querySelector(`.step[data-step="${currentStep}"] .step-progress`);
+  if (stepEl) stepEl.style.width = pct + '%';
+}
+
+function checkStepCompletion() {
+  const r = RECIPES[currentMethod];
+  if (currentStep < 0 || currentStep >= r.steps.length) return;
+
+  const step = r.steps[currentStep];
+  if (step.duration <= 0) return;
+
+  const stepElapsed = elapsed - stepStartTime;
+  if (stepElapsed >= step.duration) {
+    advanceStep();
+  }
+}
+
+function advanceStep() {
+  const r = RECIPES[currentMethod];
+  // Find next timed step
+  let next = currentStep + 1;
+  while (next < r.steps.length && r.steps[next].duration <= 0) {
+    next++;
+  }
+
+  if (next >= r.steps.length) {
+    // Brew complete
+    stopTimer();
+    currentStep = r.steps.length;
+    renderRecipe();
+    playNotification();
+    return;
+  }
+
+  currentStep = next;
+  stepStartTime = elapsed;
+  renderRecipe();
+  playBeep();
+
+  // Re-start interval display
+  if (isRunning) {
+    const btn = document.getElementById('start-btn');
+    if (btn) {
+      btn.textContent = 'Pause';
+      btn.classList.remove('btn-start');
+      btn.classList.add('btn-next');
+    }
+  }
+}
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.value = 0.15;
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc.stop(ctx.currentTime + 0.2);
+  } catch (e) {}
+}
+
+function playNotification() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.15, 0.3].forEach((delay, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = [660, 880, 1100][i];
+      osc.type = 'sine';
+      gain.gain.value = 0;
+      gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + delay + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.25);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.25);
+    });
+  } catch (e) {}
+}
+</script>
+</body>
+</html>
