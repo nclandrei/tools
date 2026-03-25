@@ -178,8 +178,8 @@ function warpPerspective(srcCanvas, corners) {
   // corners: TL, TR, BR, BL in source image coords
   const outW = Math.round(Math.max(dist(corners[0], corners[1]), dist(corners[3], corners[2])));
   const outH = Math.round(Math.max(dist(corners[0], corners[3]), dist(corners[1], corners[2])));
-  const w = Math.max(100, Math.min(4000, outW));
-  const h = Math.max(100, Math.min(4000, outH));
+  const w = Math.max(100, Math.min(MAX_DIM, outW));
+  const h = Math.max(100, Math.min(MAX_DIM, outH));
 
   const dstRect = [{x:0,y:0},{x:w-1,y:0},{x:w-1,y:h-1},{x:0,y:h-1}];
   const H = computeHomography(dstRect, corners);
@@ -193,19 +193,39 @@ function warpPerspective(srcCanvas, corners) {
   const outImg = octx.createImageData(w, h);
   const od = outImg.data;
 
+  // Bicubic interpolation kernel (Catmull-Rom)
+  function cubicWeight(t) {
+    const at = Math.abs(t);
+    if (at <= 1) return 1.5*at*at*at - 2.5*at*at + 1;
+    if (at < 2) return -0.5*at*at*at + 2.5*at*at - 4*at + 2;
+    return 0;
+  }
+
+  function sampleBicubic(sx, sy, ch) {
+    const ix = Math.floor(sx), iy = Math.floor(sy);
+    const fx = sx - ix, fy = sy - iy;
+    let val = 0;
+    for (let m = -1; m <= 2; m++) {
+      const wy = cubicWeight(fy - m);
+      const py = Math.max(0, Math.min(sh - 1, iy + m));
+      for (let n = -1; n <= 2; n++) {
+        const wx = cubicWeight(fx - n);
+        const px = Math.max(0, Math.min(sw - 1, ix + n));
+        val += sd[(py * sw + px) * 4 + ch] * wx * wy;
+      }
+    }
+    return Math.max(0, Math.min(255, Math.round(val)));
+  }
+
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const [sx, sy] = applyH(H, x, y);
-      const x0 = Math.floor(sx), y0 = Math.floor(sy);
-      const x1 = x0 + 1, y1 = y0 + 1;
-      if (x0 < 0 || x1 >= sw || y0 < 0 || y1 >= sh) continue;
-      const fx = sx - x0, fy = sy - y0;
+      if (sx < 0 || sx >= sw || sy < 0 || sy >= sh) continue;
       const idx = (y * w + x) * 4;
-      const i00 = (y0 * sw + x0) * 4, i10 = (y0 * sw + x1) * 4;
-      const i01 = (y1 * sw + x0) * 4, i11 = (y1 * sw + x1) * 4;
-      for (let c = 0; c < 4; c++) {
-        od[idx + c] = sd[i00+c]*(1-fx)*(1-fy) + sd[i10+c]*fx*(1-fy) + sd[i01+c]*(1-fx)*fy + sd[i11+c]*fx*fy;
-      }
+      od[idx]     = sampleBicubic(sx, sy, 0);
+      od[idx + 1] = sampleBicubic(sx, sy, 1);
+      od[idx + 2] = sampleBicubic(sx, sy, 2);
+      od[idx + 3] = 255;
     }
   }
   octx.putImageData(outImg, 0, 0);
@@ -231,12 +251,12 @@ function adaptiveThreshold(canvas) {
     }
   }
 
-  let bs = Math.round(w / 12);
-  if (bs < 15) bs = 15;
-  if (bs > 151) bs = 151;
+  let bs = Math.round(w / 8);
+  if (bs < 25) bs = 25;
+  if (bs > 201) bs = 201;
   if (bs % 2 === 0) bs++;
   const half = (bs - 1) >> 1;
-  const C = 12;
+  const C = 10;
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -313,7 +333,7 @@ const state = {
   format: 'pdf',
 };
 
-const MAX_DIM = 3000;
+const MAX_DIM = 4096;
 
 // ── DOM Refs ─────────────────────────────────────────────────────────────────
 
@@ -343,7 +363,10 @@ function loadImageToCanvas(img) {
   }
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
-  c.getContext('2d').drawImage(img, 0, 0, w, h);
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, w, h);
   return c;
 }
 
@@ -570,6 +593,8 @@ function showPreview() {
   previewCanvas.width = dw; previewCanvas.height = dh;
   previewCanvas.style.width = dw + 'px';
   previewCanvas.style.height = dh + 'px';
+  previewCtx.imageSmoothingEnabled = true;
+  previewCtx.imageSmoothingQuality = 'high';
   previewCtx.drawImage(canvas, 0, 0, dw, dh);
   updatePagesStrip();
   $('preview-title').textContent = state.pages.length > 1
@@ -654,7 +679,7 @@ async function doDownload() {
         const c = page.processed[state.colorMode];
         const pw = c.width * 0.75, ph = c.height * 0.75;
         if (i > 0) doc.addPage([pw, ph], c.width > c.height ? 'l' : 'p');
-        doc.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pw, ph, undefined, 'FAST');
+        doc.addImage(c.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pw, ph, undefined, 'SLOW');
       });
       const blob = doc.output('blob');
       await downloadBlob(blob, getFilename('pdf'));
@@ -662,7 +687,7 @@ async function doDownload() {
       const page = state.pages[state.currentPageIdx];
       const c = page.processed[state.colorMode];
       const mime = fmt === 'png' ? 'image/png' : 'image/jpeg';
-      const quality = fmt === 'png' ? undefined : 0.92;
+      const quality = fmt === 'png' ? undefined : 0.95;
       const dataUrl = c.toDataURL(mime, quality);
       const res = await fetch(dataUrl);
       const blob = await res.blob();
