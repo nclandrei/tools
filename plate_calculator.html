@@ -481,16 +481,35 @@
   }
 
   function setUnit(unit) {
+    const prevUnit = currentUnit;
     currentUnit = unit;
     document.querySelectorAll('.unit-option').forEach(b => {
       b.classList.toggle('active', b.dataset.unit === unit);
     });
+    // Convert current weight between units
+    const input = document.getElementById('target');
+    const val = parseFloat(input.value);
+    if (val && prevUnit !== unit) {
+      const converted = prevUnit === 'kg' ? val * 2.20462 : val / 2.20462;
+      // Round to nearest step
+      const s = unit === 'kg' ? 2.5 : 5;
+      input.value = fmtNum(Math.round(converted / s) * s);
+    }
+    // Convert bar weight
+    if (prevUnit !== unit) {
+      const barConverted = prevUnit === 'kg' ? currentBar * 2.20462 : currentBar / 2.20462;
+      const barWeights = BAR_WEIGHTS[unit];
+      // Pick the closest available bar weight
+      currentBar = barWeights.reduce((best, w) =>
+        Math.abs(w - barConverted) < Math.abs(best - barConverted) ? w : best
+      );
+    }
     // Update bar options
     renderBarOptions();
     // Update quick plates
     renderQuickPlates();
     // Update input step
-    document.getElementById('target').step = step();
+    input.step = step();
     calc();
   }
 
