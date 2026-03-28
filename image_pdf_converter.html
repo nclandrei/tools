@@ -4,39 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Image ↔ PDF Converter</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0e0f11;
-    --surface: #16181c;
-    --surface-2: #1e2026;
-    --border: #2a2d35;
-    --text: #e4e6eb;
-    --text-dim: #8b8f9a;
-    --accent: #4a7cff;
-    --accent-glow: rgba(74, 124, 255, 0.15);
-    --green: #34d399;
-    --red: #f87171;
-    --radius: 12px;
-  }
-
-  html, body {
-    height: 100%;
-    font-family: 'DM Sans', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    -webkit-tap-highlight-color: transparent;
-    -webkit-font-smoothing: antialiased;
-  }
-
   body {
     display: flex;
     flex-direction: column;
@@ -56,7 +31,7 @@
   .header { text-align: center; padding: 20px 0 8px; }
   .header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 6px; }
   .header h1 span { color: var(--accent); }
-  .header p { font-size: 0.85rem; color: var(--text-dim); }
+  .header p { font-size: 0.85rem; color: var(--text-muted); }
 
   /* Mode switch */
   .mode-bar { display: flex; justify-content: center; }
@@ -65,38 +40,30 @@
     border-radius: 8px; padding: 3px; gap: 2px;
   }
   .mode-switch button {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 500;
+    font-family: monospace; font-size: 0.78rem; font-weight: 500;
     padding: 7px 18px; border: none; border-radius: 6px; cursor: pointer;
-    background: transparent; color: var(--text-dim); transition: all 150ms ease;
+    background: transparent; color: var(--text-muted); transition: all 150ms ease;
   }
   .mode-switch button:hover { color: var(--text); }
   .mode-switch button.active { background: var(--accent); color: #fff; }
 
   /* Drop zone */
   .drop-zone {
-    position: relative; border: 2px dashed var(--border); border-radius: var(--radius);
-    padding: 48px 24px; text-align: center; cursor: pointer;
-    transition: all 0.25s ease; background: var(--surface); overflow: hidden;
+    position: relative; border-radius: 12px;
+    padding: 48px 24px; overflow: hidden;
   }
-  .drop-zone::before {
-    content: ''; position: absolute; inset: 0;
-    background: radial-gradient(circle at 50% 50%, var(--accent-glow), transparent 70%);
-    opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
-  }
-  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--surface-2); }
-  .drop-zone:hover::before, .drop-zone.drag-over::before { opacity: 1; }
 
   .drop-icon {
     width: 48px; height: 48px; margin: 0 auto 16px; border-radius: 50%;
-    background: var(--surface-2); border: 1px solid var(--border);
+    background: var(--surface-alt); border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center; transition: all 0.25s ease;
   }
-  .drop-zone:hover .drop-icon { background: var(--accent-glow); border-color: var(--accent); }
-  .drop-icon svg { width: 22px; height: 22px; color: var(--text-dim); transition: color 0.25s ease; }
+  .drop-zone:hover .drop-icon { background: var(--accent-dim); border-color: var(--accent); }
+  .drop-icon svg { width: 22px; height: 22px; color: var(--text-muted); transition: color 0.25s ease; }
   .drop-zone:hover .drop-icon svg { color: var(--accent); }
 
   .drop-text { font-size: 0.95rem; font-weight: 500; margin-bottom: 4px; }
-  .drop-hint { font-size: 0.8rem; color: var(--text-dim); }
+  .drop-hint { font-size: 0.8rem; color: var(--text-muted); }
   .drop-zone input[type="file"] { display: none; }
 
   /* File list */
@@ -105,26 +72,26 @@
   .file-card {
     display: flex; align-items: center; gap: 12px; padding: 12px 14px;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); animation: slideIn 0.3s ease;
+    border-radius: 12px; animation: slideIn 0.3s ease;
   }
   @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
   .file-card .thumb {
     width: 44px; height: 44px; border-radius: 6px; object-fit: cover;
-    background: var(--surface-2); flex-shrink: 0;
+    background: var(--surface-alt); flex-shrink: 0;
   }
   .file-card .info { flex: 1; min-width: 0; }
   .file-card .name {
     font-size: 0.85rem; font-weight: 500; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis;
   }
-  .file-card .meta { font-size: 0.75rem; color: var(--text-dim); }
+  .file-card .meta { font-size: 0.75rem; color: var(--text-muted); }
   .file-card .remove {
-    width: 28px; height: 28px; border: none; background: var(--surface-2);
-    border-radius: 6px; cursor: pointer; color: var(--text-dim); display: grid;
+    width: 28px; height: 28px; border: none; background: var(--surface-alt);
+    border-radius: 6px; cursor: pointer; color: var(--text-muted); display: grid;
     place-items: center; transition: all 150ms ease; flex-shrink: 0;
   }
-  .file-card .remove:hover { background: rgba(248,113,113,0.15); color: var(--red); }
+  .file-card .remove:hover { background: var(--red-dim); color: var(--red); }
 
   /* Sortable drag */
   .file-card.dragging { opacity: 0.4; }
@@ -133,22 +100,22 @@
   /* Options */
   .options {
     display: none; background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 16px; gap: 14px; flex-direction: column;
+    border-radius: 12px; padding: 16px; gap: 14px; flex-direction: column;
   }
   .options.show { display: flex; }
   .options h3 {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 500;
-    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim);
+    font-family: monospace; font-size: 0.7rem; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
   }
   .opt-row { display: flex; gap: 12px; flex-wrap: wrap; }
   .opt-group { flex: 1; min-width: 120px; }
   .opt-group label {
-    display: block; font-size: 0.78rem; color: var(--text-dim); margin-bottom: 5px;
+    display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 5px;
   }
   .opt-group select, .opt-group input[type="number"] {
-    width: 100%; padding: 8px 10px; background: var(--surface-2);
+    width: 100%; padding: 8px 10px; background: var(--surface-alt);
     border: 1px solid var(--border); border-radius: 8px; color: var(--text);
-    font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; outline: none;
+    font-family: monospace; font-size: 0.8rem; outline: none;
   }
   .opt-group select:focus, .opt-group input[type="number"]:focus { border-color: var(--accent); }
 
@@ -156,42 +123,31 @@
   .actions { display: none; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .actions.show { display: flex; }
 
-  .btn {
-    font-family: 'DM Sans', system-ui, sans-serif; font-size: 0.9rem; font-weight: 600;
-    padding: 10px 24px; border: none; border-radius: 8px; cursor: pointer;
-    transition: all 150ms ease; display: inline-flex; align-items: center; gap: 8px;
-  }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
-  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; filter: none; }
-  .btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--text); }
-
   /* Results */
   .results {
     display: none; flex-direction: column; gap: 10px;
   }
   .results.show { display: flex; }
   .results h3 {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 500;
-    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim);
+    font-family: monospace; font-size: 0.7rem; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
   }
 
   .result-card {
     display: flex; align-items: center; gap: 12px; padding: 12px 14px;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); animation: slideIn 0.3s ease;
+    border-radius: 12px; animation: slideIn 0.3s ease;
   }
   .result-card .thumb {
     width: 44px; height: 44px; border-radius: 6px; object-fit: contain;
-    background: var(--surface-2); flex-shrink: 0;
+    background: var(--surface-alt); flex-shrink: 0;
   }
   .result-card .info { flex: 1; min-width: 0; }
   .result-card .name {
     font-size: 0.85rem; font-weight: 500; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis;
   }
-  .result-card .meta { font-size: 0.75rem; color: var(--text-dim); }
+  .result-card .meta { font-size: 0.75rem; color: var(--text-muted); }
   .result-card .dl-btn {
     padding: 6px 14px; font-size: 0.78rem; font-weight: 600;
     background: var(--accent); color: #fff; border: none; border-radius: 6px;
@@ -201,7 +157,7 @@
 
   /* Progress */
   .progress-bar {
-    display: none; height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden;
+    display: none; height: 4px; background: var(--surface-alt); border-radius: 2px; overflow: hidden;
   }
   .progress-bar.show { display: block; }
   .progress-bar .fill {
@@ -213,11 +169,10 @@
   .toast {
     position: fixed; bottom: 18px; left: 50%;
     transform: translateX(-50%) translateY(90px);
-    background: var(--surface-2); border: 1px solid var(--border);
+    background: var(--surface); border: 1px solid var(--border);
     border-radius: 9px; padding: 9px 18px;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+    font-family: monospace; font-size: 0.75rem;
     z-index: 200; transition: transform 280ms cubic-bezier(.34,1.56,.64,1);
-    box-shadow: 0 6px 20px rgba(0,0,0,.35);
   }
   .toast.show { transform: translateX(-50%) translateY(0); }
   .toast.err { border-color: var(--red); color: var(--red); }
@@ -340,6 +295,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/theme.js"></script>
 <script>
 (function() {
   'use strict';
@@ -384,9 +340,9 @@
   // Drop zone setup
   function setupDrop(zone, input, handler) {
     zone.addEventListener('click', (e) => { if (e.target === zone || zone.contains(e.target)) input.click(); });
-    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-    zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handler(e.dataTransfer.files); });
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); handler(e.dataTransfer.files); });
     input.addEventListener('change', () => { handler(input.files); input.value = ''; });
   }
 
@@ -460,7 +416,7 @@
         card.className = 'file-card';
         const icon = document.createElement('div');
         icon.className = 'thumb';
-        icon.style.cssText = 'display:grid;place-items:center;font-family:"JetBrains Mono",monospace;font-size:0.65rem;font-weight:600;color:var(--accent);background:var(--surface-2);';
+        icon.style.cssText = 'display:grid;place-items:center;font-family:monospace;font-size:0.65rem;font-weight:600;color:var(--accent);background:var(--surface-alt);';
         icon.textContent = 'PDF';
         const info = document.createElement('div');
         info.className = 'info';
@@ -648,7 +604,7 @@
     } else {
       const icon = document.createElement('div');
       icon.className = 'thumb';
-      icon.style.cssText = 'display:grid;place-items:center;font-family:"JetBrains Mono",monospace;font-size:0.65rem;font-weight:600;color:var(--accent);background:var(--surface-2);border-radius:6px;';
+      icon.style.cssText = 'display:grid;place-items:center;font-family:monospace;font-size:0.65rem;font-weight:600;color:var(--accent);background:var(--surface-alt);border-radius:6px;';
       icon.textContent = 'PDF';
       card.appendChild(icon);
     }
@@ -683,9 +639,5 @@
   }
 })();
 </script>
-<!-- Mobile toolbar: back (mobile-only) + refresh (PWA standalone-only) -->
-<div id="mobile-toolbar"><a href="/" id="toolbar-back">← Tools</a><button id="toolbar-refresh" onclick="location.reload()">↻ Refresh</button></div>
-<style>#mobile-toolbar{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(250,250,248,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.1);padding:10px 16px;align-items:center;justify-content:space-between;font-family:Inter,system-ui,-apple-system,sans-serif}#toolbar-back{color:#7c3aed;text-decoration:none;font-size:.9rem;font-weight:500}#toolbar-refresh{display:none;background:none;border:1px solid #7c3aed;color:#7c3aed;font-size:.85rem;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:inherit}@media(max-width:768px){#mobile-toolbar{display:flex}body{padding-top:44px!important}}</style>
-<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var r=document.getElementById("toolbar-refresh");if(r)r.style.display="inline-block"}})()</script>
 </body>
 </html>

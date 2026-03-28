@@ -94,7 +94,6 @@
     align-items: center;
     gap: 16px;
     margin-bottom: 40px;
-    animation: fadeUp 0.7s ease 0.05s both;
   }
 
   .year-nav button {
@@ -143,16 +142,8 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     transition: all 0.25s ease;
-    animation: fadeUp 0.6s ease both;
     cursor: default;
   }
-
-  .basho-card:nth-child(1) { animation-delay: 0.1s; }
-  .basho-card:nth-child(2) { animation-delay: 0.15s; }
-  .basho-card:nth-child(3) { animation-delay: 0.2s; }
-  .basho-card:nth-child(4) { animation-delay: 0.25s; }
-  .basho-card:nth-child(5) { animation-delay: 0.3s; }
-  .basho-card:nth-child(6) { animation-delay: 0.35s; }
 
   .basho-card:hover {
     background: var(--surface-hover);
@@ -251,7 +242,6 @@
 
   .download-section {
     text-align: center;
-    animation: fadeUp 0.8s ease 0.45s both;
   }
 
   .download-btn {
@@ -572,9 +562,6 @@ function downloadICS() {
 // ── Init ──
 render();
 </script>
-<!-- Mobile toolbar: back (mobile-only) + refresh (PWA standalone-only) -->
-<div id="mobile-toolbar"><a href="/" id="toolbar-back">← Tools</a><button id="toolbar-refresh" onclick="location.reload()">↻ Refresh</button></div>
-<style>#mobile-toolbar{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(250,250,248,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.1);padding:10px 16px;align-items:center;justify-content:space-between;font-family:Inter,system-ui,-apple-system,sans-serif}#toolbar-back{color:#7c3aed;text-decoration:none;font-size:.9rem;font-weight:500}#toolbar-refresh{display:none;background:none;border:1px solid #7c3aed;color:#7c3aed;font-size:.85rem;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:inherit}@media(max-width:768px){#mobile-toolbar{display:flex}body{padding-top:44px!important}}</style>
-<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var r=document.getElementById("toolbar-refresh");if(r)r.style.display="inline-block"}})()</script>
+<script src="/theme.js"></script>
 </body>
 </html>

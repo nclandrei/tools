@@ -3,46 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>相撲 Sumo Day Companion</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>Sumo Day Companion</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-:root {
-  --bg: #0c0c11;
-  --surface: #15151e;
-  --surface-2: #1c1c28;
-  --surface-3: #242432;
-  --border: #2a2a3a;
-  --text: #e4e4ec;
-  --text-muted: #7a7a8e;
-  --text-dim: #55556a;
+[data-theme="light"] {
+  --gold: #9a8030;
+  --gold-dim: #6a5820;
+  --red-dim: rgba(208, 64, 64, 0.08);
+  --surface-2: var(--surface-alt);
+  --surface-3: var(--border);
+  --east-bg: #f5f0f8;
+  --west-bg: #f0f5f8;
+  --reveal-bg: #f5f5e8;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font-jp: 'Noto Sans JP', sans-serif;
+}
+
+[data-theme="dark"] {
   --gold: #c9a84c;
   --gold-dim: #8a7235;
-  --red: #d04040;
   --red-dim: #3a1818;
-  --green: #3aa86a;
-  --blue: #4a8ad4;
+  --surface-2: #232326;
+  --surface-3: #2e2e32;
   --east-bg: #1a1520;
   --west-bg: #151a20;
   --reveal-bg: #1a1a10;
   --radius: 10px;
   --radius-sm: 6px;
-  --font: 'Inter', system-ui, -apple-system, sans-serif;
   --font-jp: 'Noto Sans JP', sans-serif;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
 html {
-  font-family: var(--font);
   font-size: 15px;
-  background: var(--bg);
-  color: var(--text);
-  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  min-height: 100vh;
   padding-bottom: 4rem;
 }
 
@@ -54,6 +52,7 @@ header {
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   padding: 0.75rem 1rem;
+  margin-bottom: 0;
 }
 
 .header-row {
@@ -81,7 +80,7 @@ header {
 }
 
 select, button {
-  font-family: var(--font);
+  font-family: inherit;
   font-size: 0.8rem;
   background: var(--surface-2);
   color: var(--text);
@@ -90,10 +89,11 @@ select, button {
   padding: 0.4rem 0.6rem;
   cursor: pointer;
   transition: border-color 0.15s;
+  outline: none;
 }
 
 select:hover, button:hover { border-color: var(--gold-dim); }
-select:focus, button:focus { outline: none; border-color: var(--gold); }
+select:focus, button:focus { border-color: var(--gold); }
 
 .day-nav {
   display: flex;
@@ -153,7 +153,7 @@ select:focus, button:focus { outline: none; border-color: var(--gold); }
 
 .progress-text {
   font-size: 0.7rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -168,12 +168,12 @@ select:focus, button:focus { outline: none; border-color: var(--gold); }
   padding: 0.2rem 0.5rem;
   background: transparent;
   border-color: var(--border);
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 .progress-actions button:hover {
   color: var(--text-muted);
-  border-color: var(--text-dim);
+  border-color: var(--text-muted);
 }
 
 /* === MAIN === */
@@ -243,7 +243,7 @@ main {
   top: 0.4rem;
   left: 0.55rem;
   font-size: 0.55rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -270,7 +270,7 @@ main {
 .rikishi-name-jp {
   font-family: var(--font-jp);
   font-size: 0.7rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-weight: 400;
 }
 
@@ -283,7 +283,7 @@ main {
 .vs-badge {
   font-size: 0.65rem;
   font-weight: 700;
-  color: var(--text-dim);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -324,7 +324,7 @@ main {
 
 .result-hidden .label {
   font-size: 0.75rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-weight: 500;
 }
 
@@ -361,7 +361,7 @@ main {
   padding: 0.2rem 0.45rem;
   background: transparent;
   border: 1px solid var(--border);
-  color: var(--text-dim);
+  color: var(--text-muted);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
@@ -391,7 +391,7 @@ main {
   text-align: center;
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--text-dim);
+  color: var(--text-muted);
   cursor: pointer;
   border: none;
   background: none;
@@ -411,7 +411,7 @@ main {
 .detail-panel .loading {
   text-align: center;
   padding: 1.5rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-size: 0.8rem;
 }
 
@@ -426,7 +426,7 @@ main {
 .compare-grid .label {
   text-align: center;
   font-size: 0.65rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -441,7 +441,7 @@ main {
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-weight: 700;
   margin: 0.75rem 0 0.4rem;
   padding-bottom: 0.25rem;
@@ -536,11 +536,11 @@ main {
 }
 
 .h2h-score.leading { color: var(--gold); }
-.h2h-score.trailing { color: var(--text-dim); }
+.h2h-score.trailing { color: var(--text-muted); }
 
 .h2h-vs {
   font-size: 0.65rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-weight: 600;
 }
 
@@ -577,7 +577,7 @@ main {
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-weight: 700;
   margin-bottom: 0.35rem;
 }
@@ -592,7 +592,7 @@ main {
 }
 
 .recent-bout:last-child { border-bottom: none; }
-.recent-bout .basho { color: var(--text-dim); }
+.recent-bout .basho { color: var(--text-muted); }
 .recent-bout .winner { font-weight: 600; }
 .recent-bout .technique { color: var(--text-muted); font-style: italic; }
 
@@ -616,7 +616,7 @@ main {
 /* === KIMARITE TOOLTIP === */
 .kimarite-info {
   font-size: 0.7rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   margin-left: 0.25rem;
 }
 
@@ -631,7 +631,7 @@ main {
 }
 
 .basho-info .location { font-size: 0.8rem; color: var(--text-muted); }
-.basho-info .dates { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.15rem; }
+.basho-info .dates { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
 
 /* === DIVISION TABS === */
 .division-tabs {
@@ -646,7 +646,7 @@ main {
   padding: 0.3rem 0.6rem;
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--text-dim);
+  color: var(--text-muted);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -654,7 +654,7 @@ main {
   transition: all 0.15s;
 }
 
-.division-tab:hover { color: var(--text-muted); border-color: var(--text-dim); }
+.division-tab:hover { color: var(--text-muted); border-color: var(--text-muted); }
 .division-tab.active { color: var(--gold); border-color: var(--gold-dim); background: var(--surface-2); }
 
 /* === RESPONSIVE === */
@@ -675,6 +675,7 @@ main {
 <header>
   <div class="header-row">
     <div class="logo"><span class="jp">相撲</span> Sumo Day</div>
+    <a href="/" style="color:var(--text-muted);text-decoration:none;font-size:0.75rem;margin-left:0.25rem">&#8592;</a>
     <div class="controls">
       <select id="basho-select"></select>
       <div class="day-nav">
@@ -1122,7 +1123,7 @@ function renderDetailTabs(bout, matchId, activeTab) {
       `).join('')}
     </div>
     <div class="detail-panel" id="panel-${matchId}">
-      ${activeTab ? '<div class="loading"><div class="spinner"></div> Loading...</div>' : '<div class="loading" style="color:var(--text-dim)">Select a tab above to explore</div>'}
+      ${activeTab ? '<div class="loading"><div class="spinner"></div> Loading...</div>' : '<div class="loading" style="color:var(--text-muted)">Select a tab above to explore</div>'}
     </div>
   `;
 }
@@ -1678,9 +1679,6 @@ async function boot() {
 
 boot();
 </script>
-<!-- Mobile toolbar: back (mobile-only) + refresh (PWA standalone-only) -->
-<div id="mobile-toolbar"><a href="/" id="toolbar-back">← Tools</a><button id="toolbar-refresh" onclick="location.reload()">↻ Refresh</button></div>
-<style>#mobile-toolbar{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(250,250,248,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.1);padding:10px 16px;align-items:center;justify-content:space-between;font-family:Inter,system-ui,-apple-system,sans-serif}#toolbar-back{color:#7c3aed;text-decoration:none;font-size:.9rem;font-weight:500}#toolbar-refresh{display:none;background:none;border:1px solid #7c3aed;color:#7c3aed;font-size:.85rem;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:inherit}@media(max-width:768px){#mobile-toolbar{display:flex}body{padding-top:44px!important}}</style>
-<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var r=document.getElementById("toolbar-refresh");if(r)r.style.display="inline-block"}})()</script>
+<script src="/theme.js"></script>
 </body>
 </html>

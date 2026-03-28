@@ -5,59 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Regex Tester</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  :root {
-    --bg: #1a1a1e;
-    --surface: #24242a;
-    --border: #35353d;
-    --text: #e0e0e4;
-    --text-dim: #8888a0;
-    --accent: #e8c44a;
-    --accent-dim: #e8c44a22;
-    --green: #5caa6c;
-    --red: #c45c5c;
-    --blue: #5c8ec4;
-    --orange: #d49a5a;
-    --pink: #c45c8e;
-    --cyan: #5cbcaa;
-  }
-
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 2rem 1rem;
-    min-height: 100vh;
-    min-height: 100dvh;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  .container {
-    max-width: 640px;
-    margin: 0 auto;
-  }
-
-  h1 {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 0.25rem;
-  }
-
-  .subtitle {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    margin-bottom: 2rem;
-  }
-
   label {
     display: block;
     font-family: 'JetBrains Mono', monospace;
@@ -65,7 +16,7 @@
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 0.4rem;
   }
 
@@ -83,7 +34,6 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     overflow: hidden;
-    transition: border-color 0.15s;
   }
 
   .regex-input-wrap:focus-within {
@@ -97,7 +47,7 @@
   .regex-slash {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.95rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     padding: 0 0 0 0.75rem;
     user-select: none;
   }
@@ -122,14 +72,13 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.8rem;
     font-weight: 600;
     width: 2rem;
     height: 2.4rem;
     cursor: pointer;
-    transition: all 0.1s;
   }
 
   .flag-btn.active {
@@ -159,7 +108,6 @@
     padding: 0.75rem;
     resize: vertical;
     outline: none;
-    transition: border-color 0.15s;
     margin-bottom: 1.5rem;
   }
 
@@ -184,7 +132,7 @@
   }
 
   .match-highlight mark {
-    background: #e8c44a33;
+    background: var(--accent-dim);
     color: var(--accent);
     border-radius: 2px;
     padding: 0 1px;
@@ -192,7 +140,7 @@
   }
 
   .match-highlight mark:nth-of-type(even) {
-    background: #5c8ec433;
+    background: var(--blue-dim);
     color: var(--blue);
     border-bottom-color: var(--blue);
   }
@@ -204,9 +152,8 @@
   }
 
   .empty-state {
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-style: italic;
-    font-family: 'DM Sans', sans-serif;
     font-size: 0.8rem;
   }
 
@@ -219,7 +166,7 @@
   .stat {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.75rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
   .stat strong {
@@ -237,7 +184,7 @@
 
   .match-table th {
     text-align: left;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-weight: 600;
     font-size: 0.68rem;
     letter-spacing: 0.04em;
@@ -266,7 +213,7 @@
   }
 
   .match-table .match-range {
-    color: var(--text-dim);
+    color: var(--text-muted);
     white-space: nowrap;
   }
 
@@ -277,7 +224,7 @@
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 0.6rem;
     display: flex;
     align-items: center;
@@ -316,7 +263,7 @@
   }
 
   .token .token-desc {
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-size: 0.78rem;
   }
 
@@ -341,7 +288,7 @@
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 0.35rem;
   }
 
@@ -364,14 +311,17 @@
   }
 
   .cheat-group td:last-child {
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>Regex Tester</h1>
-  <p class="subtitle">Live matching, explanation, and cheat sheet</p>
+  <header>
+    <h1>Regex Tester</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
+  <p class="desc">Live matching, explanation, and cheat sheet</p>
 
   <label for="regex-input">Pattern</label>
   <div class="regex-row">
@@ -480,6 +430,7 @@
   </div>
 </div>
 
+<script src="/theme.js"></script>
 <script>
 const regexInput = document.getElementById('regex-input');
 const testString = document.getElementById('test-string');
@@ -802,9 +753,5 @@ document.addEventListener('keydown', (e) => {
 
 update();
 </script>
-<!-- Mobile toolbar: back (mobile-only) + refresh (PWA standalone-only) -->
-<div id="mobile-toolbar"><a href="/" id="toolbar-back">← Tools</a><button id="toolbar-refresh" onclick="location.reload()">↻ Refresh</button></div>
-<style>#mobile-toolbar{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(250,250,248,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.1);padding:10px 16px;align-items:center;justify-content:space-between;font-family:Inter,system-ui,-apple-system,sans-serif}#toolbar-back{color:#7c3aed;text-decoration:none;font-size:.9rem;font-weight:500}#toolbar-refresh{display:none;background:none;border:1px solid #7c3aed;color:#7c3aed;font-size:.85rem;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:inherit}@media(max-width:768px){#mobile-toolbar{display:flex}body{padding-top:44px!important}}</style>
-<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var r=document.getElementById("toolbar-refresh");if(r)r.style.display="inline-block"}})()</script>
 </body>
 </html>

@@ -4,406 +4,337 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SQL Formatter</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <script src="https://cdn.jsdelivr.net/npm/sql-formatter@15.4.5/dist/sql-formatter.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
-  --bg: #0e0f11;
-  --surface: #16181c;
-  --surface-2: #1e2027;
-  --surface-3: #262830;
-  --border: #2a2d36;
-  --border-hover: #3d4150;
-  --text: #e8e9ed;
-  --text-dim: #8b8f9e;
-  --text-faint: #555968;
-  --accent: #4a9eed;
-  --accent-glow: rgba(74, 158, 237, 0.12);
-  --accent-dim: #3578b9;
-  --green: #5cb87a;
-  --green-glow: rgba(92, 184, 122, 0.12);
-  --orange: #e09a3a;
-  --error: #d4504c;
-  --error-glow: rgba(212, 80, 76, 0.12);
-  --radius: 8px;
-  --radius-lg: 12px;
-  --mono: 'DM Mono', 'SF Mono', 'Fira Code', monospace;
-  --sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --transition: 150ms ease;
-}
-
-html, body {
-  height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--sans);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-
-.app {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 16px;
-}
-
-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 0 16px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 20px;
-}
-
-.logo-icon {
-  width: 30px; height: 30px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
-  display: grid; place-items: center; flex-shrink: 0;
-}
-.logo-icon svg { width: 16px; height: 16px; }
-
-header h1 {
-  font-size: 16px; font-weight: 700;
-  letter-spacing: -0.02em;
-}
-header h1 span {
-  color: var(--text-dim); font-weight: 400;
-  font-size: 13px; margin-left: 6px;
-  font-family: var(--mono);
-}
-
-.controls {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.format-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.format-group label {
-  font-size: 12px;
-  color: var(--text-dim);
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.format-select {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 7px 12px;
-  font-family: var(--mono);
-  font-size: 13px;
-  cursor: pointer;
-  transition: border-color var(--transition);
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8f9e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  padding-right: 28px;
-}
-
-.format-select:hover { border-color: var(--border-hover); }
-.format-select:focus { border-color: var(--accent); outline: none; }
-
-.action-btns {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.btn {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: 12px;
-  padding: 7px 14px;
-  cursor: pointer;
-  transition: all var(--transition);
-  white-space: nowrap;
-}
-.btn:hover { border-color: var(--border-hover); color: var(--text); }
-
-.btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  font-weight: 500;
-}
-.btn-primary:hover { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
-
-.panels {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
-}
-
-.panel {
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  min-height: 400px;
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-}
-
-.panel-label {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.panel-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.icon-btn {
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  color: var(--text-faint);
-  width: 28px; height: 28px;
-  display: grid; place-items: center;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-.icon-btn:hover { color: var(--text); border-color: var(--border); background: var(--surface-3); }
-.icon-btn svg { width: 14px; height: 14px; }
-
-textarea {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.6;
-  padding: 14px;
-  resize: none;
-  outline: none;
-  tab-size: 2;
-}
-
-textarea::placeholder { color: var(--text-faint); }
-
-.output-area {
-  flex: 1;
-  padding: 14px;
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.6;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: var(--text);
-  user-select: text;
-}
-
-.status-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
-  margin-top: 12px;
-  border-top: 1px solid var(--border);
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--text-faint);
-}
-
-.status-msg { display: flex; align-items: center; gap: 6px; }
-.status-msg.error { color: var(--error); }
-.status-msg.success { color: var(--green); }
-.status-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--text-faint);
-}
-.status-msg.error .status-dot { background: var(--error); }
-.status-msg.success .status-dot { background: var(--green); }
-
-.panel.has-error { border-color: var(--error); }
-
-.settings-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.setting {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.setting input[type="number"] {
-  width: 48px;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 5px 8px;
-  font-family: var(--mono);
-  font-size: 12px;
-  outline: none;
-  transition: border-color var(--transition);
-}
-.setting input[type="number"]:focus { border-color: var(--accent); }
-
-.setting input[type="checkbox"] {
-  accent-color: var(--accent);
-}
-
-@media (max-width: 700px) {
-  .panels {
-    grid-template-columns: 1fr;
+  .container {
+    max-width: 1100px;
   }
-  .panel { min-height: 280px; }
-  .controls { gap: 8px; }
-  .action-btns { margin-left: 0; width: 100%; }
-  .action-btns .btn { flex: 1; text-align: center; }
-}
+
+  .app {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .format-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .format-group label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .format-select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-family: monospace;
+    font-size: 13px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8f9e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 28px;
+  }
+
+  .format-select:hover { border-color: var(--border-hover); }
+  .format-select:focus { border-color: var(--accent); outline: none; }
+
+  .action-btns {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-family: monospace;
+    font-size: 12px;
+    padding: 7px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--border-hover); color: var(--text); }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 500;
+  }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 400px;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-alt);
+  }
+
+  .panel-label {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .panel-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .icon-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--text-muted);
+    width: 28px; height: 28px;
+    display: grid; place-items: center;
+    cursor: pointer;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--border); background: var(--surface-alt); }
+  .icon-btn svg { width: 14px; height: 14px; }
+
+  textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 14px;
+    resize: none;
+    outline: none;
+    tab-size: 2;
+  }
+
+  textarea::placeholder { color: var(--text-muted); }
+
+  .output-area {
+    flex: 1;
+    padding: 14px;
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+    user-select: text;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .status-msg { display: flex; align-items: center; gap: 6px; }
+  .status-msg.error { color: var(--red); }
+  .status-msg.success { color: var(--green); }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+  .status-msg.error .status-dot { background: var(--red); }
+  .status-msg.success .status-dot { background: var(--green); }
+
+  .panel.has-error { border-color: var(--red); }
+
+  .settings-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .setting {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .setting input[type="number"] {
+    width: 48px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    outline: none;
+  }
+  .setting input[type="number"]:focus { border-color: var(--accent); }
+
+  .setting input[type="checkbox"] {
+    accent-color: var(--accent);
+  }
+
+  @media (max-width: 700px) {
+    .panels {
+      grid-template-columns: 1fr;
+    }
+    .panel { min-height: 280px; }
+    .controls { gap: 8px; }
+    .action-btns { margin-left: 0; width: 100%; }
+    .action-btns .btn { flex: 1; text-align: center; }
+  }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="container">
   <header>
-    <div class="logo-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <ellipse cx="12" cy="5" rx="9" ry="3"/>
-        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-      </svg>
-    </div>
-    <h1>SQL Formatter <span>prettify · minify</span></h1>
+    <h1>SQL Formatter</h1>
+    <a href="/">&larr; all tools</a>
   </header>
 
-  <div class="controls">
-    <div class="format-group">
-      <label>Dialect</label>
-      <select id="dialect" class="format-select">
-        <option value="postgresql">PostgreSQL</option>
-        <option value="sql">Standard SQL</option>
-        <option value="mysql">MySQL</option>
-        <option value="mariadb">MariaDB</option>
-        <option value="transactsql">T-SQL</option>
-        <option value="plsql">PL/SQL</option>
-        <option value="sqlite">SQLite</option>
-        <option value="bigquery">BigQuery</option>
-        <option value="spark">Spark SQL</option>
-      </select>
-    </div>
-
-    <div class="settings-row">
-      <div class="setting">
-        <label for="indentSize">Indent</label>
-        <input type="number" id="indentSize" value="2" min="1" max="8">
+  <div class="app">
+    <div class="controls">
+      <div class="format-group">
+        <label>Dialect</label>
+        <select id="dialect" class="format-select">
+          <option value="postgresql">PostgreSQL</option>
+          <option value="sql">Standard SQL</option>
+          <option value="mysql">MySQL</option>
+          <option value="mariadb">MariaDB</option>
+          <option value="transactsql">T-SQL</option>
+          <option value="plsql">PL/SQL</option>
+          <option value="sqlite">SQLite</option>
+          <option value="bigquery">BigQuery</option>
+          <option value="spark">Spark SQL</option>
+        </select>
       </div>
-      <div class="setting">
-        <label for="uppercase">
-          <input type="checkbox" id="uppercase" checked>
-          Uppercase keywords
-        </label>
-      </div>
-    </div>
 
-    <div class="action-btns">
-      <button class="btn" id="minifyBtn">Minify</button>
-      <button class="btn btn-primary" id="formatBtn">Format</button>
-    </div>
-  </div>
-
-  <div class="panels">
-    <div class="panel" id="inputPanel">
-      <div class="panel-header">
-        <span class="panel-label">Input</span>
-        <div class="panel-actions">
-          <button class="icon-btn" id="pasteBtn" title="Paste from clipboard">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-            </svg>
-          </button>
-          <button class="icon-btn" id="clearBtn" title="Clear input">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
+      <div class="settings-row">
+        <div class="setting">
+          <label for="indentSize">Indent</label>
+          <input type="number" id="indentSize" value="2" min="1" max="8">
+        </div>
+        <div class="setting">
+          <label for="uppercase">
+            <input type="checkbox" id="uppercase" checked>
+            Uppercase keywords
+          </label>
         </div>
       </div>
-      <textarea id="inputText" placeholder="Paste your SQL query here..." spellcheck="false"></textarea>
-    </div>
 
-    <div class="panel" id="outputPanel">
-      <div class="panel-header">
-        <span class="panel-label">Output</span>
-        <div class="panel-actions">
-          <button class="icon-btn" id="copyBtn" title="Copy output">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-          </button>
-          <button class="icon-btn" id="downloadBtn" title="Download output">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-          </button>
-        </div>
+      <div class="action-btns">
+        <button class="btn" id="minifyBtn">Minify</button>
+        <button class="btn btn-primary" id="formatBtn">Format</button>
       </div>
-      <div class="output-area" id="outputText"></div>
     </div>
-  </div>
 
-  <div class="status-bar">
-    <div class="status-msg" id="statusMsg">
-      <div class="status-dot"></div>
-      <span>Ready</span>
+    <div class="panels">
+      <div class="panel" id="inputPanel">
+        <div class="panel-header">
+          <span class="panel-label">Input</span>
+          <div class="panel-actions">
+            <button class="icon-btn" id="pasteBtn" title="Paste from clipboard">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+              </svg>
+            </button>
+            <button class="icon-btn" id="clearBtn" title="Clear input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <textarea id="inputText" placeholder="Paste your SQL query here..." spellcheck="false"></textarea>
+      </div>
+
+      <div class="panel" id="outputPanel">
+        <div class="panel-header">
+          <span class="panel-label">Output</span>
+          <div class="panel-actions">
+            <button class="icon-btn" id="copyBtn" title="Copy output">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+            <button class="icon-btn" id="downloadBtn" title="Download output">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="output-area" id="outputText"></div>
+      </div>
     </div>
-    <span id="sizeInfo"></span>
+
+    <div class="status-bar">
+      <div class="status-msg" id="statusMsg">
+        <div class="status-dot"></div>
+        <span>Ready</span>
+      </div>
+      <span id="sizeInfo"></span>
+    </div>
   </div>
 </div>
 
+<script src="/theme.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const inputText = $('#inputText');
@@ -565,9 +496,5 @@ document.addEventListener('keydown', (e) => {
   }
 });
 </script>
-<!-- Mobile toolbar: back (mobile-only) + refresh (PWA standalone-only) -->
-<div id="mobile-toolbar"><a href="/" id="toolbar-back">← Tools</a><button id="toolbar-refresh" onclick="location.reload()">↻ Refresh</button></div>
-<style>#mobile-toolbar{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(250,250,248,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.1);padding:10px 16px;align-items:center;justify-content:space-between;font-family:Inter,system-ui,-apple-system,sans-serif}#toolbar-back{color:#7c3aed;text-decoration:none;font-size:.9rem;font-weight:500}#toolbar-refresh{display:none;background:none;border:1px solid #7c3aed;color:#7c3aed;font-size:.85rem;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:inherit}@media(max-width:768px){#mobile-toolbar{display:flex}body{padding-top:44px!important}}</style>
-<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var r=document.getElementById("toolbar-refresh");if(r)r.style.display="inline-block"}})()</script>
 </body>
 </html>

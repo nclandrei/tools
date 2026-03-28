@@ -4,13 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Wanderlog — Travel Guide Aggregator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
+[data-theme="light"] {
   --paper: #f7f3eb;
   --paper-dark: #ede7d9;
   --ink: #1a1612;
@@ -22,7 +22,19 @@
   --radius: 10px;
 }
 
-html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--ink); color: var(--ink); overflow: hidden; }
+[data-theme="dark"] {
+  --paper: #1c1c1e;
+  --paper-dark: #2a2a2c;
+  --ink: #e4e4e7;
+  --ink-mid: #aaa;
+  --ink-light: #777;
+  --accent: #e8714f;
+  --accent-glow: #ff8c6a;
+  --green: #34d399;
+  --radius: 10px;
+}
+
+html, body { height: 100%; font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--ink); overflow: hidden; }
 
 /* ─── LANDING ─── */
 #landing {
@@ -32,15 +44,6 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   transition: opacity 0.5s ease, transform 0.5s ease;
 }
 #landing.hidden { opacity: 0; pointer-events: none; transform: scale(1.02); }
-
-#landing::before {
-  content: '';
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(ellipse at 20% 50%, rgba(196,90,60,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 30%, rgba(58,125,92,0.05) 0%, transparent 50%);
-  pointer-events: none;
-}
 
 .landing-inner {
   position: relative; width: 100%; max-width: 480px; padding: 2rem;
@@ -54,16 +57,14 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 .compass svg { width: 100%; height: 100%; }
 
 .brand {
-  font-family: 'Playfair Display', serif;
-  font-size: 3rem; font-weight: 700; letter-spacing: -0.02em;
+  font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em;
   color: var(--ink); margin-bottom: 0.2rem;
 }
 .brand span { color: var(--accent); }
 
 .tagline {
   font-size: 0.95rem; color: var(--ink-light);
-  margin-bottom: 2.2rem; font-style: italic;
-  font-family: 'Playfair Display', serif;
+  margin-bottom: 2.2rem;
 }
 
 .search-wrap {
@@ -73,7 +74,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   flex: 1; padding: 0.8rem 1rem;
   border: 1.5px solid var(--paper-dark);
   border-radius: var(--radius);
-  background: #fff; font-size: 1rem;
+  background: var(--paper); font-size: 1rem;
   font-family: inherit; color: var(--ink);
   outline: none; transition: border-color 0.2s;
 }
@@ -108,7 +109,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 /* ─── LOADING OVERLAY ─── */
 #loading-overlay {
   position: fixed; inset: 0; z-index: 2000;
-  background: rgba(247,243,235,0.96);
+  background: var(--paper);
   display: none; align-items: center; justify-content: center;
   flex-direction: column; gap: 1rem;
 }
@@ -124,7 +125,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .loading-text {
-  font-family: 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 1.05rem; color: var(--ink-mid);
   font-style: italic;
   transition: opacity 0.3s;
@@ -144,20 +145,20 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   position: absolute; top: 0; left: 0; right: 0; z-index: 800;
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.7rem 1rem;
-  background: linear-gradient(to bottom, rgba(247,243,235,0.97) 60%, transparent);
+  background: linear-gradient(to bottom, var(--paper) 60%, transparent);
   pointer-events: none;
 }
 .top-bar > * { pointer-events: auto; }
 
 .top-brand {
-  font-family: 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 1.2rem; font-weight: 700;
   color: var(--ink); white-space: nowrap;
 }
 .top-brand span { color: var(--accent); }
 
 .city-title {
-  font-family: 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 0.95rem; color: var(--ink-mid);
   font-style: italic; flex: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -206,7 +207,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 }
 .sidebar-header-text { flex: 1; }
 .sidebar-header h2 {
-  font-family: 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 1.25rem; font-weight: 700;
   color: var(--ink); line-height: 1.2;
 }
@@ -223,7 +224,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   display: flex; align-items: center; justify-content: center;
   transition: background 0.2s; margin-top: 2px;
 }
-.btn-close:hover { background: #ddd5c7; }
+.btn-close:hover { background: var(--paper-dark); }
 .btn-close svg { width: 14px; height: 14px; stroke: var(--ink-mid); stroke-width: 2.5; }
 
 .sidebar-body {
@@ -232,7 +233,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 
 .fact-section { margin-bottom: 1.4rem; }
 .fact-section h3 {
-  font-family: 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 0.85rem; font-weight: 700; color: var(--accent);
   text-transform: uppercase; letter-spacing: 0.06em;
   margin-bottom: 0.5rem;
@@ -299,7 +300,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   display: flex; align-items: center; justify-content: center;
   font-size: 0.7rem; font-weight: 700;
-  font-family: 'DM Sans', sans-serif;
+  font-family: inherit;
 }
 
 /* tier colors */
@@ -348,7 +349,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 .cat-chip {
   padding: 0.4rem 0.9rem;
   border: 1.5px solid var(--paper-dark);
-  border-radius: 20px; background: #fff;
+  border-radius: 20px; background: var(--paper);
   font-size: 0.78rem; font-weight: 600; font-family: inherit;
   color: var(--ink-light); cursor: pointer;
   transition: all 0.2s; user-select: none;
@@ -381,7 +382,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 /* legend on map */
 .map-legend {
   position: absolute; bottom: 2rem; left: 0.75rem; z-index: 800;
-  background: rgba(247,243,235,0.94); border-radius: 8px;
+  background: var(--paper); border-radius: 8px;
   padding: 0.55rem 0.75rem; font-size: 0.7rem;
   box-shadow: 0 2px 12px rgba(0,0,0,0.1);
   display: flex; flex-direction: column; gap: 0.3rem;
@@ -428,7 +429,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   display: flex; align-items: center; justify-content: space-between;
 }
 .panel-header h2 {
-  font-family: 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 1.15rem; font-weight: 700; color: var(--ink);
 }
 .panel-body {
@@ -448,7 +449,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 .research-link {
   display: flex; align-items: center; gap: 0.5rem;
   padding: 0.55rem 0.75rem; margin-bottom: 0.35rem;
-  background: #fff; border: 1px solid var(--paper-dark);
+  background: var(--paper); border: 1px solid var(--paper-dark);
   border-radius: 8px; text-decoration: none;
   color: var(--ink); font-size: 0.82rem; font-weight: 500;
   transition: border-color 0.2s, background 0.2s;
@@ -473,7 +474,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   padding: 0.55rem 0.75rem;
   border: 1.5px solid var(--paper-dark);
   border-radius: 8px; font-family: inherit; font-size: 0.85rem;
-  color: var(--ink); background: #fff; outline: none;
+  color: var(--ink); background: var(--paper); outline: none;
   transition: border-color 0.2s;
 }
 .add-place-form input:focus, .add-place-form select:focus, .add-place-form textarea:focus {
@@ -514,7 +515,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   display: flex; align-items: center; justify-content: center;
   transition: background 0.2s;
 }
-.saved-place-actions button:hover { background: #ddd5c7; }
+.saved-place-actions button:hover { background: var(--paper-dark); }
 
 .btn-route {
   display: flex; align-items: center; justify-content: center; gap: 0.4rem;
@@ -1954,9 +1955,6 @@ $('city-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') generate();
 });
 </script>
-<!-- Mobile toolbar: back (mobile-only) + refresh (PWA standalone-only) -->
-<div id="mobile-toolbar"><a href="/" id="toolbar-back">← Tools</a><button id="toolbar-refresh" onclick="location.reload()">↻ Refresh</button></div>
-<style>#mobile-toolbar{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(250,250,248,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.1);padding:10px 16px;align-items:center;justify-content:space-between;font-family:Inter,system-ui,-apple-system,sans-serif}#toolbar-back{color:#7c3aed;text-decoration:none;font-size:.9rem;font-weight:500}#toolbar-refresh{display:none;background:none;border:1px solid #7c3aed;color:#7c3aed;font-size:.85rem;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:inherit}@media(max-width:768px){#mobile-toolbar{display:flex}body{padding-top:44px!important}}</style>
-<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var r=document.getElementById("toolbar-refresh");if(r)r.style.display="inline-block"}})()</script>
+<script src="/theme.js"></script>
 </body>
 </html>

@@ -4,22 +4,34 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Apple Health Explorer</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  :root {
-    --bg-primary: #08090d;
-    --bg-secondary: #10121a;
-    --bg-card: #161822;
-    --bg-card-hover: #1c1f2e;
-    --border: #252838;
-    --border-active: #3a3f5a;
-    --text-primary: #e8eaf0;
-    --text-secondary: #8b8fa8;
-    --text-muted: #555872;
+  [data-theme="light"] {
+    --accent-weight: #0d9488;
+    --accent-training: #c2410c;
+    --accent-steps: #0d9488;
+    --accent-correlation: #7c3aed;
+    --accent-danger: #dc2626;
+    --accent-weight-dim: rgba(13,148,136,0.1);
+    --accent-training-dim: rgba(194,65,12,0.1);
+    --accent-steps-dim: rgba(13,148,136,0.1);
+    --accent-correlation-dim: rgba(124,58,237,0.1);
+    --accent-hr: #dc2626;
+    --accent-hr-dim: rgba(220,38,38,0.1);
+    --accent-sleep: #4f46e5;
+    --accent-sleep-dim: rgba(79,70,229,0.1);
+    --bg-card: var(--surface);
+    --bg-card-hover: var(--surface-alt);
+    --border-active: var(--border-hover);
+    --text-secondary: var(--text-muted);
+  }
+
+  [data-theme="dark"] {
     --accent-weight: #00d4aa;
     --accent-training: #ff6b35;
     --accent-steps: #4ecdc4;
@@ -33,19 +45,13 @@
     --accent-hr-dim: rgba(239,68,68,0.15);
     --accent-sleep: #6366f1;
     --accent-sleep-dim: rgba(99,102,241,0.15);
+    --bg-card: #1c1c1e;
+    --bg-card-hover: #232326;
+    --border-active: #444;
+    --text-secondary: #888;
   }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: 'Outfit', sans-serif;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  .mono { font-family: 'JetBrains Mono', monospace; }
+  .mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
 
   /* Upload Screen */
   #upload-screen {
@@ -56,16 +62,6 @@
     min-height: 100vh;
     padding: 2rem;
     position: relative;
-  }
-
-  #upload-screen::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background:
-      radial-gradient(ellipse 600px 400px at 30% 20%, rgba(0,212,170,0.04), transparent),
-      radial-gradient(ellipse 500px 500px at 70% 70%, rgba(168,85,247,0.03), transparent);
-    pointer-events: none;
   }
 
   .upload-brand {
@@ -79,24 +75,21 @@
 
   .upload-title {
     font-size: clamp(2rem, 5vw, 3.5rem);
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: -0.03em;
     margin-bottom: 1.5rem;
-    background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
   }
 
   .dropzone {
     width: 100%;
     max-width: 520px;
     border: 2px dashed var(--border);
-    border-radius: 16px;
+    border-radius: 12px;
     padding: 3rem 2rem;
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s ease;
-    background: var(--bg-secondary);
+    transition: all 0.2s;
+    background: var(--surface);
     position: relative;
     z-index: 1;
   }
@@ -112,8 +105,8 @@
     opacity: 0.6;
   }
 
-  .dropzone-text { color: var(--text-secondary); font-size: 0.95rem; }
-  .dropzone-text strong { color: var(--text-primary); }
+  .dropzone-text { color: var(--text-muted); font-size: 0.95rem; }
+  .dropzone-text strong { color: var(--text); }
 
   #progress-container {
     display: none;
@@ -143,7 +136,7 @@
   .progress-text {
     margin-top: 0.5rem;
     font-size: 0.8rem;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     text-align: center;
   }
 
@@ -160,7 +153,7 @@
     justify-content: space-between;
     padding: 0.75rem 1.5rem;
     border-bottom: 1px solid var(--border);
-    background: var(--bg-secondary);
+    background: var(--surface);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -176,29 +169,29 @@
     display: flex;
     gap: 1.5rem;
     font-size: 0.78rem;
-    color: var(--text-secondary);
+    color: var(--text-muted);
   }
 
   .topbar-stats span strong {
-    color: var(--text-primary);
+    color: var(--text);
     font-weight: 600;
   }
 
   .topbar-reload {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    color: var(--text-secondary);
+    color: var(--text-muted);
     font-size: 0.78rem;
     padding: 0.35rem 0.85rem;
     border-radius: 6px;
     cursor: pointer;
-    font-family: 'Outfit', sans-serif;
+    font-family: inherit;
     transition: all 0.2s;
   }
 
   .topbar-reload:hover {
     background: var(--bg-card-hover);
-    color: var(--text-primary);
+    color: var(--text);
   }
 
   /* Tabs */
@@ -206,13 +199,13 @@
     display: flex;
     gap: 0;
     border-bottom: 1px solid var(--border);
-    background: var(--bg-secondary);
+    background: var(--surface);
     padding: 0 1.5rem;
     overflow-x: auto;
   }
 
   .tab-btn {
-    font-family: 'Outfit', sans-serif;
+    font-family: inherit;
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--text-muted);
@@ -228,7 +221,7 @@
   .tab-btn:hover { color: var(--text-secondary); }
 
   .tab-btn.active {
-    color: var(--text-primary);
+    color: var(--text);
     border-bottom-color: var(--accent-weight);
   }
 
@@ -289,7 +282,7 @@
   }
 
   .stat-card {
-    background: var(--bg-secondary);
+    background: var(--surface-alt);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 1rem;
@@ -304,14 +297,14 @@
   }
 
   .stat-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
     font-size: 1.35rem;
     font-weight: 600;
   }
 
   .stat-detail {
     font-size: 0.75rem;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     margin-top: 0.2rem;
   }
 
@@ -346,7 +339,7 @@
     width: 14px;
     height: 14px;
     border-radius: 3px;
-    background: var(--bg-secondary);
+    background: var(--surface-alt);
     transition: background 0.2s;
   }
 
@@ -433,10 +426,10 @@
   }
 
   select, input[type="date"] {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
     font-size: 0.8rem;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
+    background: var(--surface-alt);
+    color: var(--text);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.45rem 0.75rem;
@@ -455,7 +448,7 @@
 
   label.control-label {
     font-size: 0.78rem;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -472,7 +465,6 @@
     pointer-events: none;
     z-index: 1000;
     display: none;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
   }
 
   .tooltip-title {
@@ -481,7 +473,7 @@
   }
 
   .tooltip-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
     color: var(--accent-steps);
   }
 
@@ -497,15 +489,10 @@
   /* Responsive */
   @media (max-width: 768px) {
     .topbar-stats { display: none; }
+    .tab-btn { padding: 0.75rem 0.85rem; font-size: 0.8rem; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .chart-container { height: 250px; }
   }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: var(--bg-primary); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--border-active); }
 
   /* Animation */
   @keyframes fadeIn {
@@ -625,7 +612,7 @@
         </div>
         <div class="heatmap-legend">
           <span>Less</span>
-          <div class="heatmap-legend-cell" style="background:var(--bg-secondary)"></div>
+          <div class="heatmap-legend-cell" style="background:var(--surface-alt)"></div>
           <div class="heatmap-legend-cell" style="background:rgba(255,107,53,0.2)"></div>
           <div class="heatmap-legend-cell" style="background:rgba(255,107,53,0.45)"></div>
           <div class="heatmap-legend-cell" style="background:rgba(255,107,53,0.7)"></div>
@@ -702,7 +689,7 @@
         </div>
         <div class="heatmap-legend">
           <span>Less</span>
-          <div class="heatmap-legend-cell" style="background:var(--bg-secondary)"></div>
+          <div class="heatmap-legend-cell" style="background:var(--surface-alt)"></div>
           <div class="heatmap-legend-cell" style="background:rgba(78,205,196,0.2)"></div>
           <div class="heatmap-legend-cell" style="background:rgba(78,205,196,0.45)"></div>
           <div class="heatmap-legend-cell" style="background:rgba(78,205,196,0.7)"></div>
@@ -828,6 +815,7 @@
   </div>
 </div>
 
+<script src="/theme.js"></script>
 <script>
 // ===== DATA STORE =====
 const DATA = {
@@ -1260,7 +1248,7 @@ function formatNum(n) {
 // ===== CHART DEFAULTS =====
 Chart.defaults.color = '#8b8fa8';
 Chart.defaults.borderColor = '#252838';
-Chart.defaults.font.family = "'Outfit', sans-serif";
+Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.font.size = 12;
 Chart.defaults.plugins.legend.labels.boxWidth = 12;
 Chart.defaults.plugins.legend.labels.padding = 16;
@@ -2326,9 +2314,5 @@ function hideTooltip() {
   document.getElementById('tooltip').style.display = 'none';
 }
 </script>
-<!-- Mobile toolbar: back (mobile-only) + refresh (PWA standalone-only) -->
-<div id="mobile-toolbar"><a href="/" id="toolbar-back">← Tools</a><button id="toolbar-refresh" onclick="location.reload()">↻ Refresh</button></div>
-<style>#mobile-toolbar{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(250,250,248,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.1);padding:10px 16px;align-items:center;justify-content:space-between;font-family:Inter,system-ui,-apple-system,sans-serif}#toolbar-back{color:#7c3aed;text-decoration:none;font-size:.9rem;font-weight:500}#toolbar-refresh{display:none;background:none;border:1px solid #7c3aed;color:#7c3aed;font-size:.85rem;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:inherit}@media(max-width:768px){#mobile-toolbar{display:flex}body{padding-top:44px!important}}</style>
-<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var r=document.getElementById("toolbar-refresh");if(r)r.style.display="inline-block"}})()</script>
 </body>
 </html>
