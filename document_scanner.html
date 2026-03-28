@@ -4,65 +4,66 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#fafaf8">
 <title>Document Scanner</title>
 <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
 <style>
-html,body{height:100%;width:100%;overflow:hidden;background:#000;color:#fff;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;width:100%;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 #app{height:100%;display:flex;flex-direction:column}
-.screen{display:none;flex-direction:column;height:100%;position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
+.screen{display:none;flex-direction:column;height:100%;position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;background:var(--bg)}
 .screen.active{display:flex}
 
 /* Capture */
 #capture-screen{justify-content:center;align-items:center;padding:24px;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 .capture-inner{display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;max-width:320px}
-.capture-icon{width:80px;height:80px;border-radius:24px;background:#1c1c1e;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
-.capture-icon svg{width:40px;height:40px;fill:#007AFF}
-.capture-title{font-size:28px;font-weight:700;letter-spacing:-0.5px}
-.capture-sub{font-size:15px;color:#8e8e93;text-align:center;margin-bottom:12px}
-.btn{border:none;border-radius:12px;font-size:17px;font-weight:600;cursor:pointer;padding:16px 24px;width:100%;text-align:center;transition:opacity .15s}
+.capture-icon{width:80px;height:80px;border-radius:24px;background:var(--surface-alt);display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.capture-icon svg{width:40px;height:40px;fill:var(--accent)}
+.capture-title{font-size:28px;font-weight:700;letter-spacing:-0.5px;color:var(--text)}
+.capture-sub{font-size:15px;color:var(--text-muted);text-align:center;margin-bottom:12px}
+.btn{border:none;border-radius:12px;font-size:17px;font-weight:600;cursor:pointer;padding:16px 24px;width:100%;text-align:center;transition:opacity .15s;font-family:inherit}
 .btn:active{opacity:.7}
-.btn-primary{background:#007AFF;color:#fff}
-.btn-secondary{background:#2c2c2e;color:#fff}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-secondary{background:var(--surface-alt);color:var(--text);border:1px solid var(--border)}
 .btn-sm{padding:10px 16px;font-size:15px;width:auto;border-radius:8px}
 
 /* Toolbar */
-.toolbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:#1c1c1e;min-height:48px;flex-shrink:0;gap:8px}
-.toolbar-title{font-weight:600;font-size:17px;flex:1;text-align:center}
-.toolbar-btn{background:none;border:none;color:#007AFF;font-size:16px;cursor:pointer;padding:6px 8px;white-space:nowrap}
+.toolbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));background:var(--surface);border-bottom:1px solid var(--border);min-height:48px;flex-shrink:0}
+.toolbar-title{font-weight:600;font-size:17px;text-align:center;color:var(--text)}
+.toolbar-btn{background:none;border:none;color:var(--accent);font-size:16px;cursor:pointer;padding:6px 8px;white-space:nowrap;font-family:inherit}
+.toolbar-btn:last-child{text-align:right}
 
 /* Canvas container */
 .canvas-container{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000;position:relative;min-height:0}
 .canvas-container canvas{touch-action:none;display:block}
 
 /* Bottom bar */
-.bottom-bar{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));background:#1c1c1e;flex-shrink:0}
+.bottom-bar{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
 .btn-full{width:100%}
 
 /* Options bar */
-.options-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1c1c1e;border-top:1px solid #333;flex-shrink:0;gap:12px}
-.seg-ctrl{display:flex;background:#333;border-radius:8px;padding:2px;flex-shrink:0}
-.seg-btn{padding:7px 13px;border:none;border-radius:6px;background:transparent;color:#999;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s}
-.seg-btn.active{background:#555;color:#fff}
-#format-select{padding:8px 12px;border-radius:8px;background:#333;color:#fff;border:none;font-size:14px;font-weight:500;-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%23999' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+.options-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;gap:12px}
+.seg-ctrl{display:flex;background:var(--surface-alt);border-radius:8px;padding:2px;flex-shrink:0;border:1px solid var(--border)}
+.seg-btn{padding:7px 13px;border:none;border-radius:6px;background:transparent;color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:inherit}
+.seg-btn.active{background:var(--accent);color:#fff}
+#format-select{padding:8px 12px;border-radius:8px;background:var(--surface-alt);color:var(--text);border:1px solid var(--border);font-size:14px;font-weight:500;-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%23999' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
 
 /* Pages strip */
-#pages-strip{display:none;flex-direction:row;gap:8px;padding:8px 16px;background:#1c1c1e;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;border-bottom:1px solid #333}
+#pages-strip{display:none;flex-direction:row;gap:8px;padding:8px 16px;background:var(--surface);overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;border-bottom:1px solid var(--border)}
 #pages-strip.visible{display:flex}
 .page-thumb-wrap{position:relative;flex-shrink:0}
-.page-thumb{width:44px;height:58px;border-radius:4px;border:2px solid transparent;object-fit:cover;cursor:pointer;background:#333;display:block}
-.page-thumb.active{border-color:#007AFF}
-.page-del{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff3b30;color:#fff;border:2px solid #1c1c1e;font-size:11px;line-height:16px;text-align:center;cursor:pointer;font-weight:700;display:none}
+.page-thumb{width:44px;height:58px;border-radius:4px;border:2px solid transparent;object-fit:cover;cursor:pointer;background:var(--surface-alt);display:block}
+.page-thumb.active{border-color:var(--accent)}
+.page-del{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--red);color:#fff;border:2px solid var(--surface);font-size:11px;line-height:16px;text-align:center;cursor:pointer;font-weight:700;display:none}
 .page-thumb-wrap:hover .page-del,.page-thumb-wrap .page-del.show{display:block}
 
 /* Loading */
 #loading{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:12px}
 #loading.active{display:flex}
-.spinner{width:36px;height:36px;border:3px solid #444;border-top-color:#007AFF;border-radius:50%;animation:spin .7s linear infinite}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-#loading span{font-size:15px;color:#ccc}
+#loading span{font-size:15px;color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -132,6 +133,8 @@ html,body{height:100%;width:100%;overflow:hidden;background:#000;color:#fff;-web
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 'use strict';
+
+function getAccent() { return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#7c3aed'; }
 
 // ── Utility ──────────────────────────────────────────────────────────────────
 
@@ -436,12 +439,13 @@ function drawCropOverlay() {
   ctx.beginPath();
   ctx.moveTo(dc[0].x, dc[0].y);
   for (let i = 1; i <= 4; i++) ctx.lineTo(dc[i%4].x, dc[i%4].y);
-  ctx.strokeStyle = '#007AFF';
+  const accent = getAccent();
+  ctx.strokeStyle = accent;
   ctx.lineWidth = 2;
   ctx.stroke();
 
   // Midpoint lines (subtle grid)
-  ctx.strokeStyle = 'rgba(0,122,255,0.3)';
+  ctx.strokeStyle = accent + '4d';
   ctx.lineWidth = 1;
   ctx.beginPath();
   const mid = (a, b) => ({x:(a.x+b.x)/2, y:(a.y+b.y)/2});
@@ -458,7 +462,7 @@ function drawCropOverlay() {
     ctx.arc(p.x, p.y, HANDLE_R, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
     ctx.fill();
-    ctx.strokeStyle = '#007AFF';
+    ctx.strokeStyle = accent;
     ctx.lineWidth = 3;
     ctx.stroke();
   });
@@ -482,7 +486,7 @@ function drawMagnifier(ctx, canvasPos, imgPos, cw, ch) {
   ctx.shadowBlur = 12;
   ctx.beginPath();
   ctx.arc(mx, my, R + 2, 0, Math.PI * 2);
-  ctx.fillStyle = '#1c1c1e';
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#1c1c1e';
   ctx.fill();
   ctx.shadowBlur = 0;
 
@@ -505,7 +509,7 @@ function drawMagnifier(ctx, canvasPos, imgPos, cw, ch) {
   ctx.stroke();
 
   // Crosshair
-  ctx.strokeStyle = '#007AFF';
+  ctx.strokeStyle = getAccent();
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(mx - 8, my); ctx.lineTo(mx + 8, my);
