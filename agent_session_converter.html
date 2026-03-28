@@ -8,49 +8,31 @@
 <meta property="og:title" content="AI Agent Session Converter">
 <meta property="og:description" content="Convert sessions between Claude Code, Codex CLI, Cursor, Pi, and OpenCode.">
 <meta property="og:type" content="website">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-400-normal.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-500-normal.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-600-normal.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-700-normal.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-400-normal.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-500-normal.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-600-normal.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-700-normal.min.css">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  :root {
-    --bg:#0c0c0e;--surface:#151518;--surface2:#1c1c21;--border:#2a2a32;--border-hover:#3a3a45;
-    --text:#e4e4e8;--text-dim:#8a8a96;--text-muted:#5a5a66;
-    --claude-accent:#d4a27f;--claude-bg:#1a1510;--claude-border:#3d2e1f;
-    --codex-accent:#7fd4a2;--codex-bg:#101a14;--codex-border:#1f3d2a;
-    --cursor-accent:#7fb3d4;--cursor-bg:#10151a;--cursor-border:#1f2e3d;
-    --pi-accent:#d47fb3;--pi-bg:#1a1018;--pi-border:#3d1f34;
-    --opencode-accent:#d4d47f;--opencode-bg:#1a1a10;--opencode-border:#3d3d1f;
-    --user-badge:#6e8fff;--assistant-badge:#c084fc;--tool-badge:#fbbf24;
-    --error:#ef4444;--success:#22c55e;--radius:8px;--radius-lg:12px;
-  }
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
-  .container{max-width:1200px;margin:0 auto;padding:40px 24px}
-  .header{text-align:center;margin-bottom:48px}
-  .header h1{font-family:'JetBrains Mono',monospace;font-size:clamp(14px,3.2vw,22px);font-weight:700;letter-spacing:-0.5px;margin-bottom:8px;white-space:nowrap}
-  .header h1 .sep{opacity:0.2;margin:0 2px}
-  .header p{color:var(--text-dim);font-size:14px}
+  .container{max-width:1200px;padding:40px 24px}
+  .tool-header{text-align:center;margin-bottom:48px}
+  .tool-header h1{font-size:clamp(14px,3.2vw,22px);font-weight:700;letter-spacing:-0.5px;margin-bottom:8px;white-space:nowrap}
+  .tool-header h1 .sep{opacity:0.2;margin:0 2px}
+  .tool-header p{color:var(--text-muted);font-size:14px}
   .format-badge{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:0.5px}
   .format-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
-  .format-badge.claude{background:var(--claude-bg);color:var(--claude-accent);border:1px solid var(--claude-border)}
-  .format-badge.codex{background:var(--codex-bg);color:var(--codex-accent);border:1px solid var(--codex-border)}
-  .format-badge.cursor{background:var(--cursor-bg);color:var(--cursor-accent);border:1px solid var(--cursor-border)}
-  .format-badge.pi{background:var(--pi-bg);color:var(--pi-accent);border:1px solid var(--pi-border)}
-  .format-badge.opencode{background:var(--opencode-bg);color:var(--opencode-accent);border:1px solid var(--opencode-border)}
+  .format-badge.claude{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent)}
+  .format-badge.codex{background:var(--green-dim);color:var(--green);border:1px solid var(--green)}
+  .format-badge.cursor{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)}
+  .format-badge.pi{background:var(--red-dim);color:var(--red);border:1px solid var(--red)}
+  .format-badge.opencode{background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber)}
   .input-section{margin-bottom:32px}
-  .input-section label,.output-section label{display:block;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
-  .drop-zone{position:relative;border:2px dashed var(--border);border-radius:var(--radius-lg);background:var(--surface);transition:all 0.2s ease;cursor:pointer}
-  .drop-zone:hover,.drop-zone.dragover{border-color:var(--border-hover);background:var(--surface2)}
-  .drop-zone.dragover{border-color:var(--claude-accent);box-shadow:0 0 0 4px rgba(212,162,127,0.1)}
+  .input-section label,.output-section label{display:block;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+  .drop-zone{position:relative;border:2px dashed var(--border);border-radius:12px;background:var(--surface)}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--border-hover);background:var(--surface-alt)}
+  .drop-zone.dragover{border-color:var(--accent)}
   .drop-zone-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;gap:8px;min-height:120px}
   .drop-zone-inner.hidden{display:none}
   .drop-zone-icon{font-size:28px;opacity:0.3}
-  .drop-zone-text{font-size:14px;color:var(--text-dim)}
+  .drop-zone-text{font-size:14px;color:var(--text-muted)}
   .drop-zone-hint{font-size:12px;color:var(--text-muted)}
   .drop-zone textarea{width:100%;min-height:200px;max-height:400px;background:transparent;border:none;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;padding:16px;resize:vertical;outline:none}
   .drop-zone textarea::placeholder{color:var(--text-muted)}
@@ -58,54 +40,58 @@
   .input-file{display:none}
   .controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:32px}
   .controls-left,.controls-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .detect-info{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim)}
+  .detect-info{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted)}
   .detect-info .msg-count{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted)}
-  button{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;padding:0 16px;height:36px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:all 0.15s ease;display:inline-flex;align-items:center;gap:6px;vertical-align:middle}
-  button:hover{background:var(--surface2);border-color:var(--border-hover)}
+  button{font-size:13px;font-weight:600;padding:0 16px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:6px;vertical-align:middle}
+  button:hover{background:var(--surface-alt);border-color:var(--border-hover)}
   button:active{transform:scale(0.98)}
-  button.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
-  button.primary:hover{background:#d0d0d4;border-color:#d0d0d4}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
   button.primary:disabled{opacity:0.3;cursor:not-allowed}
   button .icon{font-size:14px;line-height:1}
-  select.target-select{font-family:'JetBrains Mono',monospace;font-size:12px;padding:0 12px;height:36px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;outline:none;vertical-align:middle}
+  select.target-select{font-family:'JetBrains Mono',monospace;font-size:12px;padding:0 12px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;outline:none;vertical-align:middle}
   select.target-select:hover{border-color:var(--border-hover)}
   .preview-section{margin-bottom:32px}
   .preview-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-  .preview-header h2{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px}
+  .preview-header h2{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
   .preview-toggle{font-size:12px;color:var(--text-muted);cursor:pointer;border:none;background:none;padding:4px 8px;font-family:'JetBrains Mono',monospace}
-  .preview-toggle:hover{color:var(--text-dim)}
-  .preview-list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;max-height:500px;overflow-y:auto}
+  .preview-toggle:hover{color:var(--text)}
+  .preview-list{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;max-height:500px;overflow-y:auto}
   .preview-list::-webkit-scrollbar{width:6px}
   .preview-list::-webkit-scrollbar-track{background:transparent}
   .preview-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .msg-item{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5}
   .msg-item:last-child{border-bottom:none}
   .msg-role{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px}
-  .msg-role.user{background:rgba(110,143,255,0.12);color:var(--user-badge)}
-  .msg-role.assistant{background:rgba(192,132,252,0.12);color:var(--assistant-badge)}
-  .msg-role.tool{background:rgba(251,191,36,0.10);color:var(--tool-badge)}
-  .msg-content{flex:1;min-width:0;color:var(--text-dim);white-space:pre-wrap;word-break:break-word;overflow:hidden}
+  .msg-role.user{background:var(--blue-dim);color:var(--blue)}
+  .msg-role.assistant{background:var(--accent-dim);color:var(--accent)}
+  .msg-role.tool{background:var(--amber-dim);color:var(--amber)}
+  .msg-content{flex:1;min-width:0;color:var(--text-muted);white-space:pre-wrap;word-break:break-word;overflow:hidden}
   .msg-content.truncated{max-height:60px;-webkit-mask-image:linear-gradient(to bottom,black 60%,transparent);mask-image:linear-gradient(to bottom,black 60%,transparent)}
   .msg-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);flex-shrink:0;margin-top:3px}
   .output-section{margin-bottom:32px}
-  .output-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);position:relative}
+  .output-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;position:relative}
   .output-box textarea{width:100%;min-height:200px;max-height:400px;background:transparent;border:none;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;padding:16px;resize:vertical;outline:none}
   .output-actions{display:flex;gap:8px;padding:8px 16px 12px;border-top:1px solid var(--border)}
-  .status{padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:16px;display:none;align-items:center;gap:8px}
+  .status{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none;align-items:center;gap:8px}
   .status.visible{display:flex}
-  .status.error{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--error)}
-  .status.success{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:var(--success)}
-  .toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:var(--radius);font-size:13px;font-weight:500;box-shadow:0 8px 32px rgba(0,0,0,0.4);transform:translateY(80px);opacity:0;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);z-index:999}
+  .status.error{background:var(--red-dim);border:1px solid var(--red);color:var(--red)}
+  .status.success{background:var(--green-dim);border:1px solid var(--green);color:var(--green)}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);z-index:999}
   .toast.show{transform:translateY(0);opacity:1}
   footer{text-align:center;padding:32px 0 16px;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
-  footer a{text-decoration:none}footer a:hover{text-decoration:underline}
+  footer a{color:var(--accent);text-decoration:none}footer a:hover{text-decoration:underline}
   @media(max-width:640px){.container{padding:24px 16px}.controls{flex-direction:column;align-items:stretch}.controls-left,.controls-right{justify-content:center}}
 </style>
 </head>
 <body>
 <div class="container">
-  <div class="header">
-    <h1><span style="color:var(--claude-accent)">Claude Code</span><span class="sep">·</span><span style="color:var(--codex-accent)">Codex</span><span class="sep">·</span><span style="color:var(--cursor-accent)">Cursor</span><span class="sep">·</span><span style="color:var(--pi-accent)">Pi</span><span class="sep">·</span><span style="color:var(--opencode-accent)">OpenCode</span></h1>
+  <header>
+    <h1>AI Agent Session Converter</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
+  <div class="tool-header">
+    <h1><span style="color:var(--accent)">Claude Code</span><span class="sep">·</span><span style="color:var(--green)">Codex</span><span class="sep">·</span><span style="color:var(--blue)">Cursor</span><span class="sep">·</span><span style="color:var(--red)">Pi</span><span class="sep">·</span><span style="color:var(--amber)">OpenCode</span></h1>
     <p>Paste or drop a session file — auto-detects format, converts to any other agent</p>
   </div>
   <div id="status" class="status"></div>
@@ -113,11 +99,11 @@
     <label>Input Session</label>
     <div class="drop-zone" id="dropZone">
       <div class="drop-zone-inner" id="dropPrompt">
-        <div class="drop-zone-icon">⬇</div>
+        <div class="drop-zone-icon">&#x2B07;</div>
         <div class="drop-zone-text">Drop a <strong>.jsonl</strong> or <strong>.json</strong> file here, or click to browse</div>
         <div class="drop-zone-hint">Claude Code · Codex CLI · Cursor · Pi · OpenCode</div>
       </div>
-      <textarea id="inputArea" class="hidden" placeholder="Or paste your JSONL / JSON content here…" spellcheck="false"></textarea>
+      <textarea id="inputArea" class="hidden" placeholder="Or paste your JSONL / JSON content here..." spellcheck="false"></textarea>
       <input type="file" id="fileInput" class="input-file" accept=".jsonl,.json,.txt">
     </div>
   </div>
@@ -134,9 +120,9 @@
         <option value="pi">Pi</option>
         <option value="opencode">OpenCode</option>
       </select>
-      <button id="btnPaste" title="Paste"><span class="icon">📋</span> Paste</button>
-      <button id="btnClear" title="Clear"><span class="icon">✕</span> Clear</button>
-      <button id="btnConvert" class="primary" disabled><span class="icon">⚡</span> Convert</button>
+      <button id="btnPaste" title="Paste"><span class="icon">&#x1F4CB;</span> Paste</button>
+      <button id="btnClear" title="Clear"><span class="icon">&#x2715;</span> Clear</button>
+      <button id="btnConvert" class="primary" disabled><span class="icon">&#x26A1;</span> Convert</button>
     </div>
   </div>
   <div id="previewSection" class="preview-section" style="display:none">
@@ -147,12 +133,13 @@
     <label>Output — <span id="outputFormatLabel"></span></label>
     <div class="output-box">
       <textarea id="outputArea" readonly spellcheck="false"></textarea>
-      <div class="output-actions"><button id="btnCopyOutput"><span class="icon">📋</span> Copy</button><button id="btnDownload"><span class="icon">💾</span> Download</button></div>
+      <div class="output-actions"><button id="btnCopyOutput"><span class="icon">&#x1F4CB;</span> Copy</button><button id="btnDownload"><span class="icon">&#x1F4BE;</span> Download</button></div>
     </div>
   </div>
-  <footer>Built by <a href="https://nicolaeandrei.com" style="color:var(--claude-accent)">Andrei-Mihai Nicolae</a> · <a href="https://github.com" style="color:var(--text-dim)">Source</a></footer>
+  <footer>Built by <a href="https://nicolaeandrei.com">Andrei-Mihai Nicolae</a></footer>
 </div>
 <div id="toast" class="toast"></div>
+<script src="/theme.js"></script>
 <script>
 const FORMATS={claude:{label:'Claude Code',cls:'claude',ext:'.jsonl',jsonl:true},codex:{label:'Codex CLI',cls:'codex',ext:'.jsonl',jsonl:true},cursor:{label:'Cursor',cls:'cursor',ext:'.jsonl',jsonl:true},pi:{label:'Pi',cls:'pi',ext:'.jsonl',jsonl:true},opencode:{label:'OpenCode',cls:'opencode',ext:'.json',jsonl:false}};
 let parsedLines=[],rawInput='',detectedFormat=null,extractedMessages=[],convertedOutput='',truncatePreview=true;

@@ -4,64 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Compressor</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    .container { max-width: 900px; }
 
-    :root {
-      --bg: #0a0a0b;
-      --surface: #141416;
-      --surface-hover: #1c1c1f;
-      --border: #2a2a2e;
-      --text: #e4e4e7;
-      --text-dim: #71717a;
-      --accent: #a78bfa;
-      --accent-hover: #8b5cf6;
-      --green: #34d399;
-      --red: #f87171;
-      --amber: #fbbf24;
-      --radius: 12px;
-      --radius-sm: 8px;
-      --font: 'DM Sans', -apple-system, sans-serif;
-      --mono: 'JetBrains Mono', monospace;
-    }
-
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2rem 1.5rem;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .container { max-width: 900px; margin: 0 auto; }
-
-    header { text-align: center; margin-bottom: 2.5rem; animation: fadeUp .4s ease; }
-    h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: .4rem; }
-    .subtitle { color: var(--text-dim); font-size: .95rem; }
+    header { text-align: center; animation: fadeUp .4s ease; }
+    .subtitle { color: var(--text-muted); font-size: .95rem; }
 
     .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 3rem 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all .15s ease;
       position: relative;
       animation: fadeUp .4s ease .05s both;
-    }
-    .drop-zone:hover, .drop-zone.dragover {
-      border-color: var(--accent);
-      background: rgba(167,139,250,.05);
     }
     .drop-zone input[type="file"] {
       position: absolute; inset: 0; opacity: 0; cursor: pointer;
     }
-    .drop-zone p { color: var(--text-dim); font-size: .95rem; }
-    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-dim); line-height: 1; }
+    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-muted); line-height: 1; }
 
     .file-list {
       display: flex; flex-direction: column; gap: .75rem;
@@ -70,7 +32,7 @@
 
     .file-item {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1rem;
+      border-radius: 12px; padding: 1rem;
       animation: fadeUp .3s ease;
     }
     .file-top {
@@ -78,7 +40,7 @@
     }
     .file-thumb {
       width: 64px; height: 64px; object-fit: cover;
-      border-radius: var(--radius-sm); background: #1a1a1d; flex-shrink: 0;
+      border-radius: 8px; background: var(--surface-alt); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       overflow: hidden;
     }
@@ -87,12 +49,12 @@
     }
     .file-info { flex: 1; min-width: 0; }
     .file-name { font-weight: 500; margin-bottom: .2rem; word-break: break-all; font-size: .95rem; }
-    .file-meta { color: var(--text-dim); font-family: var(--mono); font-size: .8rem; }
+    .file-meta { color: var(--text-muted); font-family: monospace; font-size: .8rem; }
     .file-meta .savings { color: var(--green); }
     .file-meta .increase { color: var(--red); }
     .file-remove {
-      background: none; border: 1px solid var(--border); color: var(--text-dim);
-      width: 32px; height: 32px; border-radius: var(--radius-sm); cursor: pointer;
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       font-size: 1.1rem; transition: all .15s ease; flex-shrink: 0;
     }
@@ -100,11 +62,11 @@
 
     .global-controls {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1rem;
+      border-radius: 12px; padding: 1rem;
       margin-top: 1.5rem; animation: fadeUp .3s ease;
     }
     .global-controls h3 {
-      font-size: .85rem; font-weight: 500; color: var(--text-dim);
+      font-size: .85rem; font-weight: 500; color: var(--text-muted);
       margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .03em;
     }
 
@@ -114,12 +76,12 @@
 
     .control-group { display: flex; flex-direction: column; gap: .3rem; }
     .control-group label {
-      font-size: .8rem; color: var(--text-dim); font-weight: 500;
+      font-size: .8rem; color: var(--text-muted); font-weight: 500;
     }
     .control-group select {
       background: var(--bg); border: 1px solid var(--border); color: var(--text);
-      font-family: var(--font); font-size: .85rem; padding: .45rem .6rem;
-      border-radius: var(--radius-sm); outline: none;
+      font-family: inherit; font-size: .85rem; padding: .45rem .6rem;
+      border-radius: 8px; outline: none;
       transition: border-color .15s ease;
     }
     .control-group select:focus {
@@ -130,18 +92,18 @@
       grid-column: 1 / -1;
       display: flex; align-items: center; gap: .75rem;
     }
-    .quality-row label { font-size: .8rem; color: var(--text-dim); font-weight: 500; white-space: nowrap; }
+    .quality-row label { font-size: .8rem; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
     .quality-row input[type="range"] {
       flex: 1; accent-color: var(--accent); height: 4px;
     }
     .quality-row .quality-val {
-      font-family: var(--mono); font-size: .85rem; color: var(--text);
+      font-family: monospace; font-size: .85rem; color: var(--text);
       min-width: 2.5rem; text-align: right;
     }
 
     .preset-hint {
       grid-column: 1 / -1;
-      font-size: .78rem; color: var(--text-dim); line-height: 1.4;
+      font-size: .78rem; color: var(--text-muted); line-height: 1.4;
     }
 
     .actions {
@@ -149,21 +111,6 @@
       display: flex; gap: .75rem; flex-wrap: wrap;
       animation: fadeUp .3s ease;
     }
-
-    .btn {
-      font-family: var(--font); font-size: .9rem; font-weight: 500;
-      padding: .6rem 1.25rem; border-radius: var(--radius-sm);
-      cursor: pointer; transition: all .15s ease; border: none;
-    }
-    .btn-primary {
-      background: var(--accent); color: #fff;
-    }
-    .btn-primary:hover { background: var(--accent-hover); }
-    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
-    .btn-secondary {
-      background: transparent; border: 1px solid var(--border); color: var(--text);
-    }
-    .btn-secondary:hover { border-color: var(--text-dim); }
 
     .progress-bar {
       grid-column: 1 / -1;
@@ -183,18 +130,13 @@
 
     .results-bar {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1rem;
+      border-radius: 12px; padding: 1rem;
       margin-top: 1rem; text-align: center;
-      font-family: var(--mono); font-size: .85rem;
+      font-family: monospace; font-size: .85rem;
       animation: fadeUp .3s ease;
     }
     .results-bar .savings { color: var(--green); font-weight: 600; }
     .results-bar .increase { color: var(--red); font-weight: 600; }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
 
     @media (max-width: 600px) {
       .controls { grid-template-columns: 1fr; }
@@ -207,8 +149,9 @@
   <div class="container">
     <header>
       <h1>PDF Compressor</h1>
-      <p class="subtitle">Reduce PDF file size entirely in your browser</p>
+      <a href="/">← all tools</a>
     </header>
+    <p class="desc">Reduce PDF file size entirely in your browser</p>
 
     <div class="drop-zone" id="dropZone">
       <input type="file" accept="application/pdf" multiple id="fileInput">
@@ -258,6 +201,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 
+  <script src="/theme.js"></script>
   <script type="module">
     import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';

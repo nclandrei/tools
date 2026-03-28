@@ -4,61 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JWT Decoder</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  :root {
-    --bg: #1a1a1e;
-    --surface: #24242a;
-    --border: #35353d;
-    --text: #e0e0e4;
-    --text-dim: #8888a0;
-    --accent: #e8c44a;
-    --accent-dim: #e8c44a22;
-    --green: #5caa6c;
-    --red: #c45c5c;
-    --blue: #5c8ac4;
-  }
-
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 2rem 1rem;
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  .container {
-    max-width: 640px;
-    margin: 0 auto;
-  }
-
-  h1 {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 0.25rem;
-  }
-
-  .subtitle {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    margin-bottom: 2rem;
-  }
-
   label {
     display: block;
     font-size: 0.75rem;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 0.4rem;
   }
 
@@ -73,7 +29,6 @@
     padding: 0.75rem;
     resize: vertical;
     outline: none;
-    transition: border-color 0.15s;
     line-height: 1.5;
   }
 
@@ -82,7 +37,7 @@
   }
 
   textarea::placeholder {
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
   .input-row {
@@ -97,7 +52,6 @@
   }
 
   .btn {
-    font-family: 'DM Sans', sans-serif;
     font-size: 0.8rem;
     font-weight: 500;
     padding: 0.55rem 1rem;
@@ -106,7 +60,6 @@
     background: var(--surface);
     color: var(--text);
     cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
     white-space: nowrap;
   }
 
@@ -140,18 +93,18 @@
   }
 
   .badge-header {
-    background: #c45c5c33;
-    color: #e07070;
+    background: var(--red-dim);
+    color: var(--red);
   }
 
   .badge-payload {
-    background: #5c8ac433;
-    color: #7ca4d8;
+    background: var(--blue-dim);
+    color: var(--blue);
   }
 
   .badge-signature {
-    background: #5caa6c33;
-    color: #7cc08c;
+    background: var(--green-dim);
+    color: var(--green);
   }
 
   .json-box {
@@ -185,7 +138,7 @@
   .sig-box {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.75rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     word-break: break-all;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -210,7 +163,7 @@
 
   .claims-table th {
     font-weight: 500;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -223,7 +176,7 @@
   }
 
   .claims-table .claim-name {
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-size: 0.72rem;
     margin-left: 0.25rem;
   }
@@ -235,7 +188,7 @@
 
   .time-relative {
     font-size: 0.72rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-left: 0.25rem;
   }
 
@@ -243,8 +196,8 @@
   .valid { color: var(--green); }
 
   .error-box {
-    background: #c45c5c22;
-    border: 1px solid #c45c5c55;
+    background: var(--red-dim);
+    border: 1px solid var(--red);
     border-radius: 6px;
     padding: 0.75rem;
     font-size: 0.82rem;
@@ -274,51 +227,43 @@
   }
 
   .chip-exp-valid {
-    background: #5caa6c22;
-    border: 1px solid #5caa6c55;
+    background: var(--green-dim);
+    border: 1px solid var(--green);
     color: var(--green);
   }
 
   .chip-exp-expired {
-    background: #c45c5c22;
-    border: 1px solid #c45c5c55;
+    background: var(--red-dim);
+    border: 1px solid var(--red);
     color: var(--red);
   }
 
   .chip-exp-none {
     background: var(--surface);
     border: 1px solid var(--border);
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
   #output { display: none; }
-
-  .back-link {
-    display: inline-block;
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    text-decoration: none;
-    margin-bottom: 1.5rem;
-  }
-
-  .back-link:hover { color: var(--accent); }
 
   .colored-token {
     word-break: break-all;
     line-height: 1.5;
   }
 
-  .colored-token .t-header { color: #e07070; }
-  .colored-token .t-payload { color: #7ca4d8; }
-  .colored-token .t-sig { color: #7cc08c; }
-  .colored-token .t-dot { color: var(--text-dim); }
+  .colored-token .t-header { color: var(--red); }
+  .colored-token .t-payload { color: var(--blue); }
+  .colored-token .t-sig { color: var(--green); }
+  .colored-token .t-dot { color: var(--text-muted); }
 </style>
 </head>
 <body>
 <div class="container">
-  <a href="/" class="back-link">&larr; all tools</a>
-  <h1>JWT Decoder</h1>
-  <p class="subtitle">Decode and inspect JSON Web Tokens. Everything runs in your browser.</p>
+  <header>
+    <h1>JWT Decoder</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
+  <p class="desc">Decode and inspect JSON Web Tokens. Everything runs in your browser.</p>
 
   <div class="input-row">
     <div class="field">
@@ -387,6 +332,7 @@
   </div>
 </div>
 
+<script src="/theme.js"></script>
 <script>
 const REGISTERED_CLAIMS = {
   iss: 'Issuer',
@@ -431,10 +377,10 @@ function decodeJwt(token) {
 
 function syntaxHighlight(json) {
   const str = JSON.stringify(json, null, 2);
-  return str.replace(/("(?:\\.|[^"\\])*")\s*:/g, '<span style="color:#e8c44a">$1</span>:')
-            .replace(/:\s*("(?:\\.|[^"\\])*")/g, ': <span style="color:#7cc08c">$1</span>')
-            .replace(/:\s*(\d+\.?\d*)/g, ': <span style="color:#7ca4d8">$1</span>')
-            .replace(/:\s*(true|false|null)/g, ': <span style="color:#e07070">$1</span>');
+  return str.replace(/("(?:\\.|[^"\\])*")\s*:/g, '<span style="color:var(--accent)">$1</span>:')
+            .replace(/:\s*("(?:\\.|[^"\\])*")/g, ': <span style="color:var(--green)">$1</span>')
+            .replace(/:\s*(\d+\.?\d*)/g, ': <span style="color:var(--blue)">$1</span>')
+            .replace(/:\s*(true|false|null)/g, ': <span style="color:var(--red)">$1</span>');
 }
 
 function relativeTime(ts) {

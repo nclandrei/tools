@@ -4,45 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sheet Converter — XLSX ↔ CSV ↔ ODS</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
-  --bg: #0e0f11;
-  --surface: #16181c;
-  --surface-2: #1e2027;
-  --surface-3: #262830;
-  --border: #2a2d36;
-  --border-hover: #3d4150;
-  --text: #e8e9ed;
-  --text-dim: #8b8f9e;
-  --text-faint: #555968;
-  --accent: #4a9eed;
-  --accent-glow: rgba(74, 158, 237, 0.12);
-  --accent-dim: #3578b9;
-  --green: #5cb87a;
-  --green-glow: rgba(92, 184, 122, 0.12);
-  --orange: #e09a3a;
-  --error: #d4504c;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --mono: 'DM Mono', 'SF Mono', 'Fira Code', monospace;
-  --sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --transition: 150ms ease;
-}
-
-html, body {
-  height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--sans);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-
 .app {
   min-height: 100dvh;
   display: flex;
@@ -62,52 +28,40 @@ header {
   margin-bottom: 20px;
 }
 
-.logo-icon {
-  width: 30px; height: 30px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
-  display: grid; place-items: center; flex-shrink: 0;
-}
-.logo-icon svg { width: 16px; height: 16px; }
-
 header h1 {
   font-size: 16px; font-weight: 700;
   letter-spacing: -0.02em;
+  flex: 1;
 }
 header h1 span {
-  color: var(--text-dim); font-weight: 400;
+  color: var(--text-muted); font-weight: 400;
   font-size: 13px; margin-left: 6px;
-  font-family: var(--mono);
+  font-family: monospace;
 }
 
 /* ── DROP ZONE ── */
 .drop-zone {
-  border: 2px dashed var(--border);
-  border-radius: var(--radius-lg);
   padding: 48px 24px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color var(--transition), background var(--transition);
   position: relative;
 }
 .drop-zone:hover, .drop-zone.drag-over {
   border-color: var(--accent);
-  background: var(--accent-glow);
+  background: var(--drop-hover);
 }
 .drop-zone input { display: none; }
 .drop-zone .drop-icon {
   width: 48px; height: 48px;
   margin: 0 auto 12px;
   border-radius: 12px;
-  background: var(--surface-2);
+  background: var(--surface-alt);
   display: grid; place-items: center;
 }
-.drop-zone .drop-icon svg { width: 24px; height: 24px; color: var(--text-dim); }
-.drop-zone p { font-size: 14px; color: var(--text-dim); }
+.drop-zone .drop-icon svg { width: 24px; height: 24px; color: var(--text-muted); }
+.drop-zone p { font-size: 14px; color: var(--text-muted); }
 .drop-zone p strong { color: var(--text); }
 .drop-zone .formats {
-  font-family: var(--mono); font-size: 11px;
-  color: var(--text-faint); margin-top: 6px;
+  font-family: monospace; font-size: 11px;
+  color: var(--text-muted); margin-top: 6px;
 }
 
 /* ── FILE INFO ── */
@@ -115,7 +69,7 @@ header h1 span {
   display: none;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
   padding: 16px;
   margin-top: 16px;
 }
@@ -133,32 +87,32 @@ header h1 span {
 .file-badge {
   display: inline-flex; align-items: center;
   padding: 4px 10px; border-radius: 6px;
-  font-family: var(--mono); font-size: 12px; font-weight: 500;
+  font-family: monospace; font-size: 12px; font-weight: 500;
   text-transform: uppercase;
 }
-.file-badge.xlsx { background: rgba(74,158,237,0.12); color: var(--accent); }
-.file-badge.csv { background: rgba(92,184,122,0.12); color: var(--green); }
-.file-badge.ods { background: rgba(224,154,58,0.12); color: var(--orange); }
-.file-badge.tsv { background: rgba(224,154,58,0.12); color: var(--orange); }
-.file-badge.xls { background: rgba(74,158,237,0.12); color: var(--accent); }
+.file-badge.xlsx { background: var(--blue-dim); color: var(--blue); }
+.file-badge.csv { background: var(--green-dim); color: var(--green); }
+.file-badge.ods { background: var(--amber-dim); color: var(--amber); }
+.file-badge.tsv { background: var(--amber-dim); color: var(--amber); }
+.file-badge.xls { background: var(--blue-dim); color: var(--blue); }
 
 .file-name {
   font-size: 14px; font-weight: 600;
 }
 .file-stats {
-  font-family: var(--mono); font-size: 12px;
-  color: var(--text-dim);
+  font-family: monospace; font-size: 12px;
+  color: var(--text-muted);
 }
 
 .btn-clear {
   background: none; border: 1px solid var(--border);
-  color: var(--text-dim); padding: 6px 12px;
+  color: var(--text-muted); padding: 6px 12px;
   border-radius: 6px; font-size: 12px;
-  font-family: var(--sans); cursor: pointer;
-  transition: all var(--transition);
+  font-family: inherit; cursor: pointer;
+  transition: all 150ms ease;
 }
 .btn-clear:hover {
-  border-color: var(--error); color: var(--error);
+  border-color: var(--red); color: var(--red);
 }
 
 /* ── SHEET TABS ── */
@@ -175,16 +129,16 @@ header h1 span {
 .sheet-tab {
   padding: 6px 14px;
   border-radius: 6px;
-  font-family: var(--mono); font-size: 12px;
-  color: var(--text-dim);
+  font-family: monospace; font-size: 12px;
+  color: var(--text-muted);
   background: none; border: 1px solid transparent;
   cursor: pointer; white-space: nowrap;
-  transition: all var(--transition);
+  transition: all 150ms ease;
 }
-.sheet-tab:hover { color: var(--text); background: var(--surface-2); }
+.sheet-tab:hover { color: var(--text); background: var(--surface-alt); }
 .sheet-tab.active {
-  color: var(--accent); background: var(--accent-glow);
-  border-color: rgba(74,158,237,0.2);
+  color: var(--accent); background: var(--accent-dim);
+  border-color: var(--accent-dim);
 }
 
 /* ── DATA PREVIEW ── */
@@ -203,39 +157,39 @@ header h1 span {
 }
 .preview-header h3 {
   font-size: 13px; font-weight: 600;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 .row-count {
-  font-family: var(--mono); font-size: 11px;
-  color: var(--text-faint);
+  font-family: monospace; font-size: 11px;
+  color: var(--text-muted);
 }
 
 .table-wrap {
   flex: 1;
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 8px;
   max-height: 420px;
 }
 .table-wrap table {
   width: 100%; border-collapse: collapse;
-  font-family: var(--mono); font-size: 12px;
+  font-family: monospace; font-size: 12px;
   table-layout: auto;
 }
 .table-wrap thead th {
   position: sticky; top: 0; z-index: 2;
-  background: var(--surface-2);
+  background: var(--surface-alt);
   padding: 8px 12px;
   text-align: left;
   font-weight: 500;
-  color: var(--text-dim);
+  color: var(--text-muted);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 .table-wrap thead th.row-num {
   width: 40px; text-align: center;
-  color: var(--text-faint); font-size: 10px;
-  background: var(--surface-3);
+  color: var(--text-muted); font-size: 10px;
+  background: var(--surface-alt);
 }
 .table-wrap tbody td {
   padding: 6px 12px;
@@ -247,15 +201,15 @@ header h1 span {
 }
 .table-wrap tbody td.row-num {
   text-align: center;
-  color: var(--text-faint); font-size: 10px;
+  color: var(--text-muted); font-size: 10px;
   background: var(--surface);
   border-right: 1px solid var(--border);
 }
 .table-wrap tbody tr:hover td {
-  background: var(--surface-2);
+  background: var(--surface-alt);
 }
 .table-wrap tbody tr:hover td.row-num {
-  background: var(--surface-3);
+  background: var(--surface-alt);
 }
 
 /* ── EXPORT SECTION ── */
@@ -264,14 +218,14 @@ header h1 span {
   margin-top: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
   padding: 16px;
 }
 .export-section.visible { display: block; }
 
 .export-section h3 {
   font-size: 13px; font-weight: 600;
-  color: var(--text-dim); margin-bottom: 12px;
+  color: var(--text-muted); margin-bottom: 12px;
 }
 
 .export-grid {
@@ -285,33 +239,33 @@ header h1 span {
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 8px;
   cursor: pointer;
-  transition: all var(--transition);
-  background: var(--surface-2);
+  transition: all 150ms ease;
+  background: var(--surface-alt);
 }
 .export-card:hover {
   border-color: var(--accent);
-  background: var(--accent-glow);
+  background: var(--accent-dim);
 }
 .export-card .fmt-icon {
   width: 36px; height: 36px;
   border-radius: 8px;
   display: grid; place-items: center;
-  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  font-family: monospace; font-size: 11px; font-weight: 600;
   flex-shrink: 0;
 }
-.export-card .fmt-icon.xlsx { background: rgba(74,158,237,0.15); color: var(--accent); }
-.export-card .fmt-icon.csv { background: rgba(92,184,122,0.15); color: var(--green); }
-.export-card .fmt-icon.ods { background: rgba(224,154,58,0.15); color: var(--orange); }
-.export-card .fmt-icon.tsv { background: rgba(224,154,58,0.15); color: var(--orange); }
+.export-card .fmt-icon.xlsx { background: var(--blue-dim); color: var(--blue); }
+.export-card .fmt-icon.csv { background: var(--green-dim); color: var(--green); }
+.export-card .fmt-icon.ods { background: var(--amber-dim); color: var(--amber); }
+.export-card .fmt-icon.tsv { background: var(--amber-dim); color: var(--amber); }
 
 .export-card .fmt-info .fmt-name {
   font-size: 13px; font-weight: 600;
 }
 .export-card .fmt-info .fmt-desc {
-  font-size: 11px; color: var(--text-dim);
-  font-family: var(--mono);
+  font-size: 11px; color: var(--text-muted);
+  font-family: monospace;
 }
 
 /* ── CSV OPTIONS ── */
@@ -319,22 +273,18 @@ header h1 span {
   display: none;
   margin-top: 12px;
   padding: 12px;
-  background: var(--surface-2);
+  background: var(--surface-alt);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 8px;
 }
 .csv-options.visible { display: block; }
 .csv-options label {
-  font-size: 12px; color: var(--text-dim);
+  font-size: 12px; color: var(--text-muted);
   display: flex; align-items: center; gap: 8px;
 }
 .csv-options select {
-  background: var(--surface-3);
-  border: 1px solid var(--border);
-  color: var(--text);
   padding: 4px 8px;
-  border-radius: 4px;
-  font-family: var(--mono);
+  font-family: monospace;
   font-size: 12px;
 }
 
@@ -343,7 +293,7 @@ header h1 span {
   position: fixed;
   bottom: 24px; left: 50%;
   transform: translateX(-50%) translateY(80px);
-  background: var(--surface-3);
+  background: var(--surface-alt);
   border: 1px solid var(--border);
   padding: 10px 20px;
   border-radius: 8px;
@@ -360,7 +310,7 @@ header h1 span {
   transform: translateX(-50%) translateY(0);
 }
 .toast.success { border-color: var(--green); }
-.toast.error { border-color: var(--error); }
+.toast.error { border-color: var(--red); }
 
 /* ── FOOTER ── */
 footer {
@@ -369,8 +319,8 @@ footer {
   border-top: 1px solid var(--border);
   text-align: center;
   font-size: 11px;
-  color: var(--text-faint);
-  font-family: var(--mono);
+  color: var(--text-muted);
+  font-family: monospace;
 }
 
 /* ── RESPONSIVE ── */
@@ -387,15 +337,8 @@ footer {
 <div class="app">
 
   <header>
-    <div class="logo-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
-        <rect x="3" y="3" width="7" height="7" rx="1"/>
-        <rect x="14" y="3" width="7" height="7" rx="1"/>
-        <rect x="3" y="14" width="7" height="7" rx="1"/>
-        <rect x="14" y="14" width="7" height="7" rx="1"/>
-      </svg>
-    </div>
-    <h1>Sheet Converter <span>xlsx · csv · ods</span></h1>
+    <h1>Sheet Converter <span>xlsx &middot; csv &middot; ods</span></h1>
+    <a href="/">&#8592; all tools</a>
   </header>
 
   <!-- DROP ZONE -->
@@ -409,7 +352,7 @@ footer {
       </svg>
     </div>
     <p>Drop a spreadsheet or <strong>click to browse</strong></p>
-    <div class="formats">.xlsx · .xls · .csv · .tsv · .ods</div>
+    <div class="formats">.xlsx &middot; .xls &middot; .csv &middot; .tsv &middot; .ods</div>
   </div>
 
   <!-- FILE INFO -->
@@ -418,8 +361,8 @@ footer {
       <div class="file-meta">
         <span class="file-badge" id="fileBadge">XLSX</span>
         <div>
-          <div class="file-name" id="fileName">—</div>
-          <div class="file-stats" id="fileStats">—</div>
+          <div class="file-name" id="fileName">&mdash;</div>
+          <div class="file-stats" id="fileStats">&mdash;</div>
         </div>
       </div>
       <button class="btn-clear" id="btnClear">Clear</button>
@@ -431,7 +374,7 @@ footer {
   <div class="preview-section" id="previewSection">
     <div class="preview-header">
       <h3>Preview</h3>
-      <span class="row-count" id="rowCount">—</span>
+      <span class="row-count" id="rowCount">&mdash;</span>
     </div>
     <div class="table-wrap" id="tableWrap">
       <table id="previewTable"><thead></thead><tbody></tbody></table>
@@ -488,6 +431,7 @@ footer {
 
 <div class="toast" id="toast"></div>
 
+<script src="/theme.js"></script>
 <script>
 (function() {
   'use strict';
@@ -576,7 +520,7 @@ footer {
     var parts = [rows + ' rows', cols + ' cols'];
     if (sheets > 1) parts.push(sheets + ' sheets');
     parts.push(formatBytes(file.size));
-    $fileStats.textContent = parts.join(' · ');
+    $fileStats.textContent = parts.join(' \u00B7 ');
   }
 
   function buildSheetTabs() {
@@ -609,7 +553,7 @@ footer {
 
     if (!json.length) {
       $table.querySelector('thead').innerHTML = '';
-      $table.querySelector('tbody').innerHTML = '<tr><td style="padding:24px;color:var(--text-faint)">Empty sheet</td></tr>';
+      $table.querySelector('tbody').innerHTML = '<tr><td style="padding:24px;color:var(--text-muted)">Empty sheet</td></tr>';
       $rowCount.textContent = '0 rows';
       return;
     }
@@ -852,7 +796,7 @@ footer {
         $fileBadge.textContent = 'CSV';
         $fileBadge.className = 'file-badge csv';
         $fileName.textContent = 'Pasted data';
-        $fileStats.textContent = rows + ' rows · ' + cols + ' cols';
+        $fileStats.textContent = rows + ' rows \u00B7 ' + cols + ' cols';
 
         $drop.style.display = 'none';
         $fileInfo.classList.add('visible');

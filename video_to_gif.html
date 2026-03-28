@@ -4,50 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Video to GIF Converter</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-:root {
-  --color-text: #1a1a1a;
-  --color-text-muted: #666;
-  --color-bg: #fafaf8;
-  --color-border: #e5e5e0;
-  --color-accent: #7c3aed;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  font-family: var(--font-sans);
-  color: var(--color-text);
-  background: var(--color-bg);
-  line-height: 1.7;
-  -webkit-font-smoothing: antialiased;
-}
-.container {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 3rem 1.5rem 4rem;
-}
-header { margin-bottom: 2rem; }
-header h1 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
-header a { color: var(--color-text-muted); font-size: 0.85rem; text-decoration: none; }
-header a:hover { color: var(--color-accent); }
-.desc { font-size: 0.88rem; color: var(--color-text-muted); margin-bottom: 2rem; }
-
-/* Drop zone */
-.drop-zone {
-  border: 2px dashed var(--color-border);
-  border-radius: 8px;
-  padding: 3rem 1.5rem;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  margin-bottom: 1.5rem;
-}
-.drop-zone:hover, .drop-zone.dragover {
-  border-color: var(--color-accent);
-  background: #f5f0ff;
-}
-.drop-zone p { font-size: 0.9rem; color: var(--color-text-muted); }
-.drop-zone .icon { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
 .drop-zone input { display: none; }
 
 /* Video preview */
@@ -80,22 +40,14 @@ header a:hover { color: var(--color-accent); }
 .control-group label {
   font-size: 0.78rem;
   font-weight: 500;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 .control-group input, .control-group select {
-  font-family: var(--font-sans);
   font-size: 0.9rem;
   padding: 0.5rem 0.6rem;
-  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: #fff;
-  color: var(--color-text);
-  outline: none;
-}
-.control-group input:focus, .control-group select:focus {
-  border-color: var(--color-accent);
 }
 
 /* Range slider for trim */
@@ -103,7 +55,7 @@ header a:hover { color: var(--color-accent); }
 .trim-track {
   position: relative;
   height: 40px;
-  background: #e5e5e0;
+  background: var(--border);
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
@@ -112,14 +64,14 @@ header a:hover { color: var(--color-accent); }
   position: absolute;
   top: 0; bottom: 0;
   background: rgba(124, 58, 237, 0.2);
-  border-left: 3px solid var(--color-accent);
-  border-right: 3px solid var(--color-accent);
+  border-left: 3px solid var(--accent);
+  border-right: 3px solid var(--accent);
 }
 .trim-handle {
   position: absolute;
   top: 0; bottom: 0;
   width: 14px;
-  background: var(--color-accent);
+  background: var(--accent);
   cursor: ew-resize;
   border-radius: 3px;
   z-index: 2;
@@ -145,32 +97,18 @@ header a:hover { color: var(--color-accent); }
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 .trim-duration {
   text-align: center;
   font-size: 0.82rem;
-  color: var(--color-text);
+  color: var(--text);
   font-weight: 500;
   margin-top: 0.25rem;
 }
 
 /* Buttons */
-.btn {
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-  font-weight: 500;
-  padding: 0.6rem 1.2rem;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-.btn:hover { opacity: 0.85; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-primary { background: var(--color-accent); color: #fff; }
-.btn-secondary { background: #fff; color: var(--color-text); border: 1px solid var(--color-border); }
 .btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 
 /* Progress */
@@ -178,21 +116,21 @@ header a:hover { color: var(--color-accent); }
 .progress-section.visible { display: block; }
 .progress-bar-wrap {
   height: 6px;
-  background: var(--color-border);
+  background: var(--border);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
 .progress-bar {
   height: 100%;
-  background: var(--color-accent);
+  background: var(--accent);
   border-radius: 3px;
   width: 0%;
   transition: width 0.2s;
 }
 .progress-text {
   font-size: 0.82rem;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 /* Result */
@@ -201,12 +139,12 @@ header a:hover { color: var(--color-accent); }
 .result-section img {
   max-width: 100%;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   margin-bottom: 1rem;
 }
 .result-info {
   font-size: 0.82rem;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   margin-bottom: 1rem;
 }
 
@@ -222,9 +160,6 @@ header a:hover { color: var(--color-accent); }
   object-fit: cover;
 }
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="container">
@@ -253,7 +188,7 @@ header a:hover { color: var(--color-accent); }
 
   <div class="controls" id="controls">
     <div>
-      <label style="font-size:0.78rem;font-weight:500;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:0.35rem;display:block;">Trim</label>
+      <label style="font-size:0.78rem;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:0.35rem;display:block;">Trim</label>
       <div class="trim-container" id="trim-container">
         <div class="trim-track" id="trim-track">
           <div class="thumb-strip" id="thumb-strip"></div>
@@ -320,6 +255,7 @@ header a:hover { color: var(--color-accent); }
   </div>
 </div>
 
+<script src="/theme.js"></script>
 <script>
 (function() {
   // FFmpeg.wasm (v0.12) loaded from CDN

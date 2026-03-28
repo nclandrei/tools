@@ -4,67 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Asset Resizer</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #0a0a0b;
-      --surface: #141416;
-      --surface-hover: #1c1c1f;
-      --border: #2a2a2e;
-      --text: #e4e4e7;
-      --text-dim: #71717a;
-      --accent: #a78bfa;
-      --accent-hover: #8b5cf6;
-      --green: #34d399;
-      --amber: #fbbf24;
-      --radius: 12px;
-      --radius-sm: 8px;
-      --font: 'DM Sans', -apple-system, sans-serif;
-      --mono: 'JetBrains Mono', monospace;
-    }
-
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2rem 1.5rem;
-      -webkit-font-smoothing: antialiased;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .container { max-width: 900px; margin: 0 auto; }
+    .container { max-width: 900px; }
 
     header { text-align: center; margin-bottom: 2.5rem; animation: fadeUp .4s ease; }
-    h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: .4rem; }
-    .subtitle { color: var(--text-dim); font-size: .95rem; }
+    h1 { font-size: 1.75rem; }
+    .subtitle { color: var(--text-muted); font-size: .95rem; }
 
-    /* Drop zone */
+    /* Drop zone overrides */
     .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 3rem 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all .15s ease;
       position: relative;
       animation: fadeUp .4s ease .05s both;
-    }
-    .drop-zone:hover, .drop-zone.dragover {
-      border-color: var(--accent);
-      background: rgba(167,139,250,.05);
     }
     .drop-zone input[type="file"] {
       position: absolute; inset: 0; opacity: 0; cursor: pointer;
     }
-    .drop-zone p { color: var(--text-dim); font-size: .95rem; }
     .drop-icon {
-      font-size: 2rem; margin-bottom: .75rem; color: var(--text-dim);
+      font-size: 2rem; margin-bottom: .75rem; color: var(--text-muted);
       line-height: 1;
     }
 
@@ -72,23 +32,23 @@
     .source-preview {
       display: flex; align-items: center; gap: 1rem;
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem;
+      border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;
       animation: fadeUp .3s ease;
     }
     .source-preview img {
       width: 72px; height: 72px; object-fit: contain;
-      border-radius: var(--radius-sm); background: #000;
+      border-radius: 6px; background: var(--surface-alt);
     }
     .source-info { flex: 1; }
     .source-info .name { font-weight: 500; margin-bottom: .2rem; word-break: break-all; }
-    .source-info .dims { color: var(--text-dim); font-family: var(--mono); font-size: .85rem; }
+    .source-info .dims { color: var(--text-muted); font-family: monospace; font-size: .85rem; }
     .change-btn {
-      background: none; border: 1px solid var(--border); color: var(--text-dim);
-      padding: .4rem .75rem; border-radius: var(--radius-sm); cursor: pointer;
-      font-family: var(--font); font-size: .85rem; transition: all .15s ease;
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      padding: .4rem .75rem; border-radius: 6px; cursor: pointer;
+      font-family: inherit; font-size: .85rem; transition: all .15s ease;
       white-space: nowrap;
     }
-    .change-btn:hover { border-color: var(--text-dim); color: var(--text); }
+    .change-btn:hover { border-color: var(--border-hover); color: var(--text); }
 
     /* Controls */
     .controls-bar {
@@ -96,26 +56,23 @@
       align-items: center; animation: fadeUp .3s ease .05s both;
     }
     .control-group { display: flex; align-items: center; gap: .5rem; }
-    .control-group > label { font-size: .85rem; color: var(--text-dim); white-space: nowrap; }
+    .control-group > label { font-size: .85rem; color: var(--text-muted); white-space: nowrap; }
     select {
-      background: var(--surface); border: 1px solid var(--border); color: var(--text);
-      border-radius: var(--radius-sm); padding: .4rem .6rem;
-      font-family: var(--font); font-size: .85rem; cursor: pointer;
+      padding: .4rem .6rem; font-size: .85rem; cursor: pointer;
     }
-    select:focus { outline: none; border-color: var(--accent); }
     input[type="color"] {
       width: 32px; height: 28px; padding: 1px; border: 1px solid var(--border);
       border-radius: 6px; background: var(--surface); cursor: pointer;
     }
     .cb-label {
       display: flex; align-items: center; gap: 4px; font-size: .85rem;
-      color: var(--text-dim); cursor: pointer; user-select: none;
+      color: var(--text-muted); cursor: pointer; user-select: none;
     }
     .cb-label input { accent-color: var(--accent); cursor: pointer; }
 
     /* Platforms */
     .platform-section {
-      border: 1px solid var(--border); border-radius: var(--radius);
+      border: 1px solid var(--border); border-radius: 8px;
       margin-bottom: .5rem; overflow: hidden;
     }
     .platform-header {
@@ -123,19 +80,19 @@
       padding: .65rem 1rem; background: var(--surface); cursor: pointer;
       user-select: none; transition: background .15s ease;
     }
-    .platform-header:hover { background: var(--surface-hover); }
+    .platform-header:hover { background: var(--surface-alt); }
     .arrow {
-      color: var(--text-dim); font-size: .65rem; transition: transform .15s ease;
+      color: var(--text-muted); font-size: .65rem; transition: transform .15s ease;
       width: .8rem; text-align: center; flex-shrink: 0;
     }
     .platform-header.open .arrow { transform: rotate(90deg); }
     .platform-header .pname { font-weight: 500; flex: 1; font-size: .95rem; }
     .platform-header .pcount {
-      font-size: .8rem; color: var(--text-dim); font-family: var(--mono);
+      font-size: .8rem; color: var(--text-muted); font-family: monospace;
     }
     .toggle-all-btn {
       font-size: .8rem; color: var(--accent); cursor: pointer;
-      background: none; border: none; font-family: var(--font);
+      background: none; border: none; font-family: inherit;
       padding: .15rem .4rem;
     }
     .toggle-all-btn:hover { text-decoration: underline; }
@@ -148,27 +105,12 @@
       accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0;
     }
     .size-name { flex: 1; font-size: .9rem; }
-    .size-dims { font-family: var(--mono); font-size: .8rem; color: var(--text-dim); }
+    .size-dims { font-family: monospace; font-size: .8rem; color: var(--text-muted); }
     .size-warn { font-size: .7rem; color: var(--amber); margin-left: .25rem; }
 
     /* Actions */
     .actions { display: flex; gap: .75rem; margin: 1.25rem 0; flex-wrap: wrap; }
-    .btn {
-      padding: .55rem 1.1rem; border-radius: var(--radius-sm); border: none;
-      font-family: var(--font); font-size: .9rem; font-weight: 500;
-      cursor: pointer; transition: all .15s ease;
-    }
-    .btn:active { transform: scale(.97); }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: var(--accent-hover); }
-    .btn-primary:disabled, .btn-secondary:disabled {
-      opacity: .4; cursor: not-allowed;
-    }
-    .btn-secondary {
-      background: var(--surface); color: var(--text); border: 1px solid var(--border);
-    }
-    .btn-secondary:hover:not(:disabled) { background: var(--surface-hover); }
-    .selected-count { font-size: .85rem; color: var(--text-dim); align-self: center; }
+    .selected-count { font-size: .85rem; color: var(--text-muted); align-self: center; }
 
     /* Progress */
     .progress-bar {
@@ -193,36 +135,30 @@
     }
     .result-card {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); overflow: hidden;
+      border-radius: 8px; overflow: hidden;
       animation: fadeUp .25s ease;
     }
     .result-preview {
       aspect-ratio: 1; display: flex; align-items: center;
-      justify-content: center; background: #000; padding: .4rem;
+      justify-content: center; background: var(--surface-alt); padding: .4rem;
     }
     .result-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .result-info { padding: .6rem .7rem; }
     .result-label { font-size: .78rem; font-weight: 500; margin-bottom: .1rem; }
-    .result-platform { font-size: .7rem; color: var(--text-dim); margin-bottom: .1rem; }
+    .result-platform { font-size: .7rem; color: var(--text-muted); margin-bottom: .1rem; }
     .result-meta {
-      font-family: var(--mono); font-size: .72rem; color: var(--text-dim);
+      font-family: monospace; font-size: .72rem; color: var(--text-muted);
       margin-bottom: .4rem;
     }
     .dl-btn {
       width: 100%; padding: .35rem; background: transparent;
-      border: 1px solid var(--border); color: var(--text-dim);
-      border-radius: 6px; cursor: pointer; font-family: var(--font);
+      border: 1px solid var(--border); color: var(--text-muted);
+      border-radius: 6px; cursor: pointer; font-family: inherit;
       font-size: .78rem; transition: all .15s ease;
     }
     .dl-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
     @media (max-width: 600px) {
-      body { padding: 1rem; }
       h1 { font-size: 1.35rem; }
       .controls-bar { flex-direction: column; align-items: stretch; }
       .results-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
@@ -236,10 +172,12 @@
 <div class="container">
   <header>
     <h1>Asset Resizer</h1>
-    <p class="subtitle">Resize images for app stores, extensions, and platforms</p>
+    <a href="/">&#8592; all tools</a>
   </header>
 
   <main>
+    <p class="desc">Resize images for app stores, extensions, and platforms</p>
+
     <div class="drop-zone" id="dropZone">
       <div class="drop-icon">&#8595;</div>
       <p>Drop an image here or click to browse</p>
@@ -296,6 +234,7 @@
   </main>
 </div>
 
+<script src="/theme.js"></script>
 <script>
 const PLATFORMS = [
   {

@@ -4,54 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HEIC to JPEG Converter</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-:root {
-  --color-text: #1a1a1a;
-  --color-text-muted: #666;
-  --color-bg: #fafaf8;
-  --color-border: #e5e5e0;
-  --color-accent: #7c3aed;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  font-family: var(--font-sans);
-  color: var(--color-text);
-  background: var(--color-bg);
-  line-height: 1.7;
-  -webkit-font-smoothing: antialiased;
-}
-.container {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 3rem 1.5rem 4rem;
-}
-header { margin-bottom: 2rem; }
-header h1 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
-header a { color: var(--color-text-muted); font-size: 0.85rem; text-decoration: none; }
-header a:hover { color: var(--color-accent); }
-.desc { font-size: 0.88rem; color: var(--color-text-muted); margin-bottom: 2rem; }
-
-/* Drop zone */
-.drop-zone {
-  border: 2px dashed var(--color-border);
-  border-radius: 8px;
-  padding: 3rem 1.5rem;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  margin-bottom: 1.5rem;
-}
-.drop-zone:hover, .drop-zone.dragover {
-  border-color: var(--color-accent);
-  background: #f5f0ff;
-}
-.drop-zone p { font-size: 0.9rem; color: var(--color-text-muted); }
-.drop-zone .icon { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
-.drop-zone input[type="file"] {
-  position: absolute; inset: 0; opacity: 0; cursor: pointer;
-}
-
 /* Quality control */
 .quality-control {
   display: none;
@@ -61,8 +17,8 @@ header a:hover { color: var(--color-accent); }
   font-size: 0.88rem;
 }
 .quality-control.show { display: flex; }
-.quality-control label { color: var(--color-text-muted); white-space: nowrap; }
-.quality-control input[type="range"] { flex: 1; accent-color: var(--color-accent); }
+.quality-control label { color: var(--text-muted); white-space: nowrap; }
+.quality-control input[type="range"] { flex: 1; }
 .quality-control .val { font-weight: 600; min-width: 3ch; text-align: right; }
 
 /* File list */
@@ -70,13 +26,13 @@ header a:hover { color: var(--color-accent); }
 
 .file-item {
   display: flex; align-items: center; gap: 1rem;
-  background: #fff; border: 1px solid var(--color-border);
+  background: var(--surface); border: 1px solid var(--border);
   border-radius: 8px; padding: 0.75rem 1rem;
   animation: fadeUp 0.25s ease;
 }
 .file-item .thumb {
   width: 56px; height: 56px; object-fit: cover;
-  border-radius: 6px; background: #eee; flex-shrink: 0;
+  border-radius: 6px; background: var(--thumb-bg); flex-shrink: 0;
 }
 .file-item .info { flex: 1; min-width: 0; }
 .file-item .name {
@@ -84,48 +40,37 @@ header a:hover { color: var(--color-accent); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .file-item .meta {
-  font-size: 0.78rem; color: var(--color-text-muted);
+  font-size: 0.78rem; color: var(--text-muted);
 }
-.file-item .meta .done { color: #16a34a; }
-.file-item .meta .err { color: #dc2626; }
+.file-item .meta .done { color: var(--green); }
+.file-item .meta .err { color: var(--red); }
 .file-item .remove {
-  background: none; border: 1px solid var(--color-border);
+  background: none; border: 1px solid var(--border);
   width: 28px; height: 28px; border-radius: 6px;
-  cursor: pointer; font-size: 1rem; color: var(--color-text-muted);
+  cursor: pointer; font-size: 1rem; color: var(--text-muted);
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
   flex-shrink: 0;
 }
-.file-item .remove:hover { border-color: #dc2626; color: #dc2626; }
+.file-item .remove:hover { border-color: var(--red); color: var(--red); }
 
 /* Buttons */
 .actions { display: none; gap: 0.75rem; flex-wrap: wrap; }
 .actions.show { display: flex; }
-.btn {
-  border: none; border-radius: 8px; cursor: pointer;
-  font-family: var(--font-sans); font-size: 0.88rem; font-weight: 500;
-  padding: 0.6rem 1.25rem; transition: all 0.15s;
-}
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-primary { background: var(--color-accent); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: #6d28d9; }
-.btn-secondary { background: #fff; border: 1px solid var(--color-border); color: var(--color-text-muted); }
-.btn-secondary:hover:not(:disabled) { border-color: #999; color: var(--color-text); }
 
 /* Progress */
 .progress-bar {
-  display: none; height: 4px; background: var(--color-border);
+  display: none; height: 4px; background: var(--border);
   border-radius: 2px; margin-bottom: 1rem; overflow: hidden;
 }
 .progress-bar.show { display: block; }
 .progress-bar .fill {
-  height: 100%; background: var(--color-accent);
+  height: 100%; background: var(--accent);
   border-radius: 2px; width: 0%; transition: width 0.2s;
 }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+.drop-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
 }
 
 @media (max-width: 500px) {
@@ -145,7 +90,7 @@ header a:hover { color: var(--color-accent); }
   <div class="drop-zone" id="dropZone" style="position:relative">
     <span class="icon">&#128248;</span>
     <p>Drop HEIC files here or click to select</p>
-    <p style="font-size:0.78rem; margin-top:0.4rem; color:var(--color-text-muted)">.heic &middot; .heif</p>
+    <p style="font-size:0.78rem; margin-top:0.4rem; color:var(--text-muted)">.heic &middot; .heif</p>
     <input type="file" id="fileInput" accept=".heic,.heif,image/heic,image/heif" multiple>
   </div>
 
@@ -166,6 +111,7 @@ header a:hover { color: var(--color-accent); }
   </div>
 </div>
 
+<script src="/theme.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/libheif-js@1.18.2/libheif/libheif.js"></script>
 <script>
 const heif = libheif();
@@ -225,7 +171,7 @@ function render() {
 
     const thumb = document.createElement('div');
     thumb.className = 'thumb';
-    thumb.style.background = '#eee';
+    thumb.style.background = 'var(--thumb-bg)';
     if (item.thumbUrl) {
       const img = document.createElement('img');
       img.src = item.thumbUrl;

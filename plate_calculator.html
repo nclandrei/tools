@@ -5,53 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Plate Calculator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  :root {
-    --bg: #1a1a1e;
-    --surface: #24242a;
-    --border: #35353d;
-    --text: #e0e0e4;
-    --text-dim: #8888a0;
-    --accent: #e8c44a;
-    --accent-dim: #e8c44a22;
-    --green: #5caa6c;
-    --red: #c45c5c;
+  [data-theme="light"] {
+    --plate-accent: #b8960a;
+    --plate-accent-dim: rgba(184, 150, 10, 0.08);
+    --plate-green: #16a34a;
+    --plate-red: #dc2626;
   }
-
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 2rem 1rem;
-    min-height: 100vh;
-    min-height: 100dvh;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-font-smoothing: antialiased;
+  [data-theme="dark"] {
+    --plate-accent: #e8c44a;
+    --plate-accent-dim: rgba(232, 196, 74, 0.12);
+    --plate-green: #34d399;
+    --plate-red: #f87171;
   }
 
   .container {
     max-width: 400px;
-    margin: 0 auto;
-  }
-
-  h1 {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 0.25rem;
-  }
-
-  .subtitle {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    margin-bottom: 2rem;
   }
 
   /* Target weight input */
@@ -71,7 +43,7 @@
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 0.4rem;
   }
 
@@ -96,12 +68,12 @@
   }
   .target-input-wrap input::-webkit-inner-spin-button,
   .target-input-wrap input::-webkit-outer-spin-button { -webkit-appearance: none; }
-  .target-input-wrap input:focus { border-color: var(--accent); background: var(--accent-dim); }
+  .target-input-wrap input:focus { border-color: var(--plate-accent); background: var(--plate-accent-dim); }
 
   .target-unit {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.75rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -125,7 +97,7 @@
     transition: background 0.1s;
     flex-shrink: 0;
   }
-  .adj-btn:active { background: var(--accent-dim); border-color: var(--accent); }
+  .adj-btn:active { background: var(--plate-accent-dim); border-color: var(--plate-accent); }
 
   /* Bar weight toggle */
   .bar-section {
@@ -142,7 +114,7 @@
     flex: 1;
     background: var(--surface);
     border: none;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.72rem;
     font-weight: 600;
@@ -154,8 +126,8 @@
     text-transform: uppercase;
   }
   .bar-option.active {
-    background: var(--accent-dim);
-    color: var(--accent);
+    background: var(--plate-accent-dim);
+    color: var(--plate-accent);
   }
 
   /* Unit toggle */
@@ -173,7 +145,7 @@
     flex: 1;
     background: var(--surface);
     border: none;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.72rem;
     font-weight: 600;
@@ -185,8 +157,8 @@
     text-transform: uppercase;
   }
   .unit-option.active {
-    background: var(--accent-dim);
-    color: var(--accent);
+    background: var(--plate-accent-dim);
+    color: var(--plate-accent);
   }
 
   /* Quick-add plate buttons */
@@ -200,7 +172,7 @@
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 0.5rem;
   }
 
@@ -226,7 +198,7 @@
     min-width: 44px;
     text-align: center;
   }
-  .quick-plate:active { background: var(--accent-dim); border-color: var(--accent); }
+  .quick-plate:active { background: var(--plate-accent-dim); border-color: var(--plate-accent); }
 
   /* Barbell visual */
   .barbell-section {
@@ -298,7 +270,7 @@
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--green);
+    color: var(--plate-green);
     margin-bottom: 0.75rem;
   }
 
@@ -323,7 +295,7 @@
 
   .plate-count {
     font-size: 0.85rem;
-    color: var(--accent);
+    color: var(--plate-accent);
     font-weight: 600;
   }
 
@@ -346,7 +318,7 @@
     text-align: center;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.78rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     padding-top: 0.6rem;
     margin-top: 0.4rem;
     border-top: 1px solid var(--border);
@@ -357,35 +329,26 @@
     text-align: center;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.82rem;
-    color: var(--red);
+    color: var(--plate-red);
     padding: 0.5rem 0;
   }
 
   .note {
     margin-top: 1.5rem;
     font-size: 0.78rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     line-height: 1.5;
   }
-
-  footer {
-    margin-top: 3rem;
-    text-align: center;
-    font-size: 0.75rem;
-    color: var(--text-dim);
-  }
-  footer a {
-    color: var(--text-dim);
-    text-decoration: none;
-  }
-  footer a:hover { color: var(--accent); }
 </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Plate Calculator</h1>
-  <p class="subtitle">What to load on each side of the bar.</p>
+  <header>
+    <h1>Plate Calculator</h1>
+    <a href="/">← all tools</a>
+  </header>
+  <p class="desc">What to load on each side of the bar.</p>
 
   <!-- Unit toggle -->
   <div class="unit-section" id="unit-toggle">
@@ -426,12 +389,9 @@
   <div class="note">
     Enter total weight. The calculator shows which plates to put on <strong>each side</strong> of the bar.
   </div>
-
-  <footer>
-    <a href="/">← Tools</a> · <a href="https://nicolaeandrei.com">nicolaeandrei.com</a>
-  </footer>
 </div>
 
+<script src="/theme.js"></script>
 <script>
   // Plate definitions per unit system
   const PLATES = {
@@ -695,6 +655,5 @@
   renderQuickPlates();
   calc();
 </script>
-
 </body>
 </html>

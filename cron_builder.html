@@ -4,53 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cron Expression Builder</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  :root {
-    --bg: #1a1a1e;
-    --surface: #24242a;
-    --border: #35353d;
-    --text: #e0e0e4;
-    --text-dim: #8888a0;
-    --accent: #e8c44a;
-    --accent-dim: #e8c44a22;
-    --green: #5caa6c;
-    --red: #c45c5c;
-  }
-
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 2rem 1rem;
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  .container {
-    max-width: 480px;
-    margin: 0 auto;
-  }
-
-  h1 {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 0.25rem;
-  }
-
-  .subtitle {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    margin-bottom: 2rem;
-  }
-
   /* Expression display */
   .expression-box {
     background: var(--surface);
@@ -70,16 +27,15 @@
     margin-bottom: 0.5rem;
     cursor: pointer;
     user-select: all;
-    transition: color 0.15s;
   }
 
   .expression-box .cron:hover {
-    color: #f0d060;
+    color: var(--accent-hover);
   }
 
   .expression-box .human {
     font-size: 0.82rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     line-height: 1.5;
   }
 
@@ -96,7 +52,7 @@
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     width: 3.5ch;
     text-align: center;
     padding: 0 0.75ch;
@@ -119,7 +75,6 @@
     padding: 0.15rem 0.75ch;
     border-radius: 4px;
     cursor: pointer;
-    transition: background 0.1s;
   }
 
   .cron-part:hover {
@@ -139,13 +94,12 @@
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     background: none;
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 0.3rem 0.8rem;
     cursor: pointer;
-    transition: color 0.1s, border-color 0.1s;
   }
 
   .copy-btn:hover {
@@ -160,7 +114,7 @@
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 0.5rem;
   }
 
@@ -175,13 +129,12 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.7rem;
     font-weight: 600;
-    color: var(--text-dim);
+    color: var(--text-muted);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 0.35rem 0.7rem;
     cursor: pointer;
-    transition: color 0.1s, border-color 0.1s;
   }
 
   .preset:hover {
@@ -222,7 +175,7 @@
     flex: 1;
     background: var(--bg);
     border: none;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.62rem;
     font-weight: 600;
@@ -230,7 +183,6 @@
     padding: 0.5rem 0.25rem;
     cursor: pointer;
     text-align: center;
-    transition: background 0.1s, color 0.1s;
     text-transform: uppercase;
   }
 
@@ -253,7 +205,7 @@
     gap: 0.5rem;
     margin-bottom: 0.5rem;
     font-size: 0.82rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
   .mode-content .row input[type="number"],
@@ -296,9 +248,8 @@
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 4px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     cursor: pointer;
-    transition: background 0.1s, color 0.1s, border-color 0.1s;
   }
 
   .value-grid .vg-btn:hover {
@@ -327,7 +278,7 @@
   .next-runs .run-item {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.75rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     padding: 0.3rem 0;
     border-bottom: 1px solid var(--border);
   }
@@ -376,8 +327,10 @@
 </head>
 <body>
 <div class="container">
-  <h1>Cron Builder</h1>
-  <p class="subtitle">Visual cron schedule builder with human-readable output</p>
+  <header>
+    <h1>Cron Builder</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
 
   <!-- Expression display -->
   <div class="expression-box">
@@ -414,6 +367,7 @@
   </div>
 </div>
 
+<script src="/theme.js"></script>
 <script>
 const FIELDS = [
   { name: 'Minute', key: 'minute', min: 0, max: 59, labels: null },

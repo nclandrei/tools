@@ -4,63 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EXIF Stripper</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #0a0a0b;
-      --surface: #141416;
-      --surface-hover: #1c1c1f;
-      --border: #2a2a2e;
-      --text: #e4e4e7;
-      --text-dim: #71717a;
-      --accent: #a78bfa;
-      --accent-hover: #8b5cf6;
-      --green: #34d399;
-      --red: #f87171;
-      --radius: 12px;
-      --radius-sm: 8px;
-      --font: 'DM Sans', -apple-system, sans-serif;
-      --mono: 'JetBrains Mono', monospace;
-    }
-
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2rem 1.5rem;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .container { max-width: 900px; margin: 0 auto; }
+    .container { max-width: 900px; }
 
     header { text-align: center; margin-bottom: 2.5rem; animation: fadeUp .4s ease; }
-    h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: .4rem; }
-    .subtitle { color: var(--text-dim); font-size: .95rem; }
+    h1 { font-size: 1.75rem; }
+    .subtitle { color: var(--text-muted); font-size: .95rem; }
 
     .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 3rem 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all .15s ease;
       position: relative;
       animation: fadeUp .4s ease .05s both;
-    }
-    .drop-zone:hover, .drop-zone.dragover {
-      border-color: var(--accent);
-      background: rgba(167,139,250,.05);
     }
     .drop-zone input[type="file"] {
       position: absolute; inset: 0; opacity: 0; cursor: pointer;
     }
-    .drop-zone p { color: var(--text-dim); font-size: .95rem; }
-    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-dim); line-height: 1; }
+    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-muted); line-height: 1; }
 
     .file-list {
       display: flex; flex-direction: column; gap: .75rem;
@@ -70,39 +31,39 @@
     .file-item {
       display: flex; align-items: center; gap: 1rem;
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1rem;
+      border-radius: 8px; padding: 1rem;
       animation: fadeUp .3s ease;
     }
     .file-item img {
       width: 64px; height: 64px; object-fit: cover;
-      border-radius: var(--radius-sm); background: #000; flex-shrink: 0;
+      border-radius: 6px; background: var(--surface-alt); flex-shrink: 0;
     }
     .file-info { flex: 1; min-width: 0; }
     .file-name { font-weight: 500; margin-bottom: .2rem; word-break: break-all; font-size: .95rem; }
-    .file-meta { color: var(--text-dim); font-family: var(--mono); font-size: .8rem; }
+    .file-meta { color: var(--text-muted); font-family: monospace; font-size: .8rem; }
     .file-meta .stripped { color: var(--green); }
     .file-meta .has-exif { color: var(--red); }
     .file-remove {
-      background: none; border: 1px solid var(--border); color: var(--text-dim);
-      width: 32px; height: 32px; border-radius: var(--radius-sm); cursor: pointer;
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       font-size: 1.1rem; transition: all .15s ease; flex-shrink: 0;
     }
     .file-remove:hover { border-color: var(--red); color: var(--red); }
 
     .metadata-toggle {
-      background: none; border: 1px solid var(--border); color: var(--text-dim);
-      padding: .3rem .6rem; border-radius: var(--radius-sm); cursor: pointer;
-      font-family: var(--font); font-size: .8rem; transition: all .15s ease;
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      padding: .3rem .6rem; border-radius: 6px; cursor: pointer;
+      font-family: inherit; font-size: .8rem; transition: all .15s ease;
       margin-top: .35rem; display: inline-block;
     }
-    .metadata-toggle:hover { border-color: var(--text-dim); color: var(--text); }
+    .metadata-toggle:hover { border-color: var(--border-hover); color: var(--text); }
 
     .metadata-panel {
       display: none; margin-top: .5rem;
       background: var(--bg); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: .75rem;
-      font-family: var(--mono); font-size: .75rem; color: var(--text-dim);
+      border-radius: 6px; padding: .75rem;
+      font-family: monospace; font-size: .75rem; color: var(--text-muted);
       max-height: 200px; overflow-y: auto; word-break: break-all;
     }
     .metadata-panel.open { display: block; }
@@ -115,38 +76,22 @@
       animation: fadeUp .3s ease;
     }
 
-    .btn {
-      border: none; border-radius: var(--radius-sm); cursor: pointer;
-      font-family: var(--font); font-size: .95rem; font-weight: 500;
-      padding: .7rem 1.5rem; transition: all .15s ease;
-    }
-    .btn:disabled { opacity: .4; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-    .btn-secondary {
-      background: none; border: 1px solid var(--border); color: var(--text-dim);
-    }
-    .btn-secondary:hover:not(:disabled) { border-color: var(--text-dim); color: var(--text); }
-
     .empty { display: none; }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
   </style>
 </head>
 <body>
 <div class="container">
   <header>
     <h1>EXIF Stripper</h1>
-    <p class="subtitle">Remove metadata from photos before sharing. Everything runs in your browser.</p>
+    <a href="/">&#8592; all tools</a>
   </header>
+
+  <p class="desc">Remove metadata from photos before sharing. Everything runs in your browser.</p>
 
   <div class="drop-zone" id="dropZone">
     <div class="drop-icon">&#128247;</div>
     <p>Drop images here or click to select</p>
-    <p style="font-size:.8rem; margin-top:.4rem; color:var(--text-dim)">Supports JPEG and PNG</p>
+    <p style="font-size:.8rem; margin-top:.4rem; color:var(--text-muted)">Supports JPEG and PNG</p>
     <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple>
   </div>
 
@@ -158,6 +103,7 @@
   </div>
 </div>
 
+<script src="/theme.js"></script>
 <script>
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
@@ -362,7 +308,7 @@ function render() {
 
     const meta = document.createElement('div');
     meta.className = 'file-meta';
-    meta.textContent = formatSize(file.size) + ' · ' + file.type.split('/')[1].toUpperCase();
+    meta.textContent = formatSize(file.size) + ' \u00B7 ' + file.type.split('/')[1].toUpperCase();
 
     info.appendChild(name);
     info.appendChild(meta);
@@ -375,7 +321,7 @@ function render() {
         if (tags.length > 0) {
           const badge = document.createElement('span');
           badge.className = 'has-exif';
-          badge.textContent = ' · ' + tags.length + ' metadata fields found';
+          badge.textContent = ' \u00B7 ' + tags.length + ' metadata fields found';
           meta.appendChild(badge);
 
           const toggleBtn = document.createElement('button');
@@ -406,15 +352,15 @@ function render() {
         } else {
           const badge = document.createElement('span');
           badge.className = 'stripped';
-          badge.textContent = ' · No EXIF metadata detected';
+          badge.textContent = ' \u00B7 No EXIF metadata detected';
           meta.appendChild(badge);
         }
       };
       reader.readAsArrayBuffer(file);
     } else {
       const badge = document.createElement('span');
-      badge.style.color = 'var(--text-dim)';
-      badge.textContent = ' · Non-JPEG (metadata stripped on re-encode)';
+      badge.style.color = 'var(--text-muted)';
+      badge.textContent = ' \u00B7 Non-JPEG (metadata stripped on re-encode)';
       meta.appendChild(badge);
     }
 

@@ -6,9 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#000000">
 <title>Document Scanner</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',system-ui,sans-serif;background:#000;color:#fff;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;width:100%;overflow:hidden;background:#000;color:#fff;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 #app{height:100%;display:flex;flex-direction:column}
 .screen{display:none;flex-direction:column;height:100%;position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
 .screen.active{display:flex}
@@ -126,6 +128,7 @@ html,body{height:100%;width:100%;overflow:hidden;font-family:-apple-system,Blink
   <div id="loading"><div class="spinner"></div><span>Processing...</span></div>
 </div>
 
+<script src="/theme.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 'use strict';

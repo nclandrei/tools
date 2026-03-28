@@ -4,64 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Image Compressor</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #0a0a0b;
-      --surface: #141416;
-      --surface-hover: #1c1c1f;
-      --border: #2a2a2e;
-      --text: #e4e4e7;
-      --text-dim: #71717a;
-      --accent: #a78bfa;
-      --accent-hover: #8b5cf6;
-      --green: #34d399;
-      --red: #f87171;
-      --amber: #fbbf24;
-      --radius: 12px;
-      --radius-sm: 8px;
-      --font: 'DM Sans', -apple-system, sans-serif;
-      --mono: 'JetBrains Mono', monospace;
-    }
-
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2rem 1.5rem;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .container { max-width: 900px; margin: 0 auto; }
+    .container { max-width: 900px; }
 
     header { text-align: center; margin-bottom: 2.5rem; animation: fadeUp .4s ease; }
-    h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: .4rem; }
-    .subtitle { color: var(--text-dim); font-size: .95rem; }
+    h1 { font-size: 1.75rem; }
+    .subtitle { color: var(--text-muted); font-size: .95rem; }
 
     .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 3rem 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all .15s ease;
       position: relative;
       animation: fadeUp .4s ease .05s both;
-    }
-    .drop-zone:hover, .drop-zone.dragover {
-      border-color: var(--accent);
-      background: rgba(167,139,250,.05);
     }
     .drop-zone input[type="file"] {
       position: absolute; inset: 0; opacity: 0; cursor: pointer;
     }
-    .drop-zone p { color: var(--text-dim); font-size: .95rem; }
-    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-dim); line-height: 1; }
+    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-muted); line-height: 1; }
 
     .file-list {
       display: flex; flex-direction: column; gap: .75rem;
@@ -70,7 +30,7 @@
 
     .file-item {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1rem;
+      border-radius: 8px; padding: 1rem;
       animation: fadeUp .3s ease;
     }
     .file-top {
@@ -78,16 +38,16 @@
     }
     .file-item img.thumb {
       width: 64px; height: 64px; object-fit: cover;
-      border-radius: var(--radius-sm); background: #000; flex-shrink: 0;
+      border-radius: 6px; background: var(--surface-alt); flex-shrink: 0;
     }
     .file-info { flex: 1; min-width: 0; }
     .file-name { font-weight: 500; margin-bottom: .2rem; word-break: break-all; font-size: .95rem; }
-    .file-meta { color: var(--text-dim); font-family: var(--mono); font-size: .8rem; }
+    .file-meta { color: var(--text-muted); font-family: monospace; font-size: .8rem; }
     .file-meta .savings { color: var(--green); }
     .file-meta .increase { color: var(--red); }
     .file-remove {
-      background: none; border: 1px solid var(--border); color: var(--text-dim);
-      width: 32px; height: 32px; border-radius: var(--radius-sm); cursor: pointer;
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       font-size: 1.1rem; transition: all .15s ease; flex-shrink: 0;
     }
@@ -101,30 +61,23 @@
 
     .control-group { display: flex; flex-direction: column; gap: .3rem; }
     .control-group label {
-      font-size: .8rem; color: var(--text-dim); font-weight: 500;
+      font-size: .8rem; color: var(--text-muted); font-weight: 500;
     }
     .control-group select,
     .control-group input[type="number"] {
-      background: var(--bg); border: 1px solid var(--border); color: var(--text);
-      font-family: var(--font); font-size: .85rem; padding: .45rem .6rem;
-      border-radius: var(--radius-sm); outline: none;
-      transition: border-color .15s ease;
-    }
-    .control-group select:focus,
-    .control-group input[type="number"]:focus {
-      border-color: var(--accent);
+      padding: .45rem .6rem; font-size: .85rem;
     }
 
     .quality-row {
       grid-column: 1 / -1;
       display: flex; align-items: center; gap: .75rem;
     }
-    .quality-row label { font-size: .8rem; color: var(--text-dim); font-weight: 500; white-space: nowrap; }
+    .quality-row label { font-size: .8rem; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
     .quality-row input[type="range"] {
-      flex: 1; accent-color: var(--accent); height: 4px;
+      flex: 1; height: 4px;
     }
     .quality-row .quality-val {
-      font-family: var(--mono); font-size: .85rem; color: var(--text);
+      font-family: monospace; font-size: .85rem; color: var(--text);
       min-width: 2.5rem; text-align: right;
     }
 
@@ -135,12 +88,12 @@
     .resize-row .control-group { flex: 1; }
     .link-btn {
       background: none; border: 1px solid var(--border); color: var(--accent);
-      width: 32px; height: 34px; border-radius: var(--radius-sm); cursor: pointer;
+      width: 32px; height: 34px; border-radius: 6px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       font-size: .9rem; transition: all .15s ease; flex-shrink: 0;
       margin-bottom: 1px;
     }
-    .link-btn.linked { border-color: var(--accent); background: rgba(167,139,250,.1); }
+    .link-btn.linked { border-color: var(--accent); background: var(--accent-dim); }
     .link-btn:hover { border-color: var(--accent); }
 
     .actions {
@@ -149,45 +102,25 @@
       animation: fadeUp .3s ease;
     }
 
-    .btn {
-      font-family: var(--font); font-size: .9rem; font-weight: 500;
-      padding: .6rem 1.25rem; border-radius: var(--radius-sm);
-      cursor: pointer; transition: all .15s ease; border: none;
-    }
-    .btn-primary {
-      background: var(--accent); color: #fff;
-    }
-    .btn-primary:hover { background: var(--accent-hover); }
-    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
-    .btn-secondary {
-      background: transparent; border: 1px solid var(--border); color: var(--text);
-    }
-    .btn-secondary:hover { border-color: var(--text-dim); }
-
     .global-controls {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1rem;
+      border-radius: 8px; padding: 1rem;
       margin-top: 1.5rem; animation: fadeUp .3s ease;
     }
     .global-controls h3 {
-      font-size: .85rem; font-weight: 500; color: var(--text-dim);
+      font-size: .85rem; font-weight: 500; color: var(--text-muted);
       margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .03em;
     }
 
     .results-bar {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1rem;
+      border-radius: 8px; padding: 1rem;
       margin-top: 1rem; text-align: center;
-      font-family: var(--mono); font-size: .85rem;
+      font-family: monospace; font-size: .85rem;
       animation: fadeUp .3s ease;
     }
     .results-bar .savings { color: var(--green); font-weight: 600; }
     .results-bar .increase { color: var(--red); font-weight: 600; }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
 
     @media (max-width: 600px) {
       .controls { grid-template-columns: 1fr; }
@@ -201,14 +134,16 @@
   <div class="container">
     <header>
       <h1>Image Compressor</h1>
-      <p class="subtitle">Resize, adjust quality, convert between PNG / JPEG / WebP</p>
+      <a href="/">&#8592; all tools</a>
     </header>
+
+    <p class="desc">Resize, adjust quality, convert between PNG / JPEG / WebP</p>
 
     <div class="drop-zone" id="dropZone">
       <input type="file" accept="image/png,image/jpeg,image/webp" multiple id="fileInput">
       <div class="drop-icon">&#128444;</div>
       <p>Drop images here or click to browse</p>
-      <p style="font-size:.8rem;color:var(--text-dim);margin-top:.3rem;">PNG, JPEG, WebP</p>
+      <p style="font-size:.8rem;color:var(--text-muted);margin-top:.3rem;">PNG, JPEG, WebP</p>
     </div>
 
     <div class="global-controls" id="globalControls" style="display:none;">
@@ -246,6 +181,7 @@
     <div class="results-bar" id="resultsBar" style="display:none;"></div>
   </div>
 
+  <script src="/theme.js"></script>
   <script>
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
@@ -310,7 +246,7 @@
         item.naturalWidth = img.naturalWidth;
         item.naturalHeight = img.naturalHeight;
         const dimEl = el.querySelector('.dims');
-        if (dimEl) dimEl.textContent = img.naturalWidth + ' × ' + img.naturalHeight;
+        if (dimEl) dimEl.textContent = img.naturalWidth + ' \u00D7 ' + img.naturalHeight;
       };
       img.src = url;
 
@@ -320,7 +256,7 @@
           <div class="file-info">
             <div class="file-name">${esc(item.file.name)}</div>
             <div class="file-meta">
-              <span class="dims">…</span> &middot; ${formatBytes(item.originalSize)} &middot; ${formatType(item.file.type)}
+              <span class="dims">\u2026</span> &middot; ${formatBytes(item.originalSize)} &middot; ${formatType(item.file.type)}
               <span class="result-info"></span>
             </div>
           </div>
@@ -357,7 +293,7 @@
 
     compressBtn.addEventListener('click', async () => {
       compressBtn.disabled = true;
-      compressBtn.textContent = 'Compressing…';
+      compressBtn.textContent = 'Compressing\u2026';
       downloadAllBtn.style.display = 'none';
       resultsBar.style.display = 'none';
 
@@ -388,9 +324,9 @@
         const diff = totalOriginal - totalCompressed;
         const pct = ((diff / totalOriginal) * 100).toFixed(1);
         if (diff >= 0) {
-          resultsBar.innerHTML = `${formatBytes(totalOriginal)} → ${formatBytes(totalCompressed)} &middot; <span class="savings">saved ${formatBytes(diff)} (${pct}%)</span>`;
+          resultsBar.innerHTML = `${formatBytes(totalOriginal)} \u2192 ${formatBytes(totalCompressed)} &middot; <span class="savings">saved ${formatBytes(diff)} (${pct}%)</span>`;
         } else {
-          resultsBar.innerHTML = `${formatBytes(totalOriginal)} → ${formatBytes(totalCompressed)} &middot; <span class="increase">+${formatBytes(-diff)} larger</span>`;
+          resultsBar.innerHTML = `${formatBytes(totalOriginal)} \u2192 ${formatBytes(totalCompressed)} &middot; <span class="increase">+${formatBytes(-diff)} larger</span>`;
         }
         resultsBar.style.display = '';
       }
@@ -407,9 +343,9 @@
       const diff = item.originalSize - item.compressedSize;
       const pct = ((diff / item.originalSize) * 100).toFixed(1);
       if (diff >= 0) {
-        info.innerHTML = ` → ${formatBytes(item.compressedSize)} <span class="savings">−${pct}%</span>`;
+        info.innerHTML = ` \u2192 ${formatBytes(item.compressedSize)} <span class="savings">\u2212${pct}%</span>`;
       } else {
-        info.innerHTML = ` → ${formatBytes(item.compressedSize)} <span class="increase">+${Math.abs(pct)}%</span>`;
+        info.innerHTML = ` \u2192 ${formatBytes(item.compressedSize)} <span class="increase">+${Math.abs(pct)}%</span>`;
       }
     }
 

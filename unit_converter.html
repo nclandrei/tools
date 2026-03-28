@@ -5,53 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Unit Converter</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  :root {
-    --bg: #1a1a1e;
-    --surface: #24242a;
-    --border: #35353d;
-    --text: #e0e0e4;
-    --text-dim: #8888a0;
-    --accent: #e8c44a;
-    --accent-dim: #e8c44a22;
-    --green: #5caa6c;
-    --red: #c45c5c;
-  }
-
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 2rem 1rem;
-    min-height: 100vh;
-    min-height: 100dvh;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-font-smoothing: antialiased;
-  }
-
   .container {
     max-width: 440px;
-    margin: 0 auto;
-  }
-
-  h1 {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 0.25rem;
-  }
-
-  .subtitle {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    margin-bottom: 2rem;
+    padding: 3rem 1rem 4rem;
+    min-height: 100dvh;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Category tabs */
@@ -69,9 +31,8 @@
     flex: 1;
     background: var(--surface);
     border: none;
-    color: var(--text-dim);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     padding: 0.6rem 0.3rem;
@@ -79,6 +40,7 @@
     text-align: center;
     transition: background 0.1s, color 0.1s;
     text-transform: uppercase;
+    font-family: inherit;
   }
   .cat-tab.active {
     background: var(--accent-dim);
@@ -91,12 +53,11 @@
   }
 
   .field-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 0.4rem;
   }
 
@@ -108,44 +69,31 @@
 
   .input-row input {
     flex: 1;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-family: 'JetBrains Mono', monospace;
     font-size: 1.4rem;
     font-weight: 700;
     padding: 0.5rem 0.8rem;
     text-align: right;
-    outline: none;
     min-width: 0;
     -moz-appearance: textfield;
   }
   .input-row input::-webkit-inner-spin-button,
   .input-row input::-webkit-outer-spin-button { -webkit-appearance: none; }
-  .input-row input:focus { border-color: var(--accent); background: var(--accent-dim); }
+  .input-row input:focus { background: var(--accent-dim); }
 
   .input-row select {
     width: 110px;
     flex-shrink: 0;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-family: 'JetBrains Mono', monospace;
     font-size: 0.78rem;
     font-weight: 600;
     padding: 0.5rem 0.4rem;
-    outline: none;
     cursor: pointer;
     -webkit-appearance: none;
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238888a0'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.5rem center;
     padding-right: 1.5rem;
   }
-  .input-row select:focus { border-color: var(--accent); }
 
   /* Swap button */
   .swap-row {
@@ -164,7 +112,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-size: 1.1rem;
     transition: border-color 0.15s, color 0.15s;
   }
@@ -180,8 +128,7 @@
   }
 
   .results-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -195,7 +142,6 @@
     align-items: baseline;
     padding: 0.35rem 0;
     border-bottom: 1px solid var(--border);
-    font-family: 'JetBrains Mono', monospace;
     cursor: pointer;
     transition: background 0.1s;
     margin: 0 -0.5rem;
@@ -215,28 +161,27 @@
 
   .result-unit {
     font-size: 0.75rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-weight: 600;
   }
 
   /* Currency status */
   .currency-status {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
-    color: var(--text-dim);
+    font-size: 0.75rem;
+    color: var(--text-muted);
     text-align: center;
     margin-bottom: 1rem;
   }
   .currency-status .fresh { color: var(--green); }
-  .currency-status .stale { color: var(--accent); }
+  .currency-status .stale { color: var(--amber); }
   .currency-status .error { color: var(--red); }
 
   .refresh-btn {
     background: none;
     border: none;
     color: var(--accent);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
+    font-family: inherit;
     cursor: pointer;
     text-decoration: underline;
     padding: 0;
@@ -251,7 +196,6 @@
     transform: translateX(-50%) translateY(20px);
     background: var(--green);
     color: #fff;
-    font-family: 'JetBrains Mono', monospace;
     font-size: 0.75rem;
     font-weight: 600;
     padding: 0.4rem 1rem;
@@ -270,10 +214,10 @@
     margin-top: 3rem;
     text-align: center;
     font-size: 0.75rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
   footer a {
-    color: var(--text-dim);
+    color: var(--text-muted);
     text-decoration: none;
   }
   footer a:hover { color: var(--accent); }
@@ -282,8 +226,11 @@
 <body>
 
 <div class="container">
-  <h1>Unit Converter</h1>
-  <p class="subtitle">Length, weight, temperature, and currency.</p>
+  <header>
+    <h1>Unit Converter</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Length, weight, temperature, and currency.</p>
 
   <div class="category-tabs" id="cat-tabs">
     <button class="cat-tab active" data-cat="length" onclick="setCat('length')">Length</button>
@@ -318,7 +265,7 @@
   </div>
 
   <footer>
-    <a href="/">&#8592; Tools</a> &middot; <a href="https://nicolaeandrei.com">nicolaeandrei.com</a>
+    <a href="https://nicolaeandrei.com">nicolaeandrei.com</a>
   </footer>
 </div>
 
@@ -676,5 +623,6 @@
   convert('from');
 </script>
 
+<script src="/theme.js"></script>
 </body>
 </html>

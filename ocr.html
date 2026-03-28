@@ -4,43 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OCR — Extract Text from Images</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #0a0a0b;
-      --surface: #141416;
-      --surface-hover: #1c1c1f;
-      --border: #2a2a2e;
-      --text: #e4e4e7;
-      --text-dim: #71717a;
-      --accent: #a78bfa;
-      --accent-hover: #8b5cf6;
-      --green: #34d399;
-      --red: #f87171;
-      --radius: 12px;
-      --radius-sm: 8px;
-      --font: 'DM Sans', -apple-system, sans-serif;
-      --mono: 'JetBrains Mono', monospace;
-    }
-
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2rem 1.5rem;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .container { max-width: 900px; margin: 0 auto; }
+    .container { max-width: 900px; }
 
     header { text-align: center; margin-bottom: 2.5rem; animation: fadeUp .4s ease; }
-    h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: .4rem; }
-    .subtitle { color: var(--text-dim); font-size: .95rem; }
+    h1 { font-size: 1.75rem; }
+    .subtitle { color: var(--text-muted); font-size: .95rem; }
 
     .settings {
       display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap;
@@ -49,36 +21,21 @@
 
     .setting-group {
       display: flex; align-items: center; gap: .4rem;
-      font-size: .85rem; color: var(--text-dim);
+      font-size: .85rem; color: var(--text-muted);
     }
 
     select {
-      background: var(--surface); color: var(--text); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: .4rem .6rem;
-      font-family: var(--font); font-size: .85rem; cursor: pointer;
-      outline: none;
+      padding: .4rem .6rem; font-size: .85rem; cursor: pointer;
     }
-    select:focus { border-color: var(--accent); }
 
     .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 3rem 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all .15s ease;
       position: relative;
       animation: fadeUp .4s ease .05s both;
-    }
-    .drop-zone:hover, .drop-zone.dragover {
-      border-color: var(--accent);
-      background: rgba(167,139,250,.05);
     }
     .drop-zone input[type="file"] {
       position: absolute; inset: 0; opacity: 0; cursor: pointer;
     }
-    .drop-zone p { color: var(--text-dim); font-size: .95rem; }
-    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-dim); line-height: 1; }
+    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-muted); line-height: 1; }
 
     .result-area {
       margin-top: 1.5rem;
@@ -91,7 +48,7 @@
     }
     .image-preview img {
       max-width: 100%; max-height: 400px;
-      border-radius: var(--radius);
+      border-radius: 8px;
       border: 1px solid var(--border);
       display: block;
       margin: 0 auto;
@@ -99,8 +56,8 @@
     .image-preview .remove-btn {
       position: absolute; top: .5rem; right: .5rem;
       background: rgba(0,0,0,.7); border: 1px solid var(--border);
-      color: var(--text-dim); width: 32px; height: 32px;
-      border-radius: var(--radius-sm); cursor: pointer;
+      color: var(--text-muted); width: 32px; height: 32px;
+      border-radius: 6px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       font-size: 1.1rem; transition: all .15s ease;
     }
@@ -108,7 +65,7 @@
 
     .progress-bar {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); overflow: hidden;
+      border-radius: 6px; overflow: hidden;
       height: 6px; margin-bottom: 1rem;
     }
     .progress-bar .fill {
@@ -118,16 +75,16 @@
     }
 
     .status-text {
-      font-size: .85rem; color: var(--text-dim);
+      font-size: .85rem; color: var(--text-muted);
       text-align: center; margin-bottom: 1rem;
     }
 
     .text-output {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border-radius: 8px;
       padding: 1rem;
-      font-family: var(--mono);
+      font-family: monospace;
       font-size: .85rem;
       line-height: 1.6;
       color: var(--text);
@@ -143,27 +100,14 @@
       display: flex; gap: .75rem; margin-top: 1rem; flex-wrap: wrap;
     }
 
-    .btn {
-      border: none; border-radius: var(--radius-sm); cursor: pointer;
-      font-family: var(--font); font-size: .95rem; font-weight: 500;
-      padding: .7rem 1.5rem; transition: all .15s ease;
-    }
-    .btn:disabled { opacity: .4; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-    .btn-secondary {
-      background: none; border: 1px solid var(--border); color: var(--text-dim);
-    }
-    .btn-secondary:hover:not(:disabled) { border-color: var(--text-dim); color: var(--text); }
-
     .confidence-badge {
       display: inline-block;
       font-size: .8rem;
-      font-family: var(--mono);
+      font-family: monospace;
       padding: .2rem .5rem;
-      border-radius: var(--radius-sm);
+      border-radius: 6px;
       border: 1px solid var(--border);
-      color: var(--text-dim);
+      color: var(--text-muted);
       margin-left: .5rem;
     }
 
@@ -171,23 +115,20 @@
       position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
       background: var(--surface); border: 1px solid var(--border);
       color: var(--green); padding: .6rem 1.2rem;
-      border-radius: var(--radius-sm); font-size: .85rem;
+      border-radius: 6px; font-size: .85rem;
       opacity: 0; transition: opacity .2s ease; pointer-events: none;
     }
     .toast.show { opacity: 1; }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
   </style>
 </head>
 <body>
 <div class="container">
   <header>
     <h1>OCR</h1>
-    <p class="subtitle">Extract text from images using Tesseract.js. Everything runs in your browser.</p>
+    <a href="/">&#8592; all tools</a>
   </header>
+
+  <p class="desc">Extract text from images using Tesseract.js. Everything runs in your browser.</p>
 
   <div class="settings">
     <div class="setting-group">
@@ -222,7 +163,7 @@
   <div class="drop-zone" id="dropZone">
     <div class="drop-icon">&#128065;</div>
     <p>Drop an image here or click to select</p>
-    <p style="font-size:.8rem; margin-top:.4rem; color:var(--text-dim)">Supports JPEG, PNG, WebP, BMP, TIFF</p>
+    <p style="font-size:.8rem; margin-top:.4rem; color:var(--text-muted)">Supports JPEG, PNG, WebP, BMP, TIFF</p>
     <input type="file" id="fileInput" accept="image/*">
   </div>
 
@@ -250,6 +191,7 @@
 
 <div class="toast" id="toast">Copied to clipboard</div>
 
+<script src="/theme.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
   const dropZone = document.getElementById('dropZone');

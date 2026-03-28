@@ -4,56 +4,33 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coffee Brewing Guide</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
   [hidden] { display: none !important; }
 
-  :root {
-    --bg: #1a1a1e;
-    --surface: #24242a;
-    --surface-hover: #2a2a32;
-    --border: #35353d;
-    --text: #e0e0e4;
-    --text-dim: #8888a0;
-    --accent: #c4956a;
-    --accent-dim: #c4956a22;
-    --accent-hover: #d4a57a;
-    --green: #5caa6c;
-    --red: #c45c5c;
-    --amber: #e8c44a;
+  [data-theme="light"] {
+    --accent: #b07d4f;
+    --accent-dim: rgba(176, 125, 79, 0.08);
+    --accent-hover: #9a6a40;
+    --surface-hover: var(--surface-alt);
     --radius: 10px;
     --radius-sm: 6px;
   }
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 2rem 1rem;
-    min-height: 100vh;
+  [data-theme="dark"] {
+    --accent: #c4956a;
+    --accent-dim: rgba(196, 149, 106, 0.1);
+    --accent-hover: #d4a57a;
+    --surface-hover: #2a2a32;
+    --radius: 10px;
+    --radius-sm: 6px;
   }
 
   .container {
     max-width: 480px;
-    margin: 0 auto;
-  }
-
-  h1 {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 0.25rem;
-  }
-
-  .subtitle {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    margin-bottom: 1.5rem;
+    padding: 3rem 1rem 4rem;
   }
 
   /* Method selector */
@@ -85,7 +62,7 @@
   }
 
   .method-btn .method-name {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 0.8rem;
     font-weight: 600;
     display: block;
@@ -94,7 +71,7 @@
 
   .method-btn .method-time {
     font-size: 0.7rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
   /* Recipe panel */
@@ -126,17 +103,17 @@
   }
 
   .param-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 0.6rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--text-muted);
     display: block;
   }
 
   .param-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 1rem;
     font-weight: 700;
     color: var(--text);
@@ -158,12 +135,12 @@
   }
 
   .dose-adjuster label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
   .dose-adjuster button {
@@ -173,7 +150,7 @@
     border: 1px solid var(--border);
     background: var(--surface-hover);
     color: var(--text);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 1rem;
     font-weight: 700;
     cursor: pointer;
@@ -187,7 +164,7 @@
   .dose-adjuster button:active { transform: scale(0.93); }
 
   .dose-display {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 1.3rem;
     font-weight: 700;
     color: var(--accent);
@@ -197,12 +174,12 @@
 
   /* Steps */
   .steps-header {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 0.5rem;
   }
 
@@ -229,10 +206,10 @@
   }
 
   .step-num {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 0.75rem;
     font-weight: 700;
-    color: var(--text-dim);
+    color: var(--text-muted);
     min-width: 20px;
     padding-top: 0.1rem;
   }
@@ -249,12 +226,12 @@
 
   .step-desc {
     font-size: 0.78rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     line-height: 1.4;
   }
 
   .step-time {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 0.7rem;
     color: var(--accent);
     margin-top: 0.2rem;
@@ -277,7 +254,7 @@
   }
 
   .timer-display {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 2rem;
     font-weight: 700;
     color: var(--text);
@@ -293,7 +270,7 @@
     padding: 0.5rem 1.2rem;
     border-radius: var(--radius-sm);
     border: none;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -319,7 +296,7 @@
   .btn-reset {
     background: transparent;
     border: 1px solid var(--border);
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
   .btn-reset:hover { border-color: var(--red); color: var(--red); }
 
@@ -342,7 +319,7 @@
     border-left: 3px solid var(--accent);
     border-radius: var(--radius-sm);
     font-size: 0.78rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     line-height: 1.5;
   }
 
@@ -364,7 +341,7 @@
   }
 
   .taste-card .taste-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: inherit;
     font-size: 0.65rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -378,7 +355,7 @@
 
   .taste-card .taste-fix {
     font-size: 0.75rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
     line-height: 1.4;
   }
 
@@ -386,9 +363,9 @@
   .back-btn {
     background: none;
     border: none;
-    color: var(--text-dim);
-    font-family: 'DM Sans', sans-serif;
+    color: var(--text-muted);
     font-size: 0.82rem;
+    font-family: inherit;
     cursor: pointer;
     padding: 0.3rem 0;
     margin-bottom: 1rem;
@@ -410,8 +387,11 @@
 </head>
 <body>
 <div class="container">
-  <h1>Coffee Brewing Guide</h1>
-  <p class="subtitle">Interactive recipes & timers for great coffee</p>
+  <header>
+    <h1>Coffee Brewing Guide</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Interactive recipes & timers for great coffee</p>
 
   <!-- Method Selection -->
   <div id="method-select">
@@ -863,5 +843,6 @@ function playNotification() {
   } catch (e) {}
 }
 </script>
+<script src="/theme.js"></script>
 </body>
 </html>

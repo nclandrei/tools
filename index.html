@@ -9,58 +9,19 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
   <style>
-    :root {
-      --color-text: #1a1a1a;
-      --color-text-muted: #666;
-      --color-bg: #fafaf8;
-      --color-border: #e5e5e0;
-      --color-accent: #7c3aed;
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: var(--font-sans);
-      color: var(--color-text);
-      background: var(--color-bg);
-      line-height: 1.7;
-      -webkit-font-smoothing: antialiased;
-    }
-
     .container {
       max-width: 720px;
-      margin: 0 auto;
-      padding: 3rem 1.5rem 4rem;
-    }
-
-    header {
-      margin-bottom: 2rem;
-    }
-
-    header h1 {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin-bottom: 0.25rem;
-    }
-
-    header a {
-      color: var(--color-text-muted);
-      font-size: 0.85rem;
-      text-decoration: none;
-    }
-
-    header a:hover {
-      color: var(--color-accent);
     }
 
     .intro {
       font-size: 0.88rem;
-      color: var(--color-text-muted);
+      color: var(--text-muted);
       line-height: 1.6;
       margin-bottom: 2rem;
     }
@@ -71,8 +32,8 @@
 
     .intro .tip {
       font-size: 0.82rem;
-      color: var(--color-text-muted);
-      border-left: 2px solid var(--color-border);
+      color: var(--text-muted);
+      border-left: 2px solid var(--border);
       padding-left: 0.75rem;
       margin-top: 0.75rem;
     }
@@ -80,23 +41,23 @@
     .search-input {
       width: 100%;
       padding: 0.6rem 0.8rem;
-      font-family: var(--font-sans);
+      font-family: inherit;
       font-size: 0.95rem;
-      border: 1px solid var(--color-border);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      background: #fff;
-      color: var(--color-text);
+      background: var(--surface);
+      color: var(--text);
       outline: none;
       margin-bottom: 2rem;
       transition: border-color 0.15s ease;
     }
 
     .search-input:focus {
-      border-color: var(--color-accent);
+      border-color: var(--accent);
     }
 
     .search-input::placeholder {
-      color: var(--color-text-muted);
+      color: var(--text-muted);
     }
 
     .category {
@@ -108,7 +69,7 @@
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: var(--color-text-muted);
+      color: var(--text-muted);
       margin-bottom: 0.6rem;
     }
 
@@ -121,39 +82,37 @@
     .tool-card {
       display: block;
       padding: 0.75rem 0.9rem;
-      border: 1px solid var(--color-border);
+      border: 1px solid var(--border);
       border-radius: 6px;
       text-decoration: none;
       transition: border-color 0.15s ease, background 0.15s ease;
     }
 
     .tool-card:hover {
-      border-color: var(--color-accent);
-      background: #fff;
+      border-color: var(--accent);
+      background: var(--surface);
     }
 
     .tool-title {
       display: block;
       font-size: 0.95rem;
       font-weight: 500;
-      color: var(--color-text);
+      color: var(--text);
       margin-bottom: 0.15rem;
     }
 
     .tool-desc {
       display: block;
       font-size: 0.82rem;
-      color: var(--color-text-muted);
+      color: var(--text-muted);
       line-height: 1.4;
     }
 
-
     .no-results {
       font-size: 0.9rem;
-      color: var(--color-text-muted);
+      color: var(--text-muted);
       display: none;
     }
-
   </style>
 </head>
 <body>
@@ -484,6 +443,7 @@
     <p id="no-results" class="no-results">No tools match your search.</p>
   </div>
 
+  <script src="/theme.js"></script>
   <script>
     const search = document.getElementById('search');
     const categoriesEl = document.getElementById('categories');
@@ -573,5 +533,9 @@
       noResults.style.display = anyVisible ? 'none' : '';
     });
   </script>
+<!-- PWA standalone refresh button -->
+<div id="pwa-refresh-bar"><button id="pwa-refresh-btn" onclick="location.reload()">&#8635; Refresh</button></div>
+<style>#pwa-refresh-bar{display:none;position:fixed;top:10px;right:60px;z-index:9999}#pwa-refresh-btn{background:var(--surface);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border);color:var(--accent);font-size:.85rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:500}</style>
+<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var b=document.getElementById("pwa-refresh-bar");if(b)b.style.display="block"}})()</script>
 </body>
 </html>

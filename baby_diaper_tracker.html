@@ -4,40 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Baby Diaper Tracker</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  :root {
-    --bg: #0e0e0e;
-    --surface: #171717;
-    --surface-2: #1e1e1e;
-    --surface-3: #262626;
-    --border: #2a2a2a;
-    --border-hover: #3a3a3a;
-    --text: #e8e8e8;
-    --text-mid: #a0a0a0;
-    --text-dim: #606060;
-    --accent: #e8c547;
-    --accent-dim: rgba(232, 197, 71, 0.12);
+  [data-theme="light"] {
+    --pee: #ca8a04;
+    --pee-dim: rgba(202, 138, 4, 0.1);
+    --poo: #78350f;
+    --poo-dim: rgba(120, 53, 15, 0.1);
+    --danger: #dc2626;
+    --danger-dim: rgba(220, 38, 38, 0.08);
+    --tracker-accent: #b8960a;
+    --tracker-accent-dim: rgba(184, 150, 10, 0.08);
+  }
+  [data-theme="dark"] {
     --pee: #f0c040;
     --pee-dim: rgba(240, 192, 64, 0.12);
-    --poo: #8b6914;
-    --poo-dim: rgba(139, 105, 20, 0.15);
-    --danger: #c45b5b;
-    --danger-dim: rgba(196, 91, 91, 0.12);
-    --radius: 6px;
-    --mono: 'DM Mono', monospace;
-    --sans: 'Instrument Sans', system-ui, sans-serif;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: var(--sans);
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
+    --poo: #c49a30;
+    --poo-dim: rgba(196, 154, 48, 0.15);
+    --danger: #f87171;
+    --danger-dim: rgba(248, 113, 113, 0.1);
+    --tracker-accent: #e8c547;
+    --tracker-accent-dim: rgba(232, 197, 71, 0.12);
   }
 
   .app {
@@ -56,14 +45,11 @@
   }
 
   header h1 {
-    font-family: var(--mono);
-    font-size: 18px;
-    font-weight: 500;
-    letter-spacing: -0.5px;
-    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 600;
   }
 
-  header h1 span { color: var(--accent); }
+  header h1 span { color: var(--tracker-accent); }
 
   .header-actions {
     display: flex;
@@ -73,10 +59,10 @@
   .icon-btn {
     background: var(--surface);
     border: 1px solid var(--border);
-    color: var(--text-dim);
+    color: var(--text-muted);
     width: 36px;
     height: 36px;
-    border-radius: var(--radius);
+    border-radius: 6px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -87,7 +73,7 @@
 
   .icon-btn:hover {
     border-color: var(--border-hover);
-    color: var(--text-mid);
+    color: var(--text);
   }
 
   /* Baby selector */
@@ -102,14 +88,15 @@
   .baby-tab {
     background: var(--surface);
     border: 1px solid var(--border);
-    color: var(--text-mid);
+    color: var(--text-muted);
     padding: 6px 14px;
-    border-radius: var(--radius);
+    border-radius: 6px;
     cursor: pointer;
-    font-family: var(--sans);
+    font-family: inherit;
     font-size: 14px;
     font-weight: 500;
     transition: all 0.15s;
+    position: relative;
   }
 
   .baby-tab:hover {
@@ -118,14 +105,14 @@
   }
 
   .baby-tab.active {
-    background: var(--accent-dim);
-    border-color: var(--accent);
-    color: var(--accent);
+    background: var(--tracker-accent-dim);
+    border-color: var(--tracker-accent);
+    color: var(--tracker-accent);
   }
 
   .baby-tab.add-baby {
     border-style: dashed;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-size: 16px;
     padding: 6px 10px;
   }
@@ -142,10 +129,10 @@
   .date-nav button {
     background: var(--surface);
     border: 1px solid var(--border);
-    color: var(--text-mid);
+    color: var(--text-muted);
     width: 36px;
     height: 36px;
-    border-radius: var(--radius);
+    border-radius: 6px;
     cursor: pointer;
     font-size: 18px;
     display: flex;
@@ -160,7 +147,7 @@
   }
 
   .date-nav .date-label {
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
     font-size: 15px;
     color: var(--text);
     min-width: 140px;
@@ -169,8 +156,8 @@
 
   .date-nav .date-label .today-badge {
     font-size: 11px;
-    color: var(--accent);
-    font-family: var(--sans);
+    color: var(--tracker-accent);
+    font-family: inherit;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -187,13 +174,13 @@
   .counter-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 6px;
     padding: 24px 16px;
     text-align: center;
   }
 
-  .counter-card.pee { border-color: rgba(240, 192, 64, 0.25); }
-  .counter-card.poo { border-color: rgba(139, 105, 20, 0.3); }
+  .counter-card.pee { border-color: var(--pee-dim); }
+  .counter-card.poo { border-color: var(--poo-dim); }
 
   .counter-label {
     font-size: 13px;
@@ -207,7 +194,7 @@
   .counter-card.poo .counter-label { color: var(--poo); }
 
   .counter-value {
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
     font-size: 48px;
     font-weight: 500;
     margin-bottom: 16px;
@@ -223,7 +210,7 @@
   .counter-btn {
     width: 44px;
     height: 44px;
-    border-radius: var(--radius);
+    border-radius: 6px;
     border: 1px solid var(--border);
     cursor: pointer;
     font-size: 22px;
@@ -232,26 +219,26 @@
     align-items: center;
     justify-content: center;
     transition: all 0.15s;
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
   }
 
   .counter-btn.plus {
-    background: var(--surface-2);
+    background: var(--surface-alt);
     color: var(--text);
   }
 
   .counter-btn.plus:hover {
-    background: var(--surface-3);
+    background: var(--border);
     border-color: var(--border-hover);
   }
 
   .counter-btn.minus {
     background: var(--surface);
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
   .counter-btn.minus:hover {
-    color: var(--text-mid);
+    color: var(--text);
     border-color: var(--border-hover);
   }
 
@@ -261,23 +248,23 @@
   }
 
   .log-section h2 {
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
     font-size: 13px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 12px;
   }
 
   .log-empty {
     font-size: 14px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     padding: 16px;
     text-align: center;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 6px;
   }
 
   .log-list {
@@ -293,7 +280,7 @@
     padding: 10px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 6px;
     font-size: 14px;
   }
 
@@ -306,15 +293,15 @@
   .log-entry .log-type.poo { color: var(--poo); }
 
   .log-entry .log-time {
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
     font-size: 13px;
-    color: var(--text-mid);
+    color: var(--text-muted);
   }
 
   .log-entry .log-delete {
     background: none;
     border: none;
-    color: var(--text-dim);
+    color: var(--text-muted);
     cursor: pointer;
     font-size: 14px;
     padding: 2px 6px;
@@ -343,14 +330,13 @@
   .modal {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 6px;
     padding: 24px;
     width: 90%;
     max-width: 340px;
   }
 
   .modal h3 {
-    font-family: var(--mono);
     font-size: 15px;
     font-weight: 500;
     margin-bottom: 16px;
@@ -360,11 +346,11 @@
   .modal input {
     width: 100%;
     padding: 10px 12px;
-    background: var(--surface-2);
+    background: var(--surface-alt);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 6px;
     color: var(--text);
-    font-family: var(--sans);
+    font-family: inherit;
     font-size: 14px;
     outline: none;
     margin-bottom: 16px;
@@ -380,24 +366,24 @@
 
   .modal-btn {
     padding: 8px 16px;
-    border-radius: var(--radius);
+    border-radius: 6px;
     border: 1px solid var(--border);
     cursor: pointer;
-    font-family: var(--sans);
+    font-family: inherit;
     font-size: 13px;
     font-weight: 500;
     transition: all 0.15s;
   }
 
   .modal-btn.cancel {
-    background: var(--surface-2);
-    color: var(--text-mid);
+    background: var(--surface-alt);
+    color: var(--text-muted);
   }
 
   .modal-btn.confirm {
-    background: var(--accent-dim);
-    border-color: var(--accent);
-    color: var(--accent);
+    background: var(--tracker-accent-dim);
+    border-color: var(--tracker-accent);
+    color: var(--tracker-accent);
   }
 
   .modal-btn:hover { opacity: 0.85; }
@@ -412,18 +398,18 @@
   .summary {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 6px;
     padding: 16px;
     margin-bottom: 32px;
   }
 
   .summary h2 {
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
     font-size: 13px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 12px;
   }
 
@@ -431,17 +417,16 @@
     display: flex;
     justify-content: space-between;
     font-size: 14px;
-    color: var(--text-mid);
+    color: var(--text-muted);
     padding: 4px 0;
   }
 
   .summary-row span:last-child {
-    font-family: var(--mono);
+    font-family: 'JetBrains Mono', monospace;
     color: var(--text);
   }
 
-  /* Context menu for baby tabs */
-  .baby-tab { position: relative; }
+  #importFile { display: none; }
 </style>
 </head>
 <body>
@@ -506,6 +491,7 @@
   </div>
 </div>
 
+<script src="/theme.js"></script>
 <script>
 (function() {
   const STORAGE_KEY = 'diaper-tracker';

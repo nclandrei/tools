@@ -4,55 +4,37 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grand Sumo Calendar</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  :root {
-    --bg: #0e0c0b;
-    --surface: #1a1715;
-    --surface-hover: #242019;
-    --border: #2e2923;
+  [data-theme="light"] {
+    --sand: #8a7050;
+    --sand-dim: #6a5840;
+    --red: #b03030;
+    --red-glow: rgba(176, 48, 48, 0.15);
+    --surface-hover: var(--surface-alt);
+  }
+
+  [data-theme="dark"] {
     --sand: #c4a882;
     --sand-dim: #8a7560;
-    --cream: #f0e6d6;
     --red: #c43c3c;
-    --red-glow: #c43c3c44;
-    --white: #faf6f0;
-    --text-dim: #7a7268;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--white);
-    font-family: 'DM Sans', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  .noise {
-    position: fixed;
-    inset: 0;
-    opacity: 0.03;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 100;
+    --red-glow: rgba(196, 60, 60, 0.25);
+    --surface-hover: #232326;
   }
 
   .container {
     max-width: 740px;
-    margin: 0 auto;
-    padding: 60px 24px 80px;
+    padding: 3rem 1.5rem 4rem;
   }
 
   header {
     text-align: center;
     margin-bottom: 56px;
-    animation: fadeUp 0.8s ease both;
   }
 
   .kanji {
-    font-family: 'Noto Serif JP', serif;
     font-size: 14px;
     letter-spacing: 0.5em;
     color: var(--sand-dim);
@@ -61,11 +43,9 @@
   }
 
   h1 {
-    font-family: 'Noto Serif JP', serif;
-    font-weight: 900;
-    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 700;
+    font-size: clamp(32px, 6vw, 48px);
     line-height: 1.15;
-    color: var(--cream);
     margin-bottom: 12px;
   }
 
@@ -75,7 +55,7 @@
 
   .subtitle {
     font-size: 15px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-weight: 400;
   }
 
@@ -104,7 +84,7 @@
   }
 
   .badge.algo {
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-style: italic;
   }
 
@@ -130,7 +110,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'DM Sans', sans-serif;
+    font-family: inherit;
   }
 
   .year-nav button:hover {
@@ -139,10 +119,9 @@
   }
 
   .year-nav .year-display {
-    font-family: 'Noto Serif JP', serif;
-    font-weight: 900;
+    font-weight: 700;
     font-size: 28px;
-    color: var(--cream);
+    color: var(--text);
     min-width: 80px;
     text-align: center;
   }
@@ -187,7 +166,6 @@
 
   .basho-card.active {
     border-color: var(--red);
-    box-shadow: 0 0 24px var(--red-glow), inset 0 0 24px var(--red-glow);
   }
 
   .basho-card.active .month-num {
@@ -199,8 +177,7 @@
   }
 
   .month-num {
-    font-family: 'Noto Serif JP', serif;
-    font-weight: 900;
+    font-weight: 700;
     font-size: 28px;
     color: var(--sand);
     line-height: 1;
@@ -208,22 +185,21 @@
 
   .month-label {
     font-size: 11px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin-top: 2px;
   }
 
   .basho-info h3 {
-    font-family: 'Noto Serif JP', serif;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 18px;
-    color: var(--cream);
+    color: var(--text);
     margin-bottom: 4px;
   }
 
   .basho-info .jp-name {
-    font-family: 'Noto Serif JP', serif;
+    font-family: inherit;
     font-size: 13px;
     color: var(--sand-dim);
     margin-bottom: 6px;
@@ -231,7 +207,7 @@
 
   .basho-meta {
     font-size: 13px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     display: flex;
     flex-wrap: wrap;
     gap: 4px 14px;
@@ -249,13 +225,13 @@
   }
 
   .basho-dates .date-range {
-    color: var(--cream);
+    color: var(--text);
     font-weight: 600;
     font-size: 14px;
   }
 
   .basho-dates .days-label {
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-size: 12px;
     margin-top: 2px;
   }
@@ -284,10 +260,10 @@
     gap: 10px;
     padding: 16px 36px;
     background: var(--red);
-    color: var(--white);
+    color: var(--text);
     border: none;
     border-radius: 10px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: inherit;
     font-size: 16px;
     font-weight: 700;
     cursor: pointer;
@@ -297,7 +273,6 @@
 
   .download-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 32px var(--red-glow);
     filter: brightness(1.1);
   }
 
@@ -313,14 +288,14 @@
   .download-hint {
     margin-top: 14px;
     font-size: 13px;
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
   .footer-note {
     text-align: center;
     margin-top: 48px;
     font-size: 12px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     opacity: 0.6;
     line-height: 1.6;
   }
@@ -353,17 +328,20 @@
 </style>
 </head>
 <body>
-<div class="noise"></div>
 <div class="container">
   <header>
+    <h1>Grand Sumo Calendar</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <div style="text-align:center; margin-bottom: 2rem;">
     <div class="kanji">大相撲 本場所</div>
-    <h1>Grand Sumo <span id="yearTitle"></span></h1>
+    <div style="font-size: clamp(28px, 5vw, 42px); font-weight: 700; margin-bottom: 8px;">Grand Sumo <span style="color: var(--red)" id="yearTitle"></span></div>
     <p class="subtitle"><strong>6 Honbasho</strong> — all tournaments in one calendar</p>
     <div class="badge-row">
       <span class="badge" id="tzBadge">Detecting timezone…</span>
       <span class="badge algo" id="sourceBadge"></span>
     </div>
-  </header>
+  </div>
 
   <nav class="year-nav">
     <button onclick="changeYear(-1)" aria-label="Previous year">‹</button>
@@ -594,5 +572,9 @@ function downloadICS() {
 // ── Init ──
 render();
 </script>
+<!-- Mobile toolbar: back (mobile-only) + refresh (PWA standalone-only) -->
+<div id="mobile-toolbar"><a href="/" id="toolbar-back">← Tools</a><button id="toolbar-refresh" onclick="location.reload()">↻ Refresh</button></div>
+<style>#mobile-toolbar{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(250,250,248,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.1);padding:10px 16px;align-items:center;justify-content:space-between;font-family:Inter,system-ui,-apple-system,sans-serif}#toolbar-back{color:#7c3aed;text-decoration:none;font-size:.9rem;font-weight:500}#toolbar-refresh{display:none;background:none;border:1px solid #7c3aed;color:#7c3aed;font-size:.85rem;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:inherit}@media(max-width:768px){#mobile-toolbar{display:flex}body{padding-top:44px!important}}</style>
+<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var r=document.getElementById("toolbar-refresh");if(r)r.style.display="inline-block"}})()</script>
 </body>
 </html>
