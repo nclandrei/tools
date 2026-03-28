@@ -75,6 +75,7 @@ html,body{height:100%;width:100%;overflow:hidden;-webkit-user-select:none;user-s
         <svg viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/></svg>
       </div>
       <div class="capture-title">Document Scanner</div>
+      <a href="/" style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;margin-bottom:8px">← all tools</a>
       <div class="capture-sub">Scan documents with your camera and save as PDF or image</div>
       <button class="btn btn-primary" id="camera-btn">Take Photo</button>
       <button class="btn btn-secondary" id="upload-btn">Upload Image</button>
@@ -129,7 +130,6 @@ html,body{height:100%;width:100%;overflow:hidden;-webkit-user-select:none;user-s
   <div id="loading"><div class="spinner"></div><span>Processing...</span></div>
 </div>
 
-<script src="/theme.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 'use strict';

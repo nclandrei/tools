@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/theme.css">
 <style>
   .container{max-width:1200px;padding:40px 24px}
-  .tool-header{text-align:center;margin-bottom:48px}
+  .tool-header{margin-bottom:48px}
   .tool-header h1{font-size:clamp(14px,3.2vw,22px);font-weight:700;letter-spacing:-0.5px;margin-bottom:8px;white-space:nowrap}
   .tool-header h1 .sep{opacity:0.2;margin:0 2px}
   .tool-header p{color:var(--text-muted);font-size:14px}
@@ -88,7 +88,7 @@
 <div class="container">
   <header>
     <h1>AI Agent Session Converter</h1>
-    <a href="/">&larr; all tools</a>
+    <a href="/">← all tools</a>
   </header>
   <div class="tool-header">
     <h1><span style="color:var(--accent)">Claude Code</span><span class="sep">·</span><span style="color:var(--green)">Codex</span><span class="sep">·</span><span style="color:var(--blue)">Cursor</span><span class="sep">·</span><span style="color:var(--red)">Pi</span><span class="sep">·</span><span style="color:var(--amber)">OpenCode</span></h1>
@@ -139,7 +139,6 @@
   <footer>Built by <a href="https://nicolaeandrei.com">Andrei-Mihai Nicolae</a></footer>
 </div>
 <div id="toast" class="toast"></div>
-<script src="/theme.js"></script>
 <script>
 const FORMATS={claude:{label:'Claude Code',cls:'claude',ext:'.jsonl',jsonl:true},codex:{label:'Codex CLI',cls:'codex',ext:'.jsonl',jsonl:true},cursor:{label:'Cursor',cls:'cursor',ext:'.jsonl',jsonl:true},pi:{label:'Pi',cls:'pi',ext:'.jsonl',jsonl:true},opencode:{label:'OpenCode',cls:'opencode',ext:'.json',jsonl:false}};
 let parsedLines=[],rawInput='',detectedFormat=null,extractedMessages=[],convertedOutput='',truncatePreview=true;

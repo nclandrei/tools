@@ -30,7 +30,7 @@
     gap: 20px;
   }
 
-  header { text-align: center; padding: 20px 0 8px; margin-bottom: 0; }
+  header { padding: 20px 0 8px; margin-bottom: 0; }
   header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 6px; }
   header h1 span { color: var(--accent); }
   header p { font-size: 0.85rem; color: var(--text-muted); }
@@ -160,7 +160,7 @@
 <div class="app">
   <header>
     <h1>DOCX <span>&rarr;</span> PDF</h1>
-    <a href="/">&#8592; all tools</a>
+    <a href="/">← all tools</a>
     <p>Convert Word documents to PDF right in your browser</p>
     <div class="badges">
       <span class="badge">.docx</span>
@@ -196,7 +196,6 @@
 <div class="toast" id="toast"></div>
 <div id="renderContainer"></div>
 
-<script src="/theme.js"></script>
 <script>
 (function() {
   const $ = id => document.getElementById(id);

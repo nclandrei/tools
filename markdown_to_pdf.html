@@ -25,7 +25,6 @@
 
   /* ── Header ── */
   .header {
-    text-align: center;
     padding: 20px 16px 12px;
     flex-shrink: 0;
   }
@@ -280,6 +279,7 @@
 <body>
 
 <div class="header">
+  <a href="/">← all tools</a>
   <h1>Markdown <span>→</span> PDF</h1>
   <p>Write or drop a .md file, preview, and export to PDF</p>
 </div>
@@ -335,7 +335,6 @@ Start typing markdown here, or drop a .md file anywhere...
 <div class="toast" id="toast"></div>
 <div id="renderContainer"></div>
 
-<script src="/theme.js"></script>
 <script>
 (function() {
   const $ = id => document.getElementById(id);
