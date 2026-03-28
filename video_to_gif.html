@@ -255,10 +255,8 @@
   </div>
 </div>
 
-<script>
-(function() {
-  // FFmpeg.wasm (v0.12) loaded from CDN
-  const FFMPEG_CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js';
+<script type="module">
+  import { GIFEncoder, quantize, applyPalette } from 'https://unpkg.com/gifenc@1.0.3';
 
   // Elements
   const dropZone = document.getElementById('drop-zone');
@@ -297,11 +295,6 @@
   let videoWidth = 0;
   let videoHeight = 0;
   let gifBlob = null;
-  let ffmpegLoaded = false;
-  let ffmpegLoading = false;
-
-  // FFmpeg state
-  let ffmpeg = null;
 
   function formatTime(s) {
     const m = Math.floor(s / 60);
@@ -339,21 +332,29 @@
     }
     videoFile = file;
     const url = URL.createObjectURL(file);
-    video.src = url;
-    video.onloadedmetadata = () => {
-      videoDuration = video.duration;
+
+    function applyDuration() {
+      const d = video.duration;
+      if (!d || d <= 0 || !isFinite(d)) return;
+      videoDuration = d;
       trimStart = 0;
-      trimEnd = videoDuration;
+      trimEnd = d;
+      updateTrimUI();
+    }
+
+    video.onloadedmetadata = () => {
       videoWidth = video.videoWidth;
       videoHeight = video.videoHeight;
       widthInput.placeholder = videoWidth + ' (original)';
-      updateTrimUI();
-      generateThumbnails();
       dropZone.style.display = 'none';
       videoSection.classList.add('visible');
       controls.classList.add('visible');
       resultSection.classList.remove('visible');
+      applyDuration();
+      generateThumbnails();
     };
+    video.ondurationchange = applyDuration;
+    video.src = url;
   }
 
   // --- Thumbnails ---
@@ -364,7 +365,6 @@
     tempVideo.src = video.src;
     tempVideo.muted = true;
     tempVideo.preload = 'auto';
-    let generated = 0;
 
     tempVideo.onloadeddata = () => {
       function grabFrame(i) {
@@ -391,10 +391,6 @@
 
   // --- Trim handles ---
   let dragging = null;
-
-  function getTrimX(time) {
-    return (time / videoDuration) * trimTrack.offsetWidth;
-  }
 
   function updateTrimUI() {
     const w = trimTrack.offsetWidth;
@@ -441,7 +437,6 @@
   handleStart.addEventListener('pointerdown', e => onPointerDown(e, handleStart));
   handleEnd.addEventListener('pointerdown', e => onPointerDown(e, handleEnd));
 
-  // Click on track to seek
   trimTrack.addEventListener('click', e => {
     if (e.target === handleStart || e.target === handleEnd) return;
     const rect = trimTrack.getBoundingClientRect();
@@ -449,14 +444,12 @@
     video.currentTime = ratio * videoDuration;
   });
 
-  // Update playhead
   video.addEventListener('timeupdate', () => {
     if (!videoDuration) return;
     const ratio = video.currentTime / videoDuration;
     trimPlayhead.style.left = (ratio * trimTrack.offsetWidth) + 'px';
   });
 
-  // Resize
   window.addEventListener('resize', updateTrimUI);
 
   // --- Play preview ---
@@ -494,48 +487,13 @@
     playBtn.textContent = 'Play preview';
   });
 
-  // --- FFmpeg loading ---
-  async function loadFFmpeg() {
-    if (ffmpegLoaded) return;
-    if (ffmpegLoading) {
-      // Wait for existing load
-      while (!ffmpegLoaded) await new Promise(r => setTimeout(r, 100));
-      return;
-    }
-    ffmpegLoading = true;
-    progressText.textContent = 'Loading FFmpeg (first time may take a moment)...';
-
-    if (typeof SharedArrayBuffer === 'undefined') {
-      throw new Error('SharedArrayBuffer is not available. This tool requires a browser with cross-origin isolation support.');
-    }
-
-    // Load the FFmpeg.wasm UMD bundle
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
-      s.crossOrigin = 'anonymous';
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('Failed to load FFmpeg library'));
-      document.head.appendChild(s);
+  // --- Frame extraction helpers ---
+  function seekTo(vid, time) {
+    return new Promise((resolve, reject) => {
+      vid.currentTime = time;
+      vid.onseeked = resolve;
+      vid.onerror = reject;
     });
-
-    ffmpeg = new FFmpegWASM.FFmpeg();
-    ffmpeg.on('progress', ({ progress }) => {
-      const pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
-      progressBar.style.width = pct + '%';
-      progressText.textContent = 'Converting... ' + pct + '%';
-    });
-    ffmpeg.on('log', ({ message }) => {
-      console.log('[ffmpeg]', message);
-    });
-
-    await ffmpeg.load({
-      coreURL: FFMPEG_CORE_URL,
-      wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm',
-    });
-
-    ffmpegLoaded = true;
-    ffmpegLoading = false;
   }
 
   // --- Convert ---
@@ -544,8 +502,8 @@
 
     const fps = parseInt(fpsSelect.value);
     const maxColors = parseInt(colorsSelect.value);
-    const outWidth = parseInt(widthInput.value) || -1;
-    const ss = trimStart;
+    const outWidth = parseInt(widthInput.value) || videoWidth;
+    const outHeight = Math.round((videoHeight / videoWidth) * outWidth);
     const duration = trimEnd - trimStart;
 
     if (duration <= 0) {
@@ -560,66 +518,62 @@
     progressSection.classList.add('visible');
     resultSection.classList.remove('visible');
     progressBar.style.width = '0%';
-    progressText.textContent = 'Loading FFmpeg...';
+    progressText.textContent = 'Extracting frames...';
 
     try {
-      await loadFFmpeg();
+      // Set up canvas for frame extraction
+      const canvas = document.createElement('canvas');
+      canvas.width = outWidth;
+      canvas.height = outHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-      progressText.textContent = 'Reading video...';
-      progressBar.style.width = '5%';
+      // Use a separate video element for seeking
+      const srcVideo = document.createElement('video');
+      srcVideo.muted = true;
+      srcVideo.playsInline = true;
+      srcVideo.preload = 'auto';
+      srcVideo.src = video.src;
+      await new Promise(r => { srcVideo.oncanplay = r; });
 
-      const data = new Uint8Array(await videoFile.arrayBuffer());
-      const ext = videoFile.name.split('.').pop() || 'mp4';
-      const inputName = 'input.' + ext;
-      await ffmpeg.writeFile(inputName, data);
+      const totalFrames = Math.ceil(duration * fps);
+      const delay = Math.round(1000 / fps);
 
-      progressText.textContent = 'Converting... 0%';
-      progressBar.style.width = '10%';
+      // Initialize GIF encoder
+      const gif = GIFEncoder();
 
-      // Build filter: scale + palettegen/paletteuse for high quality
-      const scaleFilter = outWidth > 0
-        ? `scale=${outWidth}:-1:flags=lanczos`
-        : `scale=iw:-1:flags=lanczos`;
+      for (let i = 0; i < totalFrames; i++) {
+        const time = trimStart + (i / fps);
+        await seekTo(srcVideo, time);
 
-      // Two-pass for better quality: generate palette then use it
-      await ffmpeg.exec([
-        '-ss', ss.toString(),
-        '-t', duration.toString(),
-        '-i', inputName,
-        '-vf', `${scaleFilter},fps=${fps},palettegen=max_colors=${maxColors}`,
-        '-y', 'palette.png'
-      ]);
+        ctx.drawImage(srcVideo, 0, 0, outWidth, outHeight);
+        const imageData = ctx.getImageData(0, 0, outWidth, outHeight);
 
-      progressText.textContent = 'Generating GIF...';
-      progressBar.style.width = '50%';
+        const palette = quantize(imageData.data, maxColors);
+        const index = applyPalette(imageData.data, palette);
+        gif.writeFrame(index, outWidth, outHeight, { palette, delay });
 
-      await ffmpeg.exec([
-        '-ss', ss.toString(),
-        '-t', duration.toString(),
-        '-i', inputName,
-        '-i', 'palette.png',
-        '-lavfi', `${scaleFilter},fps=${fps} [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=5`,
-        '-y', 'output.gif'
-      ]);
+        const pct = Math.round(((i + 1) / totalFrames) * 100);
+        progressBar.style.width = pct + '%';
+        progressText.textContent = `Encoding frame ${i + 1}/${totalFrames}...`;
 
-      const result = await ffmpeg.readFile('output.gif');
-      gifBlob = new Blob([result], { type: 'image/gif' });
+        // Yield to keep UI responsive
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+      }
+
+      gif.finish();
+      gifBlob = new Blob([gif.bytesView()], { type: 'image/gif' });
       const gifUrl = URL.createObjectURL(gifBlob);
 
       resultImg.src = gifUrl;
-      resultInfo.textContent = `Size: ${formatSize(gifBlob.size)} | Duration: ${formatTime(duration)} | ${fps} fps`;
+      resultInfo.textContent = `Size: ${formatSize(gifBlob.size)} | Duration: ${formatTime(duration)} | ${fps} fps | ${outWidth}×${outHeight}`;
 
       progressSection.classList.remove('visible');
       resultSection.classList.add('visible');
 
-      // Cleanup temp files
-      try { await ffmpeg.deleteFile(inputName); } catch {}
-      try { await ffmpeg.deleteFile('palette.png'); } catch {}
-      try { await ffmpeg.deleteFile('output.gif'); } catch {}
-
     } catch (err) {
-      console.error(err);
-      progressText.textContent = 'Error: ' + (err.message || 'Conversion failed');
+      console.error('[GIF Convert Error]', err);
+      const msg = err && (err.message || err.toString()) || 'Conversion failed';
+      progressText.textContent = 'Error: ' + msg;
       progressBar.style.width = '0%';
     }
 
@@ -642,8 +596,6 @@
     controls.classList.add('visible');
     window.scrollTo({ top: controls.offsetTop - 20, behavior: 'smooth' });
   });
-
-})();
 </script>
 </body>
 </html>
