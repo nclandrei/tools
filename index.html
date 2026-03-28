@@ -29,6 +29,28 @@
       position: static;
     }
 
+    .header-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    #pwa-refresh-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-size: 0.85rem;
+      padding: 0 14px;
+      height: 36px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+      line-height: 36px;
+      display: none;
+    }
+
     .intro {
       font-size: 0.88rem;
       color: var(--text-muted);
@@ -131,6 +153,9 @@
       <div>
         <h1>Tools</h1>
         <a href="https://nicolaeandrei.com">&larr; nicolaeandrei.com</a>
+      </div>
+      <div class="header-actions">
+        <button id="pwa-refresh-btn" onclick="location.reload()">&#8635; Refresh</button>
       </div>
     </header>
 
@@ -459,7 +484,8 @@
   <script>
     (function() {
       var t = document.querySelector('.theme-toggle');
-      if (t) document.querySelector('header').appendChild(t);
+      var actions = document.querySelector('.header-actions');
+      if (t && actions) actions.appendChild(t);
     })();
   </script>
   <script>
@@ -552,8 +578,6 @@
     });
   </script>
 <!-- PWA standalone refresh button -->
-<div id="pwa-refresh-bar"><button id="pwa-refresh-btn" onclick="location.reload()">&#8635; Refresh</button></div>
-<style>#pwa-refresh-bar{display:none;position:absolute;top:1rem;right:calc(1rem + 36px + 0.5rem);z-index:9999}#pwa-refresh-btn{background:var(--surface);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border);color:var(--accent);font-size:.85rem;padding:0 14px;height:36px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:500;line-height:36px}</style>
-<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var b=document.getElementById("pwa-refresh-bar");if(b)b.style.display="block"}})()</script>
+<script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var b=document.getElementById("pwa-refresh-btn");if(b)b.style.display="block"}})()</script>
 </body>
 </html>
