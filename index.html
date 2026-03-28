@@ -19,6 +19,16 @@
       max-width: 720px;
     }
 
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .theme-toggle {
+      position: static;
+    }
+
     .intro {
       font-size: 0.88rem;
       color: var(--text-muted);
@@ -118,8 +128,10 @@
 <body>
   <div class="container">
     <header>
-      <h1>Tools</h1>
-      <a href="https://nicolaeandrei.com">&larr; nicolaeandrei.com</a>
+      <div>
+        <h1>Tools</h1>
+        <a href="https://nicolaeandrei.com">&larr; nicolaeandrei.com</a>
+      </div>
     </header>
 
     <div class="intro">
@@ -444,6 +456,12 @@
   </div>
 
   <script src="/theme.js"></script>
+  <script>
+    (function() {
+      var t = document.querySelector('.theme-toggle');
+      if (t) document.querySelector('header').appendChild(t);
+    })();
+  </script>
   <script>
     const search = document.getElementById('search');
     const categoriesEl = document.getElementById('categories');
