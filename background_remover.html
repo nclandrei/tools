@@ -415,9 +415,9 @@
     async function ensureModel() {
       if (model) return;
 
-      const modelId = 'briaai/RMBG-2.0';
+      const modelId = 'briaai/RMBG-1.4';
 
-      showStatus('Downloading model (first time only, ~85 MB)...');
+      showStatus('Downloading model (first time only, ~170 MB)...');
       showProgress(10);
 
       model = await AutoModel.from_pretrained(modelId, {
