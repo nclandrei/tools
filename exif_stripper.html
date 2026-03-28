@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EXIF Stripper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0b;
+      --surface: #141416;
+      --surface-hover: #1c1c1f;
+      --border: #2a2a2e;
+      --text: #e4e4e7;
+      --text-dim: #71717a;
+      --accent: #a78bfa;
+      --accent-hover: #8b5cf6;
+      --green: #34d399;
+      --red: #f87171;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font: 'DM Sans', -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container { max-width: 900px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 2.5rem; animation: fadeUp .4s ease; }
+    h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: .4rem; }
+    .subtitle { color: var(--text-dim); font-size: .95rem; }
+
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all .15s ease;
+      position: relative;
+      animation: fadeUp .4s ease .05s both;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(167,139,250,.05);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .drop-zone p { color: var(--text-dim); font-size: .95rem; }
+    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-dim); line-height: 1; }
+
+    .file-list {
+      display: flex; flex-direction: column; gap: .75rem;
+      margin-top: 1.5rem;
+    }
+
+    .file-item {
+      display: flex; align-items: center; gap: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1rem;
+      animation: fadeUp .3s ease;
+    }
+    .file-item img {
+      width: 64px; height: 64px; object-fit: cover;
+      border-radius: var(--radius-sm); background: #000; flex-shrink: 0;
+    }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name { font-weight: 500; margin-bottom: .2rem; word-break: break-all; font-size: .95rem; }
+    .file-meta { color: var(--text-dim); font-family: var(--mono); font-size: .8rem; }
+    .file-meta .stripped { color: var(--green); }
+    .file-meta .has-exif { color: var(--red); }
+    .file-remove {
+      background: none; border: 1px solid var(--border); color: var(--text-dim);
+      width: 32px; height: 32px; border-radius: var(--radius-sm); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; transition: all .15s ease; flex-shrink: 0;
+    }
+    .file-remove:hover { border-color: var(--red); color: var(--red); }
+
+    .metadata-toggle {
+      background: none; border: 1px solid var(--border); color: var(--text-dim);
+      padding: .3rem .6rem; border-radius: var(--radius-sm); cursor: pointer;
+      font-family: var(--font); font-size: .8rem; transition: all .15s ease;
+      margin-top: .35rem; display: inline-block;
+    }
+    .metadata-toggle:hover { border-color: var(--text-dim); color: var(--text); }
+
+    .metadata-panel {
+      display: none; margin-top: .5rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: .75rem;
+      font-family: var(--mono); font-size: .75rem; color: var(--text-dim);
+      max-height: 200px; overflow-y: auto; word-break: break-all;
+    }
+    .metadata-panel.open { display: block; }
+    .metadata-panel table { width: 100%; border-collapse: collapse; }
+    .metadata-panel td { padding: .2rem .4rem; vertical-align: top; }
+    .metadata-panel td:first-child { color: var(--text); white-space: nowrap; padding-right: 1rem; }
+
+    .actions-bar {
+      display: flex; gap: .75rem; margin-top: 1.5rem; flex-wrap: wrap;
+      animation: fadeUp .3s ease;
+    }
+
+    .btn {
+      border: none; border-radius: var(--radius-sm); cursor: pointer;
+      font-family: var(--font); font-size: .95rem; font-weight: 500;
+      padding: .7rem 1.5rem; transition: all .15s ease;
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-secondary {
+      background: none; border: 1px solid var(--border); color: var(--text-dim);
+    }
+    .btn-secondary:hover:not(:disabled) { border-color: var(--text-dim); color: var(--text); }
+
+    .empty { display: none; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>EXIF Stripper</h1>
+    <p class="subtitle">Remove metadata from photos before sharing. Everything runs in your browser.</p>
+  </header>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">&#128247;</div>
+    <p>Drop images here or click to select</p>
+    <p style="font-size:.8rem; margin-top:.4rem; color:var(--text-dim)">Supports JPEG and PNG</p>
+    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple>
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="actions-bar" id="actionsBar" style="display:none">
+    <button class="btn btn-primary" id="stripBtn">Strip &amp; Download All</button>
+    <button class="btn btn-secondary" id="clearBtn">Clear All</button>
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const actionsBar = document.getElementById('actionsBar');
+const stripBtn = document.getElementById('stripBtn');
+const clearBtn = document.getElementById('clearBtn');
+
+let files = [];
+
+// Drag and drop
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  addFiles(e.dataTransfer.files);
+});
+
+fileInput.addEventListener('change', e => {
+  addFiles(e.target.files);
+  e.target.value = '';
+});
+
+function addFiles(newFiles) {
+  for (const f of newFiles) {
+    if (!f.type.match(/^image\/(jpeg|png|webp)$/)) continue;
+    files.push({ file: f, id: crypto.randomUUID() });
+  }
+  render();
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function parseExif(arrayBuffer) {
+  const view = new DataView(arrayBuffer);
+  const tags = [];
+
+  // JPEG check
+  if (view.getUint8(0) !== 0xFF || view.getUint8(1) !== 0xD8) return tags;
+
+  let offset = 2;
+  while (offset < view.byteLength - 1) {
+    const marker = view.getUint16(offset);
+    if (marker === 0xFFDA) break; // start of scan
+
+    const segLen = view.getUint16(offset + 2);
+
+    // APP1 = EXIF
+    if (marker === 0xFFE1) {
+      const exifHeader = String.fromCharCode(
+        view.getUint8(offset + 4), view.getUint8(offset + 5),
+        view.getUint8(offset + 6), view.getUint8(offset + 7)
+      );
+      if (exifHeader === 'Exif') {
+        tags.push({ key: 'EXIF block', value: formatSize(segLen) + ' of EXIF data' });
+        try {
+          parseIFD(view, offset + 10, offset + 10, tags);
+        } catch (e) { /* partial parse is fine */ }
+      }
+    }
+
+    // APP13 = IPTC / Photoshop
+    if (marker === 0xFFED) {
+      tags.push({ key: 'IPTC/Photoshop', value: formatSize(segLen) });
+    }
+
+    // APP2 = ICC Profile
+    if (marker === 0xFFE2) {
+      tags.push({ key: 'ICC Profile', value: formatSize(segLen) });
+    }
+
+    // XMP
+    if (marker === 0xFFE1 && segLen > 28) {
+      const possibleXmp = [];
+      for (let i = 0; i < 28 && (offset + 4 + i) < view.byteLength; i++) {
+        possibleXmp.push(String.fromCharCode(view.getUint8(offset + 4 + i)));
+      }
+      if (possibleXmp.join('').startsWith('http://ns.adobe.com/xap')) {
+        tags.push({ key: 'XMP', value: formatSize(segLen) });
+      }
+    }
+
+    offset += 2 + segLen;
+  }
+
+  return tags;
+}
+
+const EXIF_TAGS = {
+  0x010F: 'Camera Make', 0x0110: 'Camera Model', 0x0112: 'Orientation',
+  0x011A: 'X Resolution', 0x011B: 'Y Resolution', 0x0132: 'Date/Time',
+  0x013B: 'Artist', 0x8298: 'Copyright', 0x8769: 'EXIF IFD',
+  0x8825: 'GPS IFD', 0x9003: 'Date Original', 0x9004: 'Date Digitized',
+  0x920A: 'Focal Length', 0xA405: 'Focal Length (35mm)',
+  0xA430: 'Owner', 0xA431: 'Serial Number', 0xA432: 'Lens Info',
+  0xA433: 'Lens Make', 0xA434: 'Lens Model',
+  0x0001: 'GPS Latitude Ref', 0x0002: 'GPS Latitude',
+  0x0003: 'GPS Longitude Ref', 0x0004: 'GPS Longitude',
+  0x0005: 'GPS Altitude Ref', 0x0006: 'GPS Altitude',
+};
+
+function parseIFD(view, ifdOffset, tiffStart, tags) {
+  const le = view.getUint16(tiffStart) === 0x4949;
+  const get16 = o => view.getUint16(o, le);
+  const get32 = o => view.getUint32(o, le);
+
+  const count = get16(ifdOffset);
+  for (let i = 0; i < count && i < 100; i++) {
+    const entryOffset = ifdOffset + 2 + i * 12;
+    if (entryOffset + 12 > view.byteLength) break;
+
+    const tag = get16(entryOffset);
+    const type = get16(entryOffset + 2);
+    const numValues = get32(entryOffset + 4);
+
+    const name = EXIF_TAGS[tag] || ('Tag 0x' + tag.toString(16).toUpperCase());
+
+    // Read ASCII strings
+    if (type === 2 && numValues > 0) {
+      let strOffset = entryOffset + 8;
+      if (numValues > 4) strOffset = tiffStart + get32(entryOffset + 8);
+      if (strOffset + numValues <= view.byteLength) {
+        let str = '';
+        for (let j = 0; j < numValues - 1 && j < 200; j++) {
+          str += String.fromCharCode(view.getUint8(strOffset + j));
+        }
+        if (str.trim()) tags.push({ key: name, value: str.trim() });
+        continue;
+      }
+    }
+
+    // Sub-IFDs (EXIF, GPS)
+    if ((tag === 0x8769 || tag === 0x8825) && type === 4) {
+      const subOffset = tiffStart + get32(entryOffset + 8);
+      if (subOffset < view.byteLength) {
+        try { parseIFD(view, subOffset, tiffStart, tags); } catch(e) {}
+      }
+      continue;
+    }
+
+    // Rational values
+    if (type === 5 && numValues === 1) {
+      let valOffset = tiffStart + get32(entryOffset + 8);
+      if (valOffset + 8 <= view.byteLength) {
+        const num = get32(valOffset);
+        const den = get32(valOffset + 4);
+        if (den !== 0) tags.push({ key: name, value: (num / den).toFixed(2) });
+      }
+      continue;
+    }
+  }
+}
+
+function stripMetadata(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+
+      const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const quality = mimeType === 'image/jpeg' ? 0.95 : undefined;
+
+      canvas.toBlob(blob => {
+        resolve(blob);
+      }, mimeType, quality);
+    };
+    img.src = url;
+  });
+}
+
+function render() {
+  fileList.innerHTML = '';
+  actionsBar.style.display = files.length ? 'flex' : 'none';
+
+  files.forEach((entry, idx) => {
+    const { file, id } = entry;
+    const item = document.createElement('div');
+    item.className = 'file-item';
+
+    const thumb = document.createElement('img');
+    const thumbUrl = URL.createObjectURL(file);
+    thumb.src = thumbUrl;
+    thumb.onload = () => URL.revokeObjectURL(thumbUrl);
+
+    const info = document.createElement('div');
+    info.className = 'file-info';
+
+    const name = document.createElement('div');
+    name.className = 'file-name';
+    name.textContent = file.name;
+
+    const meta = document.createElement('div');
+    meta.className = 'file-meta';
+    meta.textContent = formatSize(file.size) + ' · ' + file.type.split('/')[1].toUpperCase();
+
+    info.appendChild(name);
+    info.appendChild(meta);
+
+    // Parse EXIF for JPEG
+    if (file.type === 'image/jpeg') {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const tags = parseExif(reader.result);
+        if (tags.length > 0) {
+          const badge = document.createElement('span');
+          badge.className = 'has-exif';
+          badge.textContent = ' · ' + tags.length + ' metadata fields found';
+          meta.appendChild(badge);
+
+          const toggleBtn = document.createElement('button');
+          toggleBtn.className = 'metadata-toggle';
+          toggleBtn.textContent = 'View metadata';
+          info.appendChild(toggleBtn);
+
+          const panel = document.createElement('div');
+          panel.className = 'metadata-panel';
+          const table = document.createElement('table');
+          tags.forEach(t => {
+            const tr = document.createElement('tr');
+            const td1 = document.createElement('td');
+            td1.textContent = t.key;
+            const td2 = document.createElement('td');
+            td2.textContent = t.value;
+            tr.appendChild(td1);
+            tr.appendChild(td2);
+            table.appendChild(tr);
+          });
+          panel.appendChild(table);
+          info.appendChild(panel);
+
+          toggleBtn.addEventListener('click', () => {
+            panel.classList.toggle('open');
+            toggleBtn.textContent = panel.classList.contains('open') ? 'Hide metadata' : 'View metadata';
+          });
+        } else {
+          const badge = document.createElement('span');
+          badge.className = 'stripped';
+          badge.textContent = ' · No EXIF metadata detected';
+          meta.appendChild(badge);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const badge = document.createElement('span');
+      badge.style.color = 'var(--text-dim)';
+      badge.textContent = ' · Non-JPEG (metadata stripped on re-encode)';
+      meta.appendChild(badge);
+    }
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'file-remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.title = 'Remove';
+    removeBtn.addEventListener('click', () => {
+      files = files.filter(e => e.id !== id);
+      render();
+    });
+
+    item.appendChild(thumb);
+    item.appendChild(info);
+    item.appendChild(removeBtn);
+    fileList.appendChild(item);
+  });
+}
+
+stripBtn.addEventListener('click', async () => {
+  stripBtn.disabled = true;
+  stripBtn.textContent = 'Processing...';
+
+  for (const entry of files) {
+    const blob = await stripMetadata(entry.file);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const ext = entry.file.type === 'image/png' ? '.png' : '.jpg';
+    const baseName = entry.file.name.replace(/\.[^.]+$/, '');
+    a.download = baseName + '_clean' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
+
+  stripBtn.disabled = false;
+  stripBtn.textContent = 'Strip & Download All';
+});
+
+clearBtn.addEventListener('click', () => {
+  files = [];
+  render();
+});
+</script>
+</body>
+</html>
