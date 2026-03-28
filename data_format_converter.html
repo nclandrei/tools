@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Format Converter — JSON ↔ YAML ↔ TOML</title>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0e0f11;
+  --surface: #16181c;
+  --surface-2: #1e2027;
+  --surface-3: #262830;
+  --border: #2a2d36;
+  --border-hover: #3d4150;
+  --text: #e8e9ed;
+  --text-dim: #8b8f9e;
+  --text-faint: #555968;
+  --accent: #4a9eed;
+  --accent-glow: rgba(74, 158, 237, 0.12);
+  --accent-dim: #3578b9;
+  --green: #5cb87a;
+  --green-glow: rgba(92, 184, 122, 0.12);
+  --orange: #e09a3a;
+  --error: #d4504c;
+  --error-glow: rgba(212, 80, 76, 0.12);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --mono: 'DM Mono', 'SF Mono', 'Fira Code', monospace;
+  --sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --transition: 150ms ease;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.logo-icon {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.logo-icon svg { width: 16px; height: 16px; }
+
+header h1 {
+  font-size: 16px; font-weight: 700;
+  letter-spacing: -0.02em;
+}
+header h1 span {
+  color: var(--text-dim); font-weight: 400;
+  font-size: 13px; margin-left: 6px;
+  font-family: var(--mono);
+}
+
+/* ── CONTROLS ── */
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.format-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.format-group label {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.format-select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--transition);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8f9e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+.format-select:hover { border-color: var(--border-hover); }
+.format-select:focus { border-color: var(--accent); outline: none; }
+
+.swap-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+}
+.swap-btn:hover { border-color: var(--accent); color: var(--accent); }
+.swap-btn svg { width: 16px; height: 16px; }
+
+.action-btns {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--border-hover); color: var(--text); }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+.btn-primary:hover { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
+
+/* ── EDITOR PANELS ── */
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  min-height: 400px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.panel-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-faint);
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.icon-btn:hover { color: var(--text); border-color: var(--border); background: var(--surface-3); }
+
+.icon-btn svg { width: 14px; height: 14px; }
+
+textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 14px;
+  resize: none;
+  outline: none;
+  tab-size: 2;
+}
+
+textarea::placeholder { color: var(--text-faint); }
+
+.output-area {
+  flex: 1;
+  padding: 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  user-select: text;
+}
+
+/* ── STATUS BAR ── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.status-msg { display: flex; align-items: center; gap: 6px; }
+.status-msg.error { color: var(--error); }
+.status-msg.success { color: var(--green); }
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.status-msg.error .status-dot { background: var(--error); }
+.status-msg.success .status-dot { background: var(--green); }
+
+/* ── DROP OVERLAY ── */
+.drop-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 15, 17, 0.85);
+  z-index: 100;
+  place-items: center;
+}
+.drop-overlay.active { display: grid; }
+.drop-overlay-inner {
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 48px 64px;
+  text-align: center;
+  background: var(--accent-glow);
+}
+.drop-overlay-inner p {
+  font-size: 15px;
+  color: var(--text);
+  font-weight: 500;
+}
+.drop-overlay-inner .sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  font-family: var(--mono);
+}
+
+/* ── ERROR HIGHLIGHT ── */
+.panel.has-error { border-color: var(--error); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 700px) {
+  .panels {
+    grid-template-columns: 1fr;
+  }
+  .panel { min-height: 280px; }
+  .controls { gap: 8px; }
+  .action-btns { margin-left: 0; width: 100%; }
+  .action-btns .btn { flex: 1; text-align: center; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="9" y1="13" x2="15" y2="13"/>
+        <line x1="9" y1="17" x2="15" y2="17"/>
+      </svg>
+    </div>
+    <h1>Data Format Converter <span>json · yaml · toml</span></h1>
+  </header>
+
+  <div class="controls">
+    <div class="format-group">
+      <label>From</label>
+      <select id="inputFormat" class="format-select">
+        <option value="json">JSON</option>
+        <option value="yaml">YAML</option>
+        <option value="toml">TOML</option>
+      </select>
+    </div>
+
+    <button id="swapBtn" class="swap-btn" title="Swap formats">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 16l-4-4 4-4"/><path d="M17 8l4 4-4 4"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+      </svg>
+    </button>
+
+    <div class="format-group">
+      <label>To</label>
+      <select id="outputFormat" class="format-select">
+        <option value="yaml">YAML</option>
+        <option value="json">JSON</option>
+        <option value="toml">TOML</option>
+      </select>
+    </div>
+
+    <div class="action-btns">
+      <button class="btn" id="prettifyBtn" title="Prettify input">Prettify</button>
+      <button class="btn" id="minifyBtn" title="Minify input">Minify</button>
+      <button class="btn btn-primary" id="convertBtn">Convert</button>
+    </div>
+  </div>
+
+  <div class="panels">
+    <div class="panel" id="inputPanel">
+      <div class="panel-header">
+        <span class="panel-label">Input</span>
+        <div class="panel-actions">
+          <button class="icon-btn" id="pasteBtn" title="Paste from clipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="clearBtn" title="Clear input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <textarea id="inputText" placeholder="Paste or type your data here, or drop a file..." spellcheck="false"></textarea>
+    </div>
+
+    <div class="panel" id="outputPanel">
+      <div class="panel-header">
+        <span class="panel-label">Output</span>
+        <div class="panel-actions">
+          <button class="icon-btn" id="copyBtn" title="Copy output">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="downloadBtn" title="Download output">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="output-area" id="outputText"></div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-msg" id="statusMsg">
+      <div class="status-dot"></div>
+      <span>Ready</span>
+    </div>
+    <span id="sizeInfo"></span>
+  </div>
+</div>
+
+<div class="drop-overlay" id="dropOverlay">
+  <div class="drop-overlay-inner">
+    <p>Drop file to load</p>
+    <p class="sub">.json · .yaml · .yml · .toml</p>
+  </div>
+</div>
+
+<script type="module">
+import TOML from 'https://esm.sh/smol-toml@1.3.1';
+
+const $ = s => document.querySelector(s);
+const inputFormat = $('#inputFormat');
+const outputFormat = $('#outputFormat');
+const inputText = $('#inputText');
+const outputText = $('#outputText');
+const inputPanel = $('#inputPanel');
+const outputPanel = $('#outputPanel');
+const statusMsg = $('#statusMsg');
+const sizeInfo = $('#sizeInfo');
+const dropOverlay = $('#dropOverlay');
+
+// ── FORMAT DETECTION ──
+function detectFormat(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  // JSON: starts with { or [
+  if (/^[\[{]/.test(trimmed)) {
+    try { JSON.parse(trimmed); return 'json'; } catch {}
+  }
+  // TOML: has [section] headers or key = "value" patterns
+  if (/^\[[\w.-]+\]/m.test(trimmed) || /^[\w.-]+\s*=\s*/m.test(trimmed)) {
+    // But YAML can also have key: value, check for TOML-specific patterns
+    if (/^\[[\w.-]+\]/m.test(trimmed) || /=\s*["'\d\[{tf]/m.test(trimmed)) {
+      try { TOML.parse(trimmed); return 'toml'; } catch {}
+    }
+  }
+  // YAML: try last
+  try {
+    const result = jsyaml.load(trimmed);
+    if (result !== undefined && typeof result === 'object') return 'yaml';
+  } catch {}
+  return null;
+}
+
+// ── PARSERS ──
+function parse(text, format) {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('Input is empty');
+  switch (format) {
+    case 'json': return JSON.parse(trimmed);
+    case 'yaml': {
+      const result = jsyaml.load(trimmed);
+      if (result === undefined) throw new Error('Empty YAML document');
+      return result;
+    }
+    case 'toml': return TOML.parse(trimmed);
+    default: throw new Error(`Unknown format: ${format}`);
+  }
+}
+
+// ── SERIALIZERS ──
+function serialize(data, format, minify = false) {
+  switch (format) {
+    case 'json':
+      return minify ? JSON.stringify(data) : JSON.stringify(data, null, 2);
+    case 'yaml':
+      return jsyaml.dump(data, {
+        indent: 2,
+        lineWidth: minify ? -1 : 120,
+        noRefs: true,
+        sortKeys: false,
+        flowLevel: minify ? 0 : -1,
+      });
+    case 'toml':
+      return TOML.stringify(data);
+    default:
+      throw new Error(`Unknown format: ${format}`);
+  }
+}
+
+// ── CONVERT ──
+function convert() {
+  const raw = inputText.value;
+  if (!raw.trim()) {
+    setOutput('');
+    setStatus('Ready', '');
+    return;
+  }
+
+  inputPanel.classList.remove('has-error');
+
+  try {
+    const data = parse(raw, inputFormat.value);
+    const result = serialize(data, outputFormat.value);
+    setOutput(result);
+    setStatus(`Converted ${inputFormat.value.toUpperCase()} → ${outputFormat.value.toUpperCase()}`, 'success');
+    updateSize(raw, result);
+  } catch (e) {
+    inputPanel.classList.add('has-error');
+    setOutput('');
+    setStatus(e.message, 'error');
+    sizeInfo.textContent = '';
+  }
+}
+
+// ── PRETTIFY / MINIFY ──
+function prettify() {
+  const raw = inputText.value;
+  if (!raw.trim()) return;
+  inputPanel.classList.remove('has-error');
+  try {
+    const data = parse(raw, inputFormat.value);
+    inputText.value = serialize(data, inputFormat.value, false);
+    setStatus(`Prettified ${inputFormat.value.toUpperCase()}`, 'success');
+  } catch (e) {
+    inputPanel.classList.add('has-error');
+    setStatus(e.message, 'error');
+  }
+}
+
+function minify() {
+  const raw = inputText.value;
+  if (!raw.trim()) return;
+  inputPanel.classList.remove('has-error');
+  try {
+    const data = parse(raw, inputFormat.value);
+    const result = serialize(data, inputFormat.value, true);
+    inputText.value = result;
+    setStatus(`Minified ${inputFormat.value.toUpperCase()}`, 'success');
+  } catch (e) {
+    inputPanel.classList.add('has-error');
+    setStatus(e.message, 'error');
+  }
+}
+
+// ── UI HELPERS ──
+function setOutput(text) {
+  outputText.textContent = text;
+}
+
+function setStatus(msg, type = '') {
+  statusMsg.className = 'status-msg' + (type ? ` ${type}` : '');
+  statusMsg.querySelector('span').textContent = msg;
+}
+
+function updateSize(input, output) {
+  const inSize = new Blob([input]).size;
+  const outSize = new Blob([output]).size;
+  sizeInfo.textContent = `${fmtBytes(inSize)} → ${fmtBytes(outSize)}`;
+}
+
+function fmtBytes(b) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1048576).toFixed(1)} MB`;
+}
+
+function fileExt(format) {
+  return format === 'yaml' ? 'yaml' : format;
+}
+
+// ── EVENT HANDLERS ──
+$('#convertBtn').addEventListener('click', convert);
+$('#prettifyBtn').addEventListener('click', prettify);
+$('#minifyBtn').addEventListener('click', minify);
+
+$('#swapBtn').addEventListener('click', () => {
+  const tmp = inputFormat.value;
+  inputFormat.value = outputFormat.value;
+  outputFormat.value = tmp;
+  // If there's output, move it to input
+  const outContent = outputText.textContent;
+  if (outContent) {
+    inputText.value = outContent;
+    setOutput('');
+    setStatus('Swapped', 'success');
+  }
+});
+
+$('#clearBtn').addEventListener('click', () => {
+  inputText.value = '';
+  setOutput('');
+  inputPanel.classList.remove('has-error');
+  setStatus('Ready', '');
+  sizeInfo.textContent = '';
+  inputText.focus();
+});
+
+$('#pasteBtn').addEventListener('click', async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    inputText.value = text;
+    autoDetect(text);
+    setStatus('Pasted from clipboard', 'success');
+  } catch {
+    setStatus('Clipboard access denied', 'error');
+  }
+});
+
+$('#copyBtn').addEventListener('click', async () => {
+  const text = outputText.textContent;
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus('Copied to clipboard', 'success');
+  } catch {
+    setStatus('Copy failed', 'error');
+  }
+});
+
+$('#downloadBtn').addEventListener('click', () => {
+  const text = outputText.textContent;
+  if (!text) return;
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `converted.${fileExt(outputFormat.value)}`;
+  a.click();
+  URL.revokeObjectURL(url);
+  setStatus('Downloaded', 'success');
+});
+
+// Auto-convert on input change (debounced)
+let debounceTimer;
+inputText.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    if (inputText.value.trim()) convert();
+  }, 300);
+});
+
+// Auto-detect format
+function autoDetect(text) {
+  const fmt = detectFormat(text);
+  if (fmt) {
+    inputFormat.value = fmt;
+    // Set output to a different format
+    const formats = ['json', 'yaml', 'toml'];
+    const others = formats.filter(f => f !== fmt);
+    if (!others.includes(outputFormat.value)) return;
+    if (outputFormat.value === fmt) {
+      outputFormat.value = others[0];
+    }
+  }
+}
+
+// ── DRAG & DROP ──
+let dragCounter = 0;
+
+document.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  dragCounter++;
+  dropOverlay.classList.add('active');
+});
+
+document.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  dragCounter--;
+  if (dragCounter <= 0) {
+    dragCounter = 0;
+    dropOverlay.classList.remove('active');
+  }
+});
+
+document.addEventListener('dragover', (e) => e.preventDefault());
+
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragCounter = 0;
+  dropOverlay.classList.remove('active');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  loadFile(file);
+});
+
+function loadFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const formatMap = { json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml' };
+  const fmt = formatMap[ext];
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    inputText.value = e.target.result;
+    if (fmt) {
+      inputFormat.value = fmt;
+      const formats = ['json', 'yaml', 'toml'];
+      const others = formats.filter(f => f !== fmt);
+      if (outputFormat.value === fmt) outputFormat.value = others[0];
+    } else {
+      autoDetect(e.target.result);
+    }
+    convert();
+    setStatus(`Loaded ${file.name}`, 'success');
+  };
+  reader.readAsText(file);
+}
+
+// ── KEYBOARD SHORTCUTS ──
+document.addEventListener('keydown', (e) => {
+  // Cmd/Ctrl+Enter to convert
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    convert();
+  }
+});
+</script>
+</body>
+</html>
