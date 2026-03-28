@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Unit Converter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #1a1a1e;
+    --surface: #24242a;
+    --border: #35353d;
+    --text: #e0e0e4;
+    --text-dim: #8888a0;
+    --accent: #e8c44a;
+    --accent-dim: #e8c44a22;
+    --green: #5caa6c;
+    --red: #c45c5c;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem 1rem;
+    min-height: 100vh;
+    min-height: 100dvh;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.25rem;
+  }
+
+  .subtitle {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 2rem;
+  }
+
+  /* Category tabs */
+  .category-tabs {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .cat-tab {
+    flex: 1;
+    background: var(--surface);
+    border: none;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.6rem 0.3rem;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.1s, color 0.1s;
+    text-transform: uppercase;
+  }
+  .cat-tab.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  /* Converter area */
+  .converter {
+    margin-bottom: 1.5rem;
+  }
+
+  .field-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.4rem;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .input-row input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    padding: 0.5rem 0.8rem;
+    text-align: right;
+    outline: none;
+    min-width: 0;
+    -moz-appearance: textfield;
+  }
+  .input-row input::-webkit-inner-spin-button,
+  .input-row input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .input-row input:focus { border-color: var(--accent); background: var(--accent-dim); }
+
+  .input-row select {
+    width: 110px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.5rem 0.4rem;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238888a0'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    padding-right: 1.5rem;
+  }
+  .input-row select:focus { border-color: var(--accent); }
+
+  /* Swap button */
+  .swap-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+
+  .swap-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .swap-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Results table */
+  .results-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .results-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 0.5rem;
+  }
+
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    transition: background 0.1s;
+    margin: 0 -0.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    border-radius: 3px;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-row:hover { background: var(--accent-dim); }
+  .result-row.active-unit { background: var(--accent-dim); }
+
+  .result-value {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .result-unit {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  /* Currency status */
+  .currency-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+  .currency-status .fresh { color: var(--green); }
+  .currency-status .stale { color: var(--accent); }
+  .currency-status .error { color: var(--red); }
+
+  .refresh-btn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+  }
+  .refresh-btn:hover { color: var(--text); }
+
+  /* Copied toast */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--green);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  footer {
+    margin-top: 3rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  footer a {
+    color: var(--text-dim);
+    text-decoration: none;
+  }
+  footer a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Unit Converter</h1>
+  <p class="subtitle">Length, weight, temperature, and currency.</p>
+
+  <div class="category-tabs" id="cat-tabs">
+    <button class="cat-tab active" data-cat="length" onclick="setCat('length')">Length</button>
+    <button class="cat-tab" data-cat="weight" onclick="setCat('weight')">Weight</button>
+    <button class="cat-tab" data-cat="temp" onclick="setCat('temp')">Temp</button>
+    <button class="cat-tab" data-cat="currency" onclick="setCat('currency')">Currency</button>
+  </div>
+
+  <div id="currency-status" class="currency-status" style="display:none;"></div>
+
+  <div class="converter">
+    <div class="field-label">From</div>
+    <div class="input-row">
+      <input type="number" id="from-val" value="1" inputmode="decimal" oninput="convert('from')">
+      <select id="from-unit" onchange="convert('from')"></select>
+    </div>
+
+    <div class="swap-row">
+      <button class="swap-btn" onclick="swapUnits()" aria-label="Swap units">&#8645;</button>
+    </div>
+
+    <div class="field-label">To</div>
+    <div class="input-row">
+      <input type="number" id="to-val" inputmode="decimal" oninput="convert('to')">
+      <select id="to-unit" onchange="convert('from')"></select>
+    </div>
+  </div>
+
+  <div class="results-table" id="results-table">
+    <div class="results-label">All units</div>
+    <div id="results-list"></div>
+  </div>
+
+  <footer>
+    <a href="/">&#8592; Tools</a> &middot; <a href="https://nicolaeandrei.com">nicolaeandrei.com</a>
+  </footer>
+</div>
+
+<div class="toast" id="toast">Copied</div>
+
+<script>
+  // ── Unit definitions ──
+  // All conversions go through a base unit per category.
+  // Length base: metre, Weight base: kilogram
+
+  const UNITS = {
+    length: {
+      base: 'm',
+      units: [
+        { id: 'km',   label: 'km',   name: 'Kilometre',  factor: 1000 },
+        { id: 'm',    label: 'm',    name: 'Metre',       factor: 1 },
+        { id: 'cm',   label: 'cm',   name: 'Centimetre',  factor: 0.01 },
+        { id: 'mm',   label: 'mm',   name: 'Millimetre',  factor: 0.001 },
+        { id: 'um',   label: 'μm',   name: 'Micrometre',  factor: 1e-6 },
+        { id: 'nm',   label: 'nm',   name: 'Nanometre',   factor: 1e-9 },
+        { id: 'mi',   label: 'mi',   name: 'Mile',        factor: 1609.344 },
+        { id: 'yd',   label: 'yd',   name: 'Yard',        factor: 0.9144 },
+        { id: 'ft',   label: 'ft',   name: 'Foot',        factor: 0.3048 },
+        { id: 'in',   label: 'in',   name: 'Inch',        factor: 0.0254 },
+        { id: 'nmi',  label: 'nmi',  name: 'Nautical mile', factor: 1852 },
+      ]
+    },
+    weight: {
+      base: 'kg',
+      units: [
+        { id: 't',    label: 't',    name: 'Tonne',       factor: 1000 },
+        { id: 'kg',   label: 'kg',   name: 'Kilogram',    factor: 1 },
+        { id: 'g',    label: 'g',    name: 'Gram',        factor: 0.001 },
+        { id: 'mg',   label: 'mg',   name: 'Milligram',   factor: 1e-6 },
+        { id: 'ug',   label: 'μg',   name: 'Microgram',   factor: 1e-9 },
+        { id: 'lb',   label: 'lb',   name: 'Pound',       factor: 0.45359237 },
+        { id: 'oz',   label: 'oz',   name: 'Ounce',       factor: 0.028349523125 },
+        { id: 'st',   label: 'st',   name: 'Stone',       factor: 6.35029318 },
+      ]
+    },
+    temp: {
+      base: null, // special handling
+      units: [
+        { id: 'C',  label: '°C', name: 'Celsius' },
+        { id: 'K',  label: 'K',  name: 'Kelvin' },
+        { id: 'F',  label: '°F', name: 'Fahrenheit' },
+      ]
+    },
+    currency: {
+      base: 'EUR',
+      units: [] // populated from rates
+    }
+  };
+
+  // ── Currency ──
+  const CURRENCY_META = {
+    EUR: 'Euro', USD: 'US Dollar', GBP: 'British Pound', JPY: 'Japanese Yen',
+    CHF: 'Swiss Franc', CAD: 'Canadian Dollar', AUD: 'Australian Dollar',
+    CNY: 'Chinese Yuan', SEK: 'Swedish Krona', NOK: 'Norwegian Krone',
+    DKK: 'Danish Krone', PLN: 'Polish Zloty', CZK: 'Czech Koruna',
+    HUF: 'Hungarian Forint', RON: 'Romanian Leu', BGN: 'Bulgarian Lev',
+    HRK: 'Croatian Kuna', ISK: 'Icelandic Krona', TRY: 'Turkish Lira',
+    BRL: 'Brazilian Real', KRW: 'South Korean Won', INR: 'Indian Rupee',
+    MXN: 'Mexican Peso', ZAR: 'South African Rand', NZD: 'New Zealand Dollar',
+    SGD: 'Singapore Dollar', HKD: 'Hong Kong Dollar', THB: 'Thai Baht',
+    MYR: 'Malaysian Ringgit', PHP: 'Philippine Peso', IDR: 'Indonesian Rupiah',
+    TWD: 'Taiwan Dollar', ILS: 'Israeli Shekel', ARS: 'Argentine Peso',
+    CLP: 'Chilean Peso', COP: 'Colombian Peso', PEN: 'Peruvian Sol',
+    EGP: 'Egyptian Pound', NGN: 'Nigerian Naira', KES: 'Kenyan Shilling',
+    UAH: 'Ukrainian Hryvnia', RUB: 'Russian Ruble',
+  };
+
+  // Priority currencies shown first
+  const CURRENCY_ORDER = [
+    'EUR', 'USD', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'CNY',
+    'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON', 'BGN',
+    'HRK', 'ISK', 'TRY', 'BRL', 'KRW', 'INR', 'MXN', 'ZAR',
+    'NZD', 'SGD', 'HKD', 'THB', 'MYR', 'PHP', 'IDR', 'TWD',
+    'ILS', 'ARS', 'CLP', 'COP', 'PEN', 'EGP', 'NGN', 'KES',
+    'UAH', 'RUB',
+  ];
+
+  const CACHE_KEY = 'unit_converter_fx_cache';
+  const CACHE_MAX_AGE = 4 * 60 * 60 * 1000; // 4 hours
+
+  let currencyRates = null; // { EUR: 1, USD: x, ... }
+  let currencyTimestamp = null;
+
+  function loadCachedRates() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (Date.now() - data.timestamp < CACHE_MAX_AGE && data.rates) {
+        currencyRates = data.rates;
+        currencyTimestamp = data.timestamp;
+        buildCurrencyUnits();
+        return true;
+      }
+    } catch {}
+    return false;
+  }
+
+  function saveCachedRates() {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        rates: currencyRates,
+        timestamp: currencyTimestamp
+      }));
+    } catch {}
+  }
+
+  function buildCurrencyUnits() {
+    if (!currencyRates) return;
+    UNITS.currency.units = CURRENCY_ORDER
+      .filter(c => currencyRates[c] !== undefined)
+      .map(c => ({
+        id: c,
+        label: c,
+        name: CURRENCY_META[c] || c,
+        factor: currencyRates[c]
+      }));
+  }
+
+  async function fetchRates(force) {
+    const statusEl = document.getElementById('currency-status');
+    if (!force && loadCachedRates()) {
+      updateCurrencyStatus();
+      return;
+    }
+    statusEl.innerHTML = 'Fetching rates...';
+    statusEl.style.display = '';
+    try {
+      // frankfurter.app — free, no key, ECB rates
+      const resp = await fetch('https://api.frankfurter.app/latest');
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      currencyRates = { [data.base]: 1, ...data.rates };
+      currencyTimestamp = Date.now();
+      saveCachedRates();
+      buildCurrencyUnits();
+      updateCurrencyStatus();
+      if (currentCat === 'currency') {
+        populateSelects();
+        convert('from');
+      }
+    } catch (e) {
+      // Fall back to cache even if stale
+      if (loadCachedRates()) {
+        updateCurrencyStatus();
+      } else {
+        statusEl.innerHTML = '<span class="error">Failed to fetch rates. Try again later.</span>';
+      }
+    }
+  }
+
+  function updateCurrencyStatus() {
+    const statusEl = document.getElementById('currency-status');
+    if (!currencyTimestamp) { statusEl.style.display = 'none'; return; }
+    const age = Date.now() - currencyTimestamp;
+    const mins = Math.floor(age / 60000);
+    let agoText;
+    if (mins < 1) agoText = 'just now';
+    else if (mins < 60) agoText = mins + 'm ago';
+    else if (mins < 1440) agoText = Math.floor(mins / 60) + 'h ago';
+    else agoText = Math.floor(mins / 1440) + 'd ago';
+
+    const cls = age < CACHE_MAX_AGE ? 'fresh' : 'stale';
+    statusEl.style.display = '';
+    statusEl.innerHTML = `ECB rates: <span class="${cls}">${agoText}</span> · <button class="refresh-btn" onclick="fetchRates(true)">refresh</button>`;
+  }
+
+  // ── Temperature conversions ──
+  function tempToC(val, from) {
+    if (from === 'C') return val;
+    if (from === 'K') return val - 273.15;
+    if (from === 'F') return (val - 32) * 5 / 9;
+  }
+
+  function cToTemp(c, to) {
+    if (to === 'C') return c;
+    if (to === 'K') return c + 273.15;
+    if (to === 'F') return c * 9 / 5 + 32;
+  }
+
+  // ── State ──
+  let currentCat = 'length';
+
+  // Default selected units per category
+  const defaultUnits = {
+    length:   { from: 'km', to: 'm' },
+    weight:   { from: 'kg', to: 'g' },
+    temp:     { from: 'C',  to: 'F' },
+    currency: { from: 'EUR', to: 'USD' },
+  };
+
+  function setCat(cat) {
+    currentCat = cat;
+    document.querySelectorAll('.cat-tab').forEach(b =>
+      b.classList.toggle('active', b.dataset.cat === cat)
+    );
+    document.getElementById('currency-status').style.display =
+      cat === 'currency' ? '' : 'none';
+
+    if (cat === 'currency' && !currencyRates) {
+      fetchRates(false);
+    }
+
+    populateSelects();
+    convert('from');
+  }
+
+  function populateSelects() {
+    const fromSel = document.getElementById('from-unit');
+    const toSel = document.getElementById('to-unit');
+    const units = UNITS[currentCat].units;
+    const defs = defaultUnits[currentCat];
+
+    // Preserve current selection if valid
+    const curFrom = fromSel.value;
+    const curTo = toSel.value;
+    const validIds = new Set(units.map(u => u.id));
+
+    fromSel.innerHTML = units.map(u =>
+      `<option value="${u.id}">${u.label}</option>`
+    ).join('');
+    toSel.innerHTML = units.map(u =>
+      `<option value="${u.id}">${u.label}</option>`
+    ).join('');
+
+    fromSel.value = validIds.has(curFrom) ? curFrom : defs.from;
+    toSel.value = validIds.has(curTo) ? curTo : defs.to;
+
+    // If both same, pick next
+    if (fromSel.value === toSel.value && units.length > 1) {
+      toSel.value = units.find(u => u.id !== fromSel.value)?.id || units[1].id;
+    }
+  }
+
+  function swapUnits() {
+    const fromSel = document.getElementById('from-unit');
+    const toSel = document.getElementById('to-unit');
+    const fromVal = document.getElementById('from-val');
+    const toVal = document.getElementById('to-val');
+    const tmpUnit = fromSel.value;
+    fromSel.value = toSel.value;
+    toSel.value = tmpUnit;
+    const tmpVal = fromVal.value;
+    fromVal.value = toVal.value;
+    toVal.value = tmpVal;
+    convert('from');
+  }
+
+  function convertValue(val, fromId, toId) {
+    if (currentCat === 'temp') {
+      const c = tempToC(val, fromId);
+      return cToTemp(c, toId);
+    }
+    const units = UNITS[currentCat].units;
+    const fromFactor = units.find(u => u.id === fromId)?.factor;
+    const toFactor = units.find(u => u.id === toId)?.factor;
+    if (!fromFactor || !toFactor) return NaN;
+
+    if (currentCat === 'currency') {
+      // rates are relative to EUR: val in fromId -> EUR -> toId
+      // factor = rate vs EUR, so 1 EUR = factor units
+      // val FROM -> EUR: val / fromFactor
+      // EUR -> TO: * toFactor
+      return val / fromFactor * toFactor;
+    }
+
+    // Standard factor-based: val * fromFactor = base units, / toFactor = target
+    return val * fromFactor / toFactor;
+  }
+
+  function formatNum(n) {
+    if (n === 0) return '0';
+    const abs = Math.abs(n);
+    if (abs >= 1e12 || (abs > 0 && abs < 1e-9)) return n.toExponential(4);
+    if (abs >= 1e6) return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (abs >= 100) return n.toLocaleString('en-US', { maximumFractionDigits: 4 });
+    if (abs >= 1) return n.toLocaleString('en-US', { maximumFractionDigits: 6 });
+    if (abs >= 0.01) return n.toLocaleString('en-US', { maximumFractionDigits: 8 });
+    return n.toExponential(4);
+  }
+
+  function convert(direction) {
+    const fromVal = document.getElementById('from-val');
+    const toVal = document.getElementById('to-val');
+    const fromUnit = document.getElementById('from-unit').value;
+    const toUnit = document.getElementById('to-unit').value;
+
+    if (direction === 'from') {
+      const val = parseFloat(fromVal.value);
+      if (isNaN(val)) { toVal.value = ''; updateResults(NaN, fromUnit); return; }
+      const result = convertValue(val, fromUnit, toUnit);
+      toVal.value = formatNum(result);
+      updateResults(val, fromUnit);
+    } else {
+      const val = parseFloat(toVal.value);
+      if (isNaN(val)) { fromVal.value = ''; updateResults(NaN, fromUnit); return; }
+      const result = convertValue(val, toUnit, fromUnit);
+      fromVal.value = formatNum(result);
+      updateResults(parseFloat(fromVal.value), fromUnit);
+    }
+  }
+
+  function updateResults(sourceVal, sourceUnit) {
+    const listEl = document.getElementById('results-list');
+    const units = UNITS[currentCat].units;
+    const toUnit = document.getElementById('to-unit').value;
+
+    if (isNaN(sourceVal)) {
+      listEl.innerHTML = '';
+      return;
+    }
+
+    listEl.innerHTML = units.map(u => {
+      const converted = convertValue(sourceVal, sourceUnit, u.id);
+      const isActive = u.id === toUnit;
+      return `<div class="result-row ${isActive ? 'active-unit' : ''}"
+                   onclick="selectResultUnit('${u.id}')"
+                   title="Click to copy">
+        <span class="result-value">${formatNum(converted)}</span>
+        <span class="result-unit">${u.label} · ${u.name}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function selectResultUnit(unitId) {
+    // Copy value to clipboard
+    const fromVal = parseFloat(document.getElementById('from-val').value);
+    const fromUnit = document.getElementById('from-unit').value;
+    if (isNaN(fromVal)) return;
+    const converted = convertValue(fromVal, fromUnit, unitId);
+    const text = formatNum(converted) + ' ' + unitId;
+    navigator.clipboard.writeText(text).then(() => showToast('Copied: ' + text));
+
+    // Also set as the "to" unit
+    document.getElementById('to-unit').value = unitId;
+    convert('from');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 1500);
+  }
+
+  // ── Init ──
+  loadCachedRates();
+  populateSelects();
+  convert('from');
+</script>
+
+</body>
+</html>
