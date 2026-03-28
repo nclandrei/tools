@@ -535,7 +535,7 @@
   </script>
 <!-- PWA standalone refresh button -->
 <div id="pwa-refresh-bar"><button id="pwa-refresh-btn" onclick="location.reload()">&#8635; Refresh</button></div>
-<style>#pwa-refresh-bar{display:none;position:fixed;top:10px;right:60px;z-index:9999}#pwa-refresh-btn{background:var(--surface);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border);color:var(--accent);font-size:.85rem;padding:6px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:500}</style>
+<style>#pwa-refresh-bar{display:none;position:fixed;top:1rem;right:calc(1rem + 36px + 0.5rem);z-index:9999}#pwa-refresh-btn{background:var(--surface);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border);color:var(--accent);font-size:.85rem;padding:0 14px;height:36px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:500;line-height:36px}</style>
 <script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var b=document.getElementById("pwa-refresh-bar");if(b)b.style.display="block"}})()</script>
 </body>
 </html>
