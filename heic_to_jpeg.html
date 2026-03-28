@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEIC to JPEG Converter</title>
+<style>
+:root {
+  --color-text: #1a1a1a;
+  --color-text-muted: #666;
+  --color-bg: #fafaf8;
+  --color-border: #e5e5e0;
+  --color-accent: #7c3aed;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+.container {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 4rem;
+}
+header { margin-bottom: 2rem; }
+header h1 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+header a { color: var(--color-text-muted); font-size: 0.85rem; text-decoration: none; }
+header a:hover { color: var(--color-accent); }
+.desc { font-size: 0.88rem; color: var(--color-text-muted); margin-bottom: 2rem; }
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed var(--color-border);
+  border-radius: 8px;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  margin-bottom: 1.5rem;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--color-accent);
+  background: #f5f0ff;
+}
+.drop-zone p { font-size: 0.9rem; color: var(--color-text-muted); }
+.drop-zone .icon { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
+.drop-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+
+/* Quality control */
+.quality-control {
+  display: none;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.88rem;
+}
+.quality-control.show { display: flex; }
+.quality-control label { color: var(--color-text-muted); white-space: nowrap; }
+.quality-control input[type="range"] { flex: 1; accent-color: var(--color-accent); }
+.quality-control .val { font-weight: 600; min-width: 3ch; text-align: right; }
+
+/* File list */
+.file-list { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+
+.file-item {
+  display: flex; align-items: center; gap: 1rem;
+  background: #fff; border: 1px solid var(--color-border);
+  border-radius: 8px; padding: 0.75rem 1rem;
+  animation: fadeUp 0.25s ease;
+}
+.file-item .thumb {
+  width: 56px; height: 56px; object-fit: cover;
+  border-radius: 6px; background: #eee; flex-shrink: 0;
+}
+.file-item .info { flex: 1; min-width: 0; }
+.file-item .name {
+  font-size: 0.88rem; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.file-item .meta {
+  font-size: 0.78rem; color: var(--color-text-muted);
+}
+.file-item .meta .done { color: #16a34a; }
+.file-item .meta .err { color: #dc2626; }
+.file-item .remove {
+  background: none; border: 1px solid var(--color-border);
+  width: 28px; height: 28px; border-radius: 6px;
+  cursor: pointer; font-size: 1rem; color: var(--color-text-muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.file-item .remove:hover { border-color: #dc2626; color: #dc2626; }
+
+/* Buttons */
+.actions { display: none; gap: 0.75rem; flex-wrap: wrap; }
+.actions.show { display: flex; }
+.btn {
+  border: none; border-radius: 8px; cursor: pointer;
+  font-family: var(--font-sans); font-size: 0.88rem; font-weight: 500;
+  padding: 0.6rem 1.25rem; transition: all 0.15s;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--color-accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #6d28d9; }
+.btn-secondary { background: #fff; border: 1px solid var(--color-border); color: var(--color-text-muted); }
+.btn-secondary:hover:not(:disabled) { border-color: #999; color: var(--color-text); }
+
+/* Progress */
+.progress-bar {
+  display: none; height: 4px; background: var(--color-border);
+  border-radius: 2px; margin-bottom: 1rem; overflow: hidden;
+}
+.progress-bar.show { display: block; }
+.progress-bar .fill {
+  height: 100%; background: var(--color-accent);
+  border-radius: 2px; width: 0%; transition: width 0.2s;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 500px) {
+  .file-item .thumb { width: 44px; height: 44px; }
+  .quality-control { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>HEIC to JPEG Converter</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
+  <p class="desc">Convert iPhone HEIC photos to JPEG. Everything runs in your browser — no uploads.</p>
+
+  <div class="drop-zone" id="dropZone" style="position:relative">
+    <span class="icon">&#128248;</span>
+    <p>Drop HEIC files here or click to select</p>
+    <p style="font-size:0.78rem; margin-top:0.4rem; color:var(--color-text-muted)">.heic &middot; .heif</p>
+    <input type="file" id="fileInput" accept=".heic,.heif,image/heic,image/heif" multiple>
+  </div>
+
+  <div class="quality-control" id="qualityControl">
+    <label for="qualityRange">JPEG quality</label>
+    <input type="range" id="qualityRange" min="10" max="100" value="92">
+    <span class="val" id="qualityVal">92</span>
+  </div>
+
+  <div class="progress-bar" id="progressBar"><div class="fill" id="progressFill"></div></div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="actions" id="actions">
+    <button class="btn btn-primary" id="convertBtn">Convert All</button>
+    <button class="btn btn-secondary" id="downloadBtn" style="display:none">Download All</button>
+    <button class="btn btn-secondary" id="clearBtn">Clear</button>
+  </div>
+</div>
+
+<script type="module">
+import libheif from 'https://cdn.jsdelivr.net/npm/libheif-js@1.18.2/+esm';
+
+const decoder = new libheif.HeifDecoder();
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const actions = document.getElementById('actions');
+const convertBtn = document.getElementById('convertBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const clearBtn = document.getElementById('clearBtn');
+const qualityControl = document.getElementById('qualityControl');
+const qualityRange = document.getElementById('qualityRange');
+const qualityVal = document.getElementById('qualityVal');
+const progressBar = document.getElementById('progressBar');
+const progressFill = document.getElementById('progressFill');
+
+let items = []; // { id, file, status:'pending'|'done'|'error', blob?, error?, thumbUrl? }
+
+qualityRange.addEventListener('input', () => { qualityVal.textContent = qualityRange.value; });
+
+// Drag & drop
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+
+function addFiles(fileListObj) {
+  for (const f of fileListObj) {
+    const name = f.name.toLowerCase();
+    if (!name.endsWith('.heic') && !name.endsWith('.heif')) continue;
+    items.push({ id: crypto.randomUUID(), file: f, status: 'pending' });
+  }
+  render();
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function render() {
+  const hasItems = items.length > 0;
+  actions.classList.toggle('show', hasItems);
+  qualityControl.classList.toggle('show', hasItems);
+
+  const anyDone = items.some(i => i.status === 'done');
+  downloadBtn.style.display = anyDone ? '' : 'none';
+  convertBtn.disabled = !items.some(i => i.status === 'pending');
+
+  fileList.innerHTML = '';
+  for (const item of items) {
+    const el = document.createElement('div');
+    el.className = 'file-item';
+
+    const thumb = document.createElement('div');
+    thumb.className = 'thumb';
+    thumb.style.background = '#eee';
+    if (item.thumbUrl) {
+      const img = document.createElement('img');
+      img.src = item.thumbUrl;
+      img.className = 'thumb';
+      el.appendChild(img);
+    } else {
+      el.appendChild(thumb);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'name';
+    nameEl.textContent = item.file.name;
+    info.appendChild(nameEl);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    if (item.status === 'pending') {
+      meta.textContent = formatSize(item.file.size);
+    } else if (item.status === 'done') {
+      meta.innerHTML = `<span class="done">Converted</span> &middot; ${formatSize(item.blob.size)}`;
+    } else {
+      meta.innerHTML = `<span class="err">${item.error || 'Conversion failed'}</span>`;
+    }
+    info.appendChild(meta);
+    el.appendChild(info);
+
+    if (item.status === 'done') {
+      const dl = document.createElement('button');
+      dl.className = 'remove';
+      dl.title = 'Download';
+      dl.innerHTML = '&#8595;';
+      dl.onclick = () => downloadOne(item);
+      el.appendChild(dl);
+    }
+
+    const rm = document.createElement('button');
+    rm.className = 'remove';
+    rm.title = 'Remove';
+    rm.innerHTML = '&times;';
+    rm.onclick = () => { items = items.filter(i => i.id !== item.id); render(); };
+    el.appendChild(rm);
+
+    fileList.appendChild(el);
+  }
+}
+
+async function decodeHeic(arrayBuffer) {
+  const data = new Uint8Array(arrayBuffer);
+  const images = decoder.decode(data);
+  if (!images || images.length === 0) throw new Error('No images found in HEIC file');
+
+  const image = images[0];
+  const w = image.get_width();
+  const h = image.get_height();
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.createImageData(w, h);
+
+  await new Promise((resolve, reject) => {
+    image.display(imageData, (displayData) => {
+      if (!displayData) { reject(new Error('Failed to decode HEIC image')); return; }
+      resolve();
+    });
+  });
+
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
+async function convertOne(item) {
+  const quality = parseInt(qualityRange.value) / 100;
+  const arrayBuffer = await item.file.arrayBuffer();
+  const canvas = await decodeHeic(arrayBuffer);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (!blob) { reject(new Error('Canvas conversion failed')); return; }
+      item.blob = blob;
+      item.thumbUrl = URL.createObjectURL(blob);
+      item.status = 'done';
+      resolve();
+    }, 'image/jpeg', quality);
+  });
+}
+
+convertBtn.addEventListener('click', async () => {
+  convertBtn.disabled = true;
+  progressBar.classList.add('show');
+  const pending = items.filter(i => i.status === 'pending');
+
+  for (let idx = 0; idx < pending.length; idx++) {
+    progressFill.style.width = ((idx / pending.length) * 100) + '%';
+    try {
+      await convertOne(pending[idx]);
+    } catch (err) {
+      pending[idx].status = 'error';
+      pending[idx].error = err.message;
+    }
+    render();
+  }
+
+  progressFill.style.width = '100%';
+  setTimeout(() => { progressBar.classList.remove('show'); progressFill.style.width = '0%'; }, 600);
+});
+
+function downloadOne(item) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(item.blob);
+  a.download = item.file.name.replace(/\.heic$/i, '').replace(/\.heif$/i, '') + '.jpg';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+downloadBtn.addEventListener('click', () => {
+  for (const item of items) {
+    if (item.status === 'done') downloadOne(item);
+  }
+});
+
+clearBtn.addEventListener('click', () => { items = []; render(); });
+</script>
+</body>
+</html>
