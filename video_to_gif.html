@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Video to GIF Converter</title>
 <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" crossorigin>
 <link rel="stylesheet" href="/theme.css">
 <style>
 .drop-zone input { display: none; }
@@ -258,7 +258,7 @@
 <script>
 (function() {
   // FFmpeg.wasm (v0.12) loaded from CDN
-  const FFMPEG_CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js';
+  const FFMPEG_CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js';
 
   // Elements
   const dropZone = document.getElementById('drop-zone');
@@ -505,12 +505,17 @@
     ffmpegLoading = true;
     progressText.textContent = 'Loading FFmpeg (first time may take a moment)...';
 
+    if (typeof SharedArrayBuffer === 'undefined') {
+      throw new Error('SharedArrayBuffer is not available. This tool requires a browser with cross-origin isolation support.');
+    }
+
     // Load the FFmpeg.wasm UMD bundle
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
+      s.crossOrigin = 'anonymous';
       s.onload = resolve;
-      s.onerror = reject;
+      s.onerror = () => reject(new Error('Failed to load FFmpeg library'));
       document.head.appendChild(s);
     });
 
@@ -526,7 +531,7 @@
 
     await ffmpeg.load({
       coreURL: FFMPEG_CORE_URL,
-      wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
+      wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm',
     });
 
     ffmpegLoaded = true;
