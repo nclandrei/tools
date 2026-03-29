@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coffee Bean Tasting Log</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  [data-theme="light"] {
+    --accent: #b07d4f;
+    --accent-dim: rgba(176, 125, 79, 0.08);
+    --accent-hover: #9a6a40;
+    --surface-hover: var(--surface-alt);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  [data-theme="dark"] {
+    --accent: #c4956a;
+    --accent-dim: rgba(196, 149, 106, 0.1);
+    --accent-hover: #d4a57a;
+    --surface-hover: #2a2a32;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  .container { max-width: 560px; }
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border);
+  }
+
+  .tab {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .tab:not(.active):hover { color: var(--text); }
+
+  /* Form */
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.88rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .form-group textarea {
+    resize: vertical;
+    min-height: 60px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  /* Slider ratings */
+  .slider-group {
+    margin-bottom: 1rem;
+  }
+
+  .slider-group label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+  }
+
+  .slider-group label span {
+    color: var(--accent);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .slider-group input[type="range"] {
+    width: 100%;
+    border: none;
+    background: transparent;
+    height: 24px;
+  }
+
+  /* Flavor tags */
+  .flavor-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+  }
+
+  .flavor-tag {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    font-family: inherit;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .flavor-tag.selected {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .flavor-tag:hover:not(.selected) {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .flavor-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  /* Actions */
+  .form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+  }
+
+  .form-actions .btn { flex: 1; }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 1rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-accent:hover { background: var(--accent-hover); }
+  .btn-accent:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-outline {
+    background: var(--surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 1rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-outline:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  /* Bean cards */
+  .bean-card {
+    padding: 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    transition: border-color 0.15s;
+  }
+
+  .bean-card:hover { border-color: var(--accent); }
+
+  .bean-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.4rem;
+  }
+
+  .bean-name {
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+
+  .bean-rating {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .bean-meta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .bean-flavors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.4rem;
+  }
+
+  .bean-flavor-chip {
+    font-size: 0.68rem;
+    padding: 0.15rem 0.45rem;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: 10px;
+  }
+
+  .bean-bars {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .bean-bar-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.15rem;
+  }
+
+  .bean-bar-track {
+    height: 4px;
+    background: var(--surface-alt, var(--border));
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .bean-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  .bean-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    justify-content: flex-end;
+  }
+
+  .bean-action-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0.2rem 0;
+  }
+
+  .bean-action-btn:hover { color: var(--accent); }
+  .bean-action-btn.danger:hover { color: var(--red); }
+
+  .bean-notes {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.35rem;
+    line-height: 1.4;
+  }
+
+  /* Stats */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 0.15rem;
+  }
+
+  .top-list {
+    margin-bottom: 1.5rem;
+  }
+
+  .top-list h3 {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .top-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    font-size: 0.82rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .top-item:last-child { border-bottom: none; }
+
+  .top-item-name { color: var(--text); }
+  .top-item-count { color: var(--text-muted); }
+
+  /* Filter/sort bar */
+  .filter-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+
+  .filter-bar input {
+    flex: 1;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.85rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .filter-bar select {
+    padding: 0.45rem 0.5rem;
+    font-size: 0.82rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+
+  .export-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .export-bar .btn-outline { flex: 1; font-size: 0.78rem; padding: 0.5rem; }
+
+  @media (max-width: 440px) {
+    .form-row, .form-row-3 { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .bean-bars { grid-template-columns: 1fr 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Coffee Bean Tasting Log</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="log">Log</button>
+    <button class="tab" data-tab="add">Add Bean</button>
+    <button class="tab" data-tab="stats">Stats</button>
+  </div>
+
+  <!-- Add Bean Tab -->
+  <div id="tab-add" style="display:none">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Bean name</label>
+        <input type="text" id="bean-name" placeholder="e.g. Finca El Paraiso">
+      </div>
+      <div class="form-group">
+        <label>Roaster</label>
+        <input type="text" id="bean-roaster" placeholder="e.g. Friedhats" list="roaster-list">
+        <datalist id="roaster-list"></datalist>
+      </div>
+    </div>
+
+    <div class="form-row-3">
+      <div class="form-group">
+        <label>Origin</label>
+        <input type="text" id="bean-origin" placeholder="e.g. Colombia" list="origin-list">
+        <datalist id="origin-list"></datalist>
+      </div>
+      <div class="form-group">
+        <label>Process</label>
+        <select id="bean-process">
+          <option value="">Select</option>
+          <option>Washed</option>
+          <option>Natural</option>
+          <option>Honey</option>
+          <option>Anaerobic</option>
+          <option>Carbonic Maceration</option>
+          <option>Wet Hulled</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Roast level</label>
+        <select id="bean-roast">
+          <option value="">Select</option>
+          <option>Light</option>
+          <option>Medium-Light</option>
+          <option>Medium</option>
+          <option>Medium-Dark</option>
+          <option>Dark</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Variety</label>
+        <input type="text" id="bean-variety" placeholder="e.g. Gesha, Bourbon">
+      </div>
+      <div class="form-group">
+        <label>Brew method</label>
+        <select id="bean-brew">
+          <option value="">Select</option>
+          <option>Espresso</option>
+          <option>V60</option>
+          <option>AeroPress</option>
+          <option>French Press</option>
+          <option>Chemex</option>
+          <option>Moka Pot</option>
+          <option>Batch Brew</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="slider-group">
+      <label>Acidity <span id="acidity-val">3</span>/5</label>
+      <input type="range" id="bean-acidity" min="1" max="5" value="3">
+    </div>
+
+    <div class="slider-group">
+      <label>Body <span id="body-val">3</span>/5</label>
+      <input type="range" id="bean-body" min="1" max="5" value="3">
+    </div>
+
+    <div class="slider-group">
+      <label>Sweetness <span id="sweetness-val">3</span>/5</label>
+      <input type="range" id="bean-sweetness" min="1" max="5" value="3">
+    </div>
+
+    <div class="slider-group">
+      <label>Overall rating <span id="rating-val">3</span>/5</label>
+      <input type="range" id="bean-rating" min="1" max="5" value="3">
+    </div>
+
+    <div class="flavor-label">Flavor notes (select any)</div>
+    <div class="flavor-tags" id="flavor-tags"></div>
+
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="bean-notes" placeholder="Tasting notes, brew details, etc."></textarea>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-outline" onclick="resetForm()">Clear</button>
+      <button class="btn-accent" id="save-btn" onclick="saveBean()">Save bean</button>
+    </div>
+  </div>
+
+  <!-- Log Tab -->
+  <div id="tab-log">
+    <div class="filter-bar">
+      <input type="text" id="filter-search" placeholder="Search beans...">
+      <select id="filter-sort">
+        <option value="date-desc">Newest</option>
+        <option value="date-asc">Oldest</option>
+        <option value="rating-desc">Top rated</option>
+        <option value="name-asc">A-Z</option>
+      </select>
+    </div>
+    <div id="bean-list"></div>
+    <div class="export-bar">
+      <button class="btn-outline" onclick="exportJSON()">Export JSON</button>
+      <button class="btn-outline" onclick="exportCSV()">Export CSV</button>
+      <button class="btn-outline" onclick="importJSON()">Import JSON</button>
+    </div>
+    <input type="file" id="import-file" accept=".json" style="display:none">
+  </div>
+
+  <!-- Stats Tab -->
+  <div id="tab-stats" style="display:none">
+    <div id="stats-content"></div>
+  </div>
+</div>
+
+<script src="/theme.js"></script>
+<script>
+const FLAVORS = [
+  'Chocolate','Caramel','Nutty','Fruity','Berry','Citrus','Tropical',
+  'Floral','Honey','Vanilla','Spicy','Earthy','Smoky','Wine-like',
+  'Bright','Clean','Complex','Juicy','Creamy','Toffee','Stone Fruit'
+];
+
+const STORAGE_KEY = 'coffee-bean-log';
+let beans = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let editingId = null;
+let selectedFlavors = new Set();
+
+// Init flavor tags
+const flavorContainer = document.getElementById('flavor-tags');
+FLAVORS.forEach(f => {
+  const btn = document.createElement('button');
+  btn.className = 'flavor-tag';
+  btn.textContent = f;
+  btn.type = 'button';
+  btn.addEventListener('click', () => {
+    btn.classList.toggle('selected');
+    if (selectedFlavors.has(f)) selectedFlavors.delete(f);
+    else selectedFlavors.add(f);
+  });
+  flavorContainer.appendChild(btn);
+});
+
+// Slider value display
+['acidity','body','sweetness','rating'].forEach(id => {
+  const slider = document.getElementById('bean-' + id);
+  const display = document.getElementById(id + '-val');
+  slider.addEventListener('input', () => display.textContent = slider.value);
+});
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const name = tab.dataset.tab;
+    document.getElementById('tab-add').style.display = name === 'add' ? '' : 'none';
+    document.getElementById('tab-log').style.display = name === 'log' ? '' : 'none';
+    document.getElementById('tab-stats').style.display = name === 'stats' ? '' : 'none';
+    if (name === 'log') renderList();
+    if (name === 'stats') renderStats();
+  });
+});
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(beans));
+}
+
+function saveBean() {
+  const name = document.getElementById('bean-name').value.trim();
+  if (!name) { document.getElementById('bean-name').focus(); return; }
+
+  const bean = {
+    id: editingId || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name,
+    roaster: document.getElementById('bean-roaster').value.trim(),
+    origin: document.getElementById('bean-origin').value.trim(),
+    process: document.getElementById('bean-process').value,
+    roast: document.getElementById('bean-roast').value,
+    variety: document.getElementById('bean-variety').value.trim(),
+    brew: document.getElementById('bean-brew').value,
+    acidity: +document.getElementById('bean-acidity').value,
+    body: +document.getElementById('bean-body').value,
+    sweetness: +document.getElementById('bean-sweetness').value,
+    rating: +document.getElementById('bean-rating').value,
+    flavors: Array.from(selectedFlavors),
+    notes: document.getElementById('bean-notes').value.trim(),
+    date: editingId ? (beans.find(b => b.id === editingId) || {}).date || new Date().toISOString() : new Date().toISOString()
+  };
+
+  if (editingId) {
+    const idx = beans.findIndex(b => b.id === editingId);
+    if (idx >= 0) beans[idx] = bean;
+    editingId = null;
+    document.getElementById('save-btn').textContent = 'Save bean';
+  } else {
+    beans.push(bean);
+  }
+
+  save();
+  resetForm();
+  // Switch to log tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('[data-tab="log"]').classList.add('active');
+  document.getElementById('tab-add').style.display = 'none';
+  document.getElementById('tab-log').style.display = '';
+  renderList();
+}
+
+function resetForm() {
+  document.getElementById('bean-name').value = '';
+  document.getElementById('bean-roaster').value = '';
+  document.getElementById('bean-origin').value = '';
+  document.getElementById('bean-process').value = '';
+  document.getElementById('bean-roast').value = '';
+  document.getElementById('bean-variety').value = '';
+  document.getElementById('bean-brew').value = '';
+  document.getElementById('bean-acidity').value = 3;
+  document.getElementById('bean-body').value = 3;
+  document.getElementById('bean-sweetness').value = 3;
+  document.getElementById('bean-rating').value = 3;
+  document.getElementById('bean-notes').value = '';
+  selectedFlavors.clear();
+  document.querySelectorAll('.flavor-tag').forEach(t => t.classList.remove('selected'));
+  ['acidity','body','sweetness','rating'].forEach(id => {
+    document.getElementById(id + '-val').textContent = '3';
+  });
+  editingId = null;
+  document.getElementById('save-btn').textContent = 'Save bean';
+}
+
+function editBean(id) {
+  const bean = beans.find(b => b.id === id);
+  if (!bean) return;
+  editingId = id;
+  document.getElementById('bean-name').value = bean.name;
+  document.getElementById('bean-roaster').value = bean.roaster || '';
+  document.getElementById('bean-origin').value = bean.origin || '';
+  document.getElementById('bean-process').value = bean.process || '';
+  document.getElementById('bean-roast').value = bean.roast || '';
+  document.getElementById('bean-variety').value = bean.variety || '';
+  document.getElementById('bean-brew').value = bean.brew || '';
+  document.getElementById('bean-acidity').value = bean.acidity || 3;
+  document.getElementById('bean-body').value = bean.body || 3;
+  document.getElementById('bean-sweetness').value = bean.sweetness || 3;
+  document.getElementById('bean-rating').value = bean.rating || 3;
+  document.getElementById('bean-notes').value = bean.notes || '';
+  ['acidity','body','sweetness','rating'].forEach(id => {
+    document.getElementById(id + '-val').textContent = document.getElementById('bean-' + id).value;
+  });
+  selectedFlavors = new Set(bean.flavors || []);
+  document.querySelectorAll('.flavor-tag').forEach(t => {
+    t.classList.toggle('selected', selectedFlavors.has(t.textContent));
+  });
+  document.getElementById('save-btn').textContent = 'Update bean';
+  // Switch to add tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('[data-tab="add"]').classList.add('active');
+  document.getElementById('tab-add').style.display = '';
+  document.getElementById('tab-log').style.display = 'none';
+  document.getElementById('tab-stats').style.display = 'none';
+}
+
+function deleteBean(id) {
+  beans = beans.filter(b => b.id !== id);
+  save();
+  renderList();
+}
+
+function renderList() {
+  const search = document.getElementById('filter-search').value.toLowerCase();
+  const sort = document.getElementById('filter-sort').value;
+
+  let filtered = beans.filter(b => {
+    if (!search) return true;
+    return (b.name + ' ' + b.roaster + ' ' + b.origin + ' ' + (b.flavors || []).join(' ')).toLowerCase().includes(search);
+  });
+
+  filtered.sort((a, b) => {
+    switch (sort) {
+      case 'date-desc': return new Date(b.date) - new Date(a.date);
+      case 'date-asc': return new Date(a.date) - new Date(b.date);
+      case 'rating-desc': return b.rating - a.rating || new Date(b.date) - new Date(a.date);
+      case 'name-asc': return a.name.localeCompare(b.name);
+      default: return 0;
+    }
+  });
+
+  const container = document.getElementById('bean-list');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state">' + (beans.length === 0 ? 'No beans logged yet. Add your first tasting.' : 'No beans match your search.') + '</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(b => {
+    const date = new Date(b.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    const meta = [b.roaster, b.origin, b.process, b.roast, b.brew].filter(Boolean).join(' \u00b7 ');
+    const flavors = (b.flavors || []).map(f => '<span class="bean-flavor-chip">' + f + '</span>').join('');
+    return '<div class="bean-card">' +
+      '<div class="bean-header">' +
+        '<div class="bean-name">' + esc(b.name) + (b.variety ? ' <span style="font-weight:400;font-size:0.78rem;color:var(--text-muted)">(' + esc(b.variety) + ')</span>' : '') + '</div>' +
+        '<div class="bean-rating">' + b.rating + '/5</div>' +
+      '</div>' +
+      '<div class="bean-meta">' + esc(meta) + ' \u00b7 ' + date + '</div>' +
+      (flavors ? '<div class="bean-flavors">' + flavors + '</div>' : '') +
+      '<div class="bean-bars">' +
+        '<div><div class="bean-bar-label">Acidity</div><div class="bean-bar-track"><div class="bean-bar-fill" style="width:' + (b.acidity * 20) + '%"></div></div></div>' +
+        '<div><div class="bean-bar-label">Body</div><div class="bean-bar-track"><div class="bean-bar-fill" style="width:' + (b.body * 20) + '%"></div></div></div>' +
+        '<div><div class="bean-bar-label">Sweet</div><div class="bean-bar-track"><div class="bean-bar-fill" style="width:' + (b.sweetness * 20) + '%"></div></div></div>' +
+      '</div>' +
+      (b.notes ? '<div class="bean-notes">"' + esc(b.notes) + '"</div>' : '') +
+      '<div class="bean-actions">' +
+        '<button class="bean-action-btn" onclick="editBean(\'' + b.id + '\')">Edit</button>' +
+        '<button class="bean-action-btn danger" onclick="if(confirm(\'Delete this bean?\'))deleteBean(\'' + b.id + '\')">Delete</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  // Update datalists
+  updateDatalist('roaster-list', [...new Set(beans.map(b => b.roaster).filter(Boolean))]);
+  updateDatalist('origin-list', [...new Set(beans.map(b => b.origin).filter(Boolean))]);
+}
+
+function updateDatalist(id, values) {
+  const dl = document.getElementById(id);
+  dl.innerHTML = values.map(v => '<option value="' + esc(v) + '">').join('');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function renderStats() {
+  const container = document.getElementById('stats-content');
+  if (beans.length === 0) {
+    container.innerHTML = '<div class="empty-state">Add some beans to see stats.</div>';
+    return;
+  }
+
+  const avgRating = (beans.reduce((s, b) => s + b.rating, 0) / beans.length).toFixed(1);
+  const avgAcidity = (beans.reduce((s, b) => s + b.acidity, 0) / beans.length).toFixed(1);
+  const avgBody = (beans.reduce((s, b) => s + b.body, 0) / beans.length).toFixed(1);
+  const uniqueRoasters = new Set(beans.map(b => b.roaster).filter(Boolean)).size;
+  const uniqueOrigins = new Set(beans.map(b => b.origin).filter(Boolean)).size;
+
+  // Top roasters
+  const roasterCounts = {};
+  beans.forEach(b => { if (b.roaster) roasterCounts[b.roaster] = (roasterCounts[b.roaster] || 0) + 1; });
+  const topRoasters = Object.entries(roasterCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  // Top origins
+  const originCounts = {};
+  beans.forEach(b => { if (b.origin) originCounts[b.origin] = (originCounts[b.origin] || 0) + 1; });
+  const topOrigins = Object.entries(originCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  // Flavor frequency
+  const flavorCounts = {};
+  beans.forEach(b => (b.flavors || []).forEach(f => flavorCounts[f] = (flavorCounts[f] || 0) + 1));
+  const topFlavors = Object.entries(flavorCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  let html = '<div class="stat-grid">' +
+    '<div class="stat-card"><div class="stat-value">' + beans.length + '</div><div class="stat-label">Beans logged</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + avgRating + '</div><div class="stat-label">Avg rating</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + uniqueRoasters + '</div><div class="stat-label">Roasters</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + uniqueOrigins + '</div><div class="stat-label">Origins</div></div>' +
+  '</div>';
+
+  if (topRoasters.length > 0) {
+    html += '<div class="top-list"><h3>Top roasters</h3>' +
+      topRoasters.map(([name, count]) => '<div class="top-item"><span class="top-item-name">' + esc(name) + '</span><span class="top-item-count">' + count + '</span></div>').join('') +
+    '</div>';
+  }
+
+  if (topOrigins.length > 0) {
+    html += '<div class="top-list"><h3>Top origins</h3>' +
+      topOrigins.map(([name, count]) => '<div class="top-item"><span class="top-item-name">' + esc(name) + '</span><span class="top-item-count">' + count + '</span></div>').join('') +
+    '</div>';
+  }
+
+  if (topFlavors.length > 0) {
+    html += '<div class="top-list"><h3>Most common flavors</h3>' +
+      topFlavors.map(([name, count]) => '<div class="top-item"><span class="top-item-name">' + esc(name) + '</span><span class="top-item-count">' + count + '</span></div>').join('') +
+    '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+// Export/Import
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(beans, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, 'coffee-bean-log.json');
+}
+
+function exportCSV() {
+  const headers = ['name','roaster','origin','process','roast','variety','brew','acidity','body','sweetness','rating','flavors','notes','date'];
+  const rows = beans.map(b => headers.map(h => {
+    const val = h === 'flavors' ? (b.flavors || []).join('; ') : (b[h] || '');
+    return '"' + String(val).replace(/"/g, '""') + '"';
+  }).join(','));
+  const csv = headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  downloadBlob(blob, 'coffee-bean-log.csv');
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importJSON() {
+  document.getElementById('import-file').click();
+}
+
+document.getElementById('import-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (Array.isArray(imported)) {
+        const existingIds = new Set(beans.map(b => b.id));
+        let added = 0;
+        imported.forEach(b => {
+          if (b.name && !existingIds.has(b.id)) {
+            beans.push(b);
+            added++;
+          }
+        });
+        save();
+        renderList();
+        alert('Imported ' + added + ' bean(s).');
+      }
+    } catch (err) {
+      alert('Invalid JSON file.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// Filter listeners
+document.getElementById('filter-search').addEventListener('input', renderList);
+document.getElementById('filter-sort').addEventListener('change', renderList);
+
+// Initial render
+renderList();
+</script>
+</body>
+</html>
