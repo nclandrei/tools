@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML Entity Encoder</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 600px; }
+
+  .mode-toggle {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+
+  .mode-btn {
+    flex: 1;
+    padding: 7px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .mode-btn.active { background: var(--accent); color: #fff; }
+  .mode-btn:not(.active):hover { color: var(--text); }
+
+  .pane-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .pane-action {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .pane-action:hover { text-decoration: underline; }
+
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    border-radius: 6px;
+    resize: vertical;
+    margin-bottom: 1rem;
+  }
+
+  .output-area {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    margin-bottom: 1rem;
+    word-break: break-all;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    color: var(--text);
+  }
+
+  .preview-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .preview-box {
+    padding: 0.85rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    min-height: 40px;
+  }
+
+  /* Options */
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+
+  .option-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .option-group label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .option-group input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  /* Reference table */
+  .ref-toggle {
+    font-size: 0.82rem;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    padding: 0;
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  .ref-toggle:hover { text-decoration: underline; }
+
+  .ref-table {
+    display: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    font-size: 0.78rem;
+  }
+
+  .ref-table.visible { display: block; }
+
+  .ref-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 1fr 80px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ref-row:last-child { border-bottom: none; }
+
+  .ref-row.header {
+    background: var(--surface);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .ref-cell {
+    padding: 0.4rem 0.6rem;
+    border-right: 1px solid var(--border);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  .ref-cell:last-child { border-right: none; }
+  .ref-cell.name-cell { font-family: inherit; }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>HTML Entity Encoder</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+
+  <div class="mode-toggle">
+    <button class="mode-btn active" data-mode="encode" onclick="setMode('encode')">Encode</button>
+    <button class="mode-btn" data-mode="decode" onclick="setMode('decode')">Decode</button>
+  </div>
+
+  <div class="options">
+    <div class="option-group">
+      <input type="checkbox" id="opt-all" checked>
+      <label for="opt-all">Encode all characters</label>
+    </div>
+    <div class="option-group">
+      <input type="checkbox" id="opt-named" checked>
+      <label for="opt-named">Use named entities</label>
+    </div>
+  </div>
+
+  <div class="pane-label">
+    <span id="input-label">Input</span>
+    <button class="pane-action" onclick="clearInput()">Clear</button>
+  </div>
+  <textarea id="input" placeholder="Type or paste HTML / text here..."></textarea>
+
+  <div class="pane-label">
+    <span id="output-label">Encoded output</span>
+    <button class="pane-action" onclick="copyOutput()">Copy</button>
+  </div>
+  <div class="output-area" id="output"></div>
+
+  <div class="preview-section">
+    <div class="pane-label"><span>Rendered preview</span></div>
+    <div class="preview-box" id="preview"></div>
+  </div>
+
+  <button class="ref-toggle" id="ref-toggle" onclick="toggleRef()">Show common entities reference</button>
+  <div class="ref-table" id="ref-table">
+    <div class="ref-row header">
+      <div class="ref-cell">Char</div>
+      <div class="ref-cell">Named</div>
+      <div class="ref-cell">Numeric</div>
+      <div class="ref-cell name-cell">Description</div>
+    </div>
+  </div>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script src="/theme.js"></script>
+<script>
+let mode = 'encode';
+
+const NAMED_ENTITIES = {
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;',
+  '\u00a0': '&nbsp;', '\u00a9': '&copy;', '\u00ae': '&reg;', '\u2122': '&trade;',
+  '\u2026': '&hellip;', '\u2013': '&ndash;', '\u2014': '&mdash;',
+  '\u2018': '&lsquo;', '\u2019': '&rsquo;', '\u201c': '&ldquo;', '\u201d': '&rdquo;',
+  '\u00ab': '&laquo;', '\u00bb': '&raquo;',
+  '\u00b0': '&deg;', '\u00b1': '&plusmn;', '\u00d7': '&times;', '\u00f7': '&divide;',
+  '\u2260': '&ne;', '\u2264': '&le;', '\u2265': '&ge;',
+  '\u2190': '&larr;', '\u2191': '&uarr;', '\u2192': '&rarr;', '\u2193': '&darr;',
+  '\u00a3': '&pound;', '\u00a5': '&yen;', '\u20ac': '&euro;', '\u00a2': '&cent;',
+  '\u00bd': '&frac12;', '\u00bc': '&frac14;', '\u00be': '&frac34;',
+};
+
+const REVERSE_ENTITIES = {};
+Object.entries(NAMED_ENTITIES).forEach(([char, entity]) => {
+  REVERSE_ENTITIES[entity] = char;
+});
+
+const REFERENCE = [
+  ['&', '&amp;', '&#38;', 'Ampersand'],
+  ['<', '&lt;', '&#60;', 'Less than'],
+  ['>', '&gt;', '&#62;', 'Greater than'],
+  ['"', '&quot;', '&#34;', 'Double quote'],
+  ["'", '&apos;', '&#39;', 'Single quote'],
+  ['\u00a0', '&nbsp;', '&#160;', 'Non-breaking space'],
+  ['\u00a9', '&copy;', '&#169;', 'Copyright'],
+  ['\u00ae', '&reg;', '&#174;', 'Registered'],
+  ['\u2122', '&trade;', '&#8482;', 'Trademark'],
+  ['\u2026', '&hellip;', '&#8230;', 'Ellipsis'],
+  ['\u2013', '&ndash;', '&#8211;', 'En dash'],
+  ['\u2014', '&mdash;', '&#8212;', 'Em dash'],
+  ['\u2018', '&lsquo;', '&#8216;', 'Left single quote'],
+  ['\u2019', '&rsquo;', '&#8217;', 'Right single quote'],
+  ['\u201c', '&ldquo;', '&#8220;', 'Left double quote'],
+  ['\u201d', '&rdquo;', '&#8221;', 'Right double quote'],
+  ['\u20ac', '&euro;', '&#8364;', 'Euro sign'],
+  ['\u00a3', '&pound;', '&#163;', 'Pound sign'],
+  ['\u00a5', '&yen;', '&#165;', 'Yen sign'],
+  ['\u00b0', '&deg;', '&#176;', 'Degree'],
+  ['\u00d7', '&times;', '&#215;', 'Multiplication'],
+  ['\u00f7', '&divide;', '&#247;', 'Division'],
+  ['\u2192', '&rarr;', '&#8594;', 'Right arrow'],
+  ['\u2190', '&larr;', '&#8592;', 'Left arrow'],
+];
+
+// Build reference table
+const refTable = document.getElementById('ref-table');
+REFERENCE.forEach(([char, named, numeric, desc]) => {
+  const row = document.createElement('div');
+  row.className = 'ref-row';
+  row.innerHTML =
+    '<div class="ref-cell">' + char + '</div>' +
+    '<div class="ref-cell">' + escText(named) + '</div>' +
+    '<div class="ref-cell">' + escText(numeric) + '</div>' +
+    '<div class="ref-cell name-cell">' + desc + '</div>';
+  refTable.appendChild(row);
+});
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  document.getElementById('input-label').textContent = m === 'encode' ? 'Input' : 'Encoded input';
+  document.getElementById('output-label').textContent = m === 'encode' ? 'Encoded output' : 'Decoded output';
+  convert();
+}
+
+document.getElementById('input').addEventListener('input', convert);
+document.getElementById('opt-all').addEventListener('change', convert);
+document.getElementById('opt-named').addEventListener('change', convert);
+
+function convert() {
+  const input = document.getElementById('input').value;
+  const output = document.getElementById('output');
+  const preview = document.getElementById('preview');
+
+  if (!input) {
+    output.textContent = '';
+    preview.innerHTML = '';
+    return;
+  }
+
+  if (mode === 'encode') {
+    const encoded = encodeEntities(input);
+    output.textContent = encoded;
+    // Preview: render the original text as HTML
+    preview.innerHTML = input;
+  } else {
+    const decoded = decodeEntities(input);
+    output.textContent = decoded;
+    // Preview: render the decoded text
+    preview.textContent = decoded;
+  }
+}
+
+function encodeEntities(text) {
+  const encodeAll = document.getElementById('opt-all').checked;
+  const useNamed = document.getElementById('opt-named').checked;
+
+  let result = '';
+  for (const char of text) {
+    const code = char.codePointAt(0);
+
+    // Always encode the 5 basic HTML chars
+    if (char === '&' || char === '<' || char === '>' || char === '"' || char === "'") {
+      result += useNamed ? NAMED_ENTITIES[char] : '&#' + code + ';';
+    } else if (encodeAll && code > 127) {
+      // Non-ASCII
+      if (useNamed && NAMED_ENTITIES[char]) {
+        result += NAMED_ENTITIES[char];
+      } else {
+        result += '&#' + code + ';';
+      }
+    } else {
+      result += char;
+    }
+  }
+  return result;
+}
+
+function decodeEntities(text) {
+  // First handle named entities
+  let result = text.replace(/&[a-zA-Z]+;/g, (match) => {
+    if (REVERSE_ENTITIES[match]) return REVERSE_ENTITIES[match];
+    // Use the browser's built-in decoder for entities we don't know
+    const el = document.createElement('span');
+    el.innerHTML = match;
+    return el.textContent;
+  });
+
+  // Then handle numeric entities
+  result = result.replace(/&#(\d+);/g, (match, num) => {
+    return String.fromCodePoint(parseInt(num, 10));
+  });
+
+  result = result.replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
+    return String.fromCodePoint(parseInt(hex, 16));
+  });
+
+  return result;
+}
+
+function escText(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function clearInput() {
+  document.getElementById('input').value = '';
+  convert();
+}
+
+function copyOutput() {
+  const text = document.getElementById('output').textContent;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('toast');
+    toast.textContent = 'Copied';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+
+function toggleRef() {
+  const table = document.getElementById('ref-table');
+  const btn = document.getElementById('ref-toggle');
+  table.classList.toggle('visible');
+  btn.textContent = table.classList.contains('visible') ? 'Hide reference' : 'Show common entities reference';
+}
+</script>
+</body>
+</html>
