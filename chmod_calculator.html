@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chmod Calculator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 520px; }
+
+  .output-box {
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+
+  .output-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.2rem;
+  }
+
+  .output-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .output-value:hover { opacity: 0.8; }
+
+  .output-symbolic {
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    color: var(--text);
+    margin-top: 0.25rem;
+    cursor: pointer;
+  }
+
+  .output-symbolic:hover { color: var(--accent); }
+
+  .output-command {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    margin-top: 0.4rem;
+    cursor: pointer;
+  }
+
+  .output-command:hover { color: var(--accent); }
+
+  /* Permission grid */
+  .perm-grid {
+    display: grid;
+    grid-template-columns: auto 1fr 1fr 1fr;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .perm-header {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .perm-header:first-child { text-align: left; }
+
+  .perm-row-label {
+    padding: 0.6rem 0.7rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+  }
+
+  .perm-cell {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .perm-cell:last-child { border-right: none; }
+
+  .perm-grid > :nth-last-child(-n+4) { border-bottom: none; }
+
+  .perm-check {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    color: transparent;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .perm-check:hover { border-color: var(--accent); }
+
+  .perm-check.checked {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* Numeric input */
+  .numeric-input {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .numeric-input label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .numeric-input input {
+    width: 80px;
+    padding: 0.5rem 0.6rem;
+    font-size: 1rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  /* Common presets */
+  .presets-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+  }
+
+  .preset {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .preset:hover { border-color: var(--accent); color: var(--accent); }
+
+  .preset-desc {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Chmod Calculator</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+
+  <div class="output-box">
+    <div class="output-label">Numeric</div>
+    <div class="output-value" id="output-numeric" onclick="copyText(this.textContent)">644</div>
+    <div class="output-symbolic" id="output-symbolic" onclick="copyText(this.textContent)">-rw-r--r--</div>
+    <div class="output-command" id="output-command" onclick="copyText(this.textContent)">chmod 644 filename</div>
+  </div>
+
+  <div class="perm-grid">
+    <div class="perm-header"></div>
+    <div class="perm-header">Read (4)</div>
+    <div class="perm-header">Write (2)</div>
+    <div class="perm-header">Execute (1)</div>
+
+    <div class="perm-row-label">Owner</div>
+    <div class="perm-cell"><div class="perm-check checked" data-who="u" data-perm="r" onclick="toggle(this)">r</div></div>
+    <div class="perm-cell"><div class="perm-check checked" data-who="u" data-perm="w" onclick="toggle(this)">w</div></div>
+    <div class="perm-cell"><div class="perm-check" data-who="u" data-perm="x" onclick="toggle(this)">x</div></div>
+
+    <div class="perm-row-label">Group</div>
+    <div class="perm-cell"><div class="perm-check checked" data-who="g" data-perm="r" onclick="toggle(this)">r</div></div>
+    <div class="perm-cell"><div class="perm-check" data-who="g" data-perm="w" onclick="toggle(this)">w</div></div>
+    <div class="perm-cell"><div class="perm-check" data-who="g" data-perm="x" onclick="toggle(this)">x</div></div>
+
+    <div class="perm-row-label">Others</div>
+    <div class="perm-cell"><div class="perm-check checked" data-who="o" data-perm="r" onclick="toggle(this)">r</div></div>
+    <div class="perm-cell"><div class="perm-check" data-who="o" data-perm="w" onclick="toggle(this)">w</div></div>
+    <div class="perm-cell"><div class="perm-check" data-who="o" data-perm="x" onclick="toggle(this)">x</div></div>
+  </div>
+
+  <div class="numeric-input">
+    <label>Or enter numeric:</label>
+    <input type="text" id="numeric-input" value="644" maxlength="3" pattern="[0-7]{3}">
+  </div>
+
+  <div class="presets-label">Common presets</div>
+  <div class="presets">
+    <button class="preset" onclick="setNumeric('644')">644 <span class="preset-desc">files</span></button>
+    <button class="preset" onclick="setNumeric('755')">755 <span class="preset-desc">dirs/scripts</span></button>
+    <button class="preset" onclick="setNumeric('600')">600 <span class="preset-desc">private</span></button>
+    <button class="preset" onclick="setNumeric('700')">700 <span class="preset-desc">private dir</span></button>
+    <button class="preset" onclick="setNumeric('777')">777 <span class="preset-desc">all access</span></button>
+    <button class="preset" onclick="setNumeric('400')">400 <span class="preset-desc">read-only</span></button>
+    <button class="preset" onclick="setNumeric('666')">666 <span class="preset-desc">rw all</span></button>
+    <button class="preset" onclick="setNumeric('750')">750 <span class="preset-desc">group exec</span></button>
+  </div>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script src="/theme.js"></script>
+<script>
+const permValues = { r: 4, w: 2, x: 1 };
+const checks = document.querySelectorAll('.perm-check');
+
+function toggle(el) {
+  el.classList.toggle('checked');
+  update();
+}
+
+function update() {
+  const perms = { u: 0, g: 0, o: 0 };
+  checks.forEach(c => {
+    if (c.classList.contains('checked')) {
+      perms[c.dataset.who] += permValues[c.dataset.perm];
+    }
+  });
+
+  const numeric = '' + perms.u + perms.g + perms.o;
+  document.getElementById('output-numeric').textContent = numeric;
+  document.getElementById('numeric-input').value = numeric;
+
+  const sym = '-' +
+    (perms.u & 4 ? 'r' : '-') + (perms.u & 2 ? 'w' : '-') + (perms.u & 1 ? 'x' : '-') +
+    (perms.g & 4 ? 'r' : '-') + (perms.g & 2 ? 'w' : '-') + (perms.g & 1 ? 'x' : '-') +
+    (perms.o & 4 ? 'r' : '-') + (perms.o & 2 ? 'w' : '-') + (perms.o & 1 ? 'x' : '-');
+  document.getElementById('output-symbolic').textContent = sym;
+  document.getElementById('output-command').textContent = 'chmod ' + numeric + ' filename';
+}
+
+function setFromNumeric(val) {
+  if (!/^[0-7]{3}$/.test(val)) return;
+  const digits = val.split('').map(Number);
+  const groups = ['u', 'g', 'o'];
+  checks.forEach(c => {
+    const groupIdx = groups.indexOf(c.dataset.who);
+    const bit = permValues[c.dataset.perm];
+    c.classList.toggle('checked', (digits[groupIdx] & bit) !== 0);
+  });
+  update();
+}
+
+function setNumeric(val) {
+  document.getElementById('numeric-input').value = val;
+  setFromNumeric(val);
+}
+
+document.getElementById('numeric-input').addEventListener('input', (e) => {
+  const val = e.target.value;
+  if (/^[0-7]{3}$/.test(val)) {
+    setFromNumeric(val);
+  }
+});
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('toast');
+    toast.textContent = 'Copied: ' + text;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+</script>
+</body>
+</html>
