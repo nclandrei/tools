@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grind Size Guide</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  [data-theme="light"] {
+    --accent: #b07d4f;
+    --accent-dim: rgba(176, 125, 79, 0.08);
+    --accent-hover: #9a6a40;
+    --surface-hover: var(--surface-alt);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  [data-theme="dark"] {
+    --accent: #c4956a;
+    --accent-dim: rgba(196, 149, 106, 0.1);
+    --accent-hover: #d4a57a;
+    --surface-hover: #2a2a32;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  .container { max-width: 600px; }
+
+  .grinder-select {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+  }
+
+  .grinder-select label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .grinder-select select {
+    flex: 1;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.88rem;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Spectrum bar */
+  .spectrum {
+    position: relative;
+    height: 10px;
+    border-radius: 5px;
+    margin: 1.5rem 0 0.5rem;
+    background: linear-gradient(to right,
+      #3b2214, #5c3a24, #7a5033, #9a6a42, #b8854f, #c89e6a, #d8b888, #e8d0a8, #f0e0c0);
+  }
+
+  .spectrum-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Method rows */
+  .method-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .method-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    align-items: center;
+    transition: border-color 0.15s;
+    cursor: default;
+  }
+
+  .method-row:hover { border-color: var(--accent); }
+  .method-row.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .method-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .method-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+
+  .method-grind-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .method-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .setting-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .setting-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    position: relative;
+    overflow: visible;
+  }
+
+  .setting-fill {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+  }
+
+  .setting-marker {
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--surface);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+
+  .setting-value {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 55px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .method-texture {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  /* Detail panel */
+  .detail-panel {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    display: none;
+    animation: fadeUp 0.2s ease;
+  }
+
+  .detail-panel.visible { display: block; }
+
+  .detail-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .detail-item label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    display: block;
+  }
+
+  .detail-item span {
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+
+  .detail-notes {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .tip-box {
+    margin-top: 1.5rem;
+    padding: 0.65rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .tip-box strong { color: var(--text); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 480px) {
+    .method-row {
+      grid-template-columns: 1fr;
+      gap: 0.4rem;
+    }
+    .setting-value { min-width: 50px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Grind Size Guide</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+
+  <div class="grinder-select">
+    <label>Grinder</label>
+    <select id="grinder-select"></select>
+  </div>
+
+  <div class="spectrum"></div>
+  <div class="spectrum-labels">
+    <span>Fine (Espresso)</span>
+    <span>Medium</span>
+    <span>Coarse (French Press)</span>
+  </div>
+
+  <div class="method-list" id="method-list"></div>
+
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-title" id="detail-title"></div>
+    <div class="detail-grid" id="detail-grid"></div>
+    <div class="detail-notes" id="detail-notes"></div>
+  </div>
+
+  <div class="tip-box">
+    <strong>Dial in:</strong> Start at the recommended setting, brew, and taste. If sour or thin, go finer. If bitter or astringent, go coarser. Adjust in small increments.
+  </div>
+</div>
+
+<script src="/theme.js"></script>
+<script>
+const GRINDERS = {
+  'Niche Zero': {
+    min: 0, max: 50, unit: '',
+    methods: [
+      { name: 'Turkish', grind: 'Extra Fine', setting: [2, 5], texture: 'Powdery, like flour', temp: '~95°C', ratio: '1:10', time: '2-3 min', notes: 'Extremely fine. Use an ibrik/cezve. Bring to foaming boil twice.' },
+      { name: 'Espresso', grind: 'Fine', setting: [8, 15], texture: 'Like table salt', temp: '93°C', ratio: '1:2', time: '25-30s', notes: 'Start around 12, aim for 25-30s shot time at 1:2 ratio. Adjust by 1 increment.' },
+      { name: 'AeroPress', grind: 'Medium-Fine', setting: [18, 24], texture: 'Between table salt and sand', temp: '85-100°C', ratio: '1:15-18', time: '2-3 min', notes: 'Lower for shorter steep (1 min), higher for longer steep (3 min). Inverted method goes finer.' },
+      { name: 'V60', grind: 'Medium-Fine', setting: [20, 26], texture: 'Like fine sand', temp: '93-100°C', ratio: '1:15-17', time: '2:30-3:30', notes: 'Target 3:00 total draw-down. Finer for lighter roasts, coarser for darker.' },
+      { name: 'Chemex', grind: 'Medium', setting: [24, 30], texture: 'Like sand', temp: '93-100°C', ratio: '1:15-17', time: '3:30-4:30', notes: 'Chemex filters are thicker, so slightly coarser than V60. Target 4:00 total.' },
+      { name: 'Batch Brew', grind: 'Medium', setting: [26, 32], texture: 'Like coarse sand', temp: '92-96°C', ratio: '1:15-17', time: '4-6 min', notes: 'Depends on machine. Flat-bottom baskets need coarser than cone filters.' },
+      { name: 'Moka Pot', grind: 'Fine-Medium', setting: [14, 20], texture: 'Between espresso and pour over', temp: 'Stovetop', ratio: 'Fill basket', time: '3-5 min', notes: 'Don\'t tamp. Use pre-heated water. Remove from heat when sputtering starts.' },
+      { name: 'French Press', grind: 'Coarse', setting: [30, 38], texture: 'Like sea salt', temp: '93-100°C', ratio: '1:15-17', time: '4+ min', notes: 'Hoffmann method: 4 min steep, scoop foam, 5+ min settle. No plunge needed.' },
+      { name: 'Cold Brew', grind: 'Extra Coarse', setting: [38, 50], texture: 'Like peppercorns', temp: 'Room/fridge', ratio: '1:5-8', time: '12-24h', notes: 'Very coarse. Immersion in cold water overnight. Dilute concentrate 1:1.' },
+      { name: 'Cupping', grind: 'Medium-Coarse', setting: [26, 32], texture: 'Like coarse sand', temp: '93-100°C', ratio: '1:15', time: '4 min + break', notes: 'Standard cupping protocol: 4 min steep, break crust, skim, slurp at ~10 min.' }
+    ]
+  },
+  'Comandante C40': {
+    min: 0, max: 40, unit: ' clicks',
+    methods: [
+      { name: 'Turkish', grind: 'Extra Fine', setting: [3, 6], texture: 'Powdery, like flour', temp: '~95°C', ratio: '1:10', time: '2-3 min', notes: 'As fine as possible. Multiple passes may be needed.' },
+      { name: 'Espresso', grind: 'Fine', setting: [7, 13], texture: 'Like table salt', temp: '93°C', ratio: '1:2', time: '25-30s', notes: 'C40 can do espresso but dialing in is harder with stepped adjustment. Red Clix helps.' },
+      { name: 'AeroPress', grind: 'Medium-Fine', setting: [14, 20], texture: 'Between table salt and sand', temp: '85-100°C', ratio: '1:15-18', time: '2-3 min', notes: 'Around 16-18 clicks for standard recipe. Go lower for shorter steep.' },
+      { name: 'V60', grind: 'Medium-Fine', setting: [18, 24], texture: 'Like fine sand', temp: '93-100°C', ratio: '1:15-17', time: '2:30-3:30', notes: '~22 clicks is a common starting point. Adjust for roast and dose.' },
+      { name: 'Chemex', grind: 'Medium', setting: [22, 28], texture: 'Like sand', temp: '93-100°C', ratio: '1:15-17', time: '3:30-4:30', notes: 'Slightly coarser than V60 due to thicker filter.' },
+      { name: 'Batch Brew', grind: 'Medium', setting: [24, 30], texture: 'Like coarse sand', temp: '92-96°C', ratio: '1:15-17', time: '4-6 min', notes: 'Flat-bottom baskets go coarser. Cone filters slightly finer.' },
+      { name: 'Moka Pot', grind: 'Fine-Medium', setting: [12, 18], texture: 'Between espresso and pour over', temp: 'Stovetop', ratio: 'Fill basket', time: '3-5 min', notes: 'Finer than pour-over but coarser than espresso.' },
+      { name: 'French Press', grind: 'Coarse', setting: [28, 34], texture: 'Like sea salt', temp: '93-100°C', ratio: '1:15-17', time: '4+ min', notes: 'Coarse grind for immersion. Adjust based on steep time.' },
+      { name: 'Cold Brew', grind: 'Extra Coarse', setting: [34, 40], texture: 'Like peppercorns', temp: 'Room/fridge', ratio: '1:5-8', time: '12-24h', notes: 'Maximum coarseness for overnight cold immersion.' },
+      { name: 'Cupping', grind: 'Medium-Coarse', setting: [24, 28], texture: 'Like coarse sand', temp: '93-100°C', ratio: '1:15', time: '4 min + break', notes: 'Standard cupping protocol grind.' }
+    ]
+  },
+  '1Zpresso JX-Pro': {
+    min: 0, max: 200, unit: ' clicks',
+    methods: [
+      { name: 'Turkish', grind: 'Extra Fine', setting: [10, 30], texture: 'Powdery, like flour', temp: '~95°C', ratio: '1:10', time: '2-3 min', notes: 'Near zero setting.' },
+      { name: 'Espresso', grind: 'Fine', setting: [40, 80], texture: 'Like table salt', temp: '93°C', ratio: '1:2', time: '25-30s', notes: 'Start ~60, adjust in 2-3 click increments for 25-30s shot.' },
+      { name: 'AeroPress', grind: 'Medium-Fine', setting: [75, 100], texture: 'Between table salt and sand', temp: '85-100°C', ratio: '1:15-18', time: '2-3 min', notes: 'Around 85-90 for standard recipe.' },
+      { name: 'V60', grind: 'Medium-Fine', setting: [90, 120], texture: 'Like fine sand', temp: '93-100°C', ratio: '1:15-17', time: '2:30-3:30', notes: '~100 is a common starting point.' },
+      { name: 'Chemex', grind: 'Medium', setting: [110, 140], texture: 'Like sand', temp: '93-100°C', ratio: '1:15-17', time: '3:30-4:30', notes: 'Coarser than V60.' },
+      { name: 'Batch Brew', grind: 'Medium', setting: [120, 150], texture: 'Like coarse sand', temp: '92-96°C', ratio: '1:15-17', time: '4-6 min', notes: 'Adjust based on batch size and brewer type.' },
+      { name: 'Moka Pot', grind: 'Fine-Medium', setting: [60, 90], texture: 'Between espresso and pour over', temp: 'Stovetop', ratio: 'Fill basket', time: '3-5 min', notes: 'Between espresso and pour-over range.' },
+      { name: 'French Press', grind: 'Coarse', setting: [140, 170], texture: 'Like sea salt', temp: '93-100°C', ratio: '1:15-17', time: '4+ min', notes: 'Coarse for immersion brewing.' },
+      { name: 'Cold Brew', grind: 'Extra Coarse', setting: [170, 200], texture: 'Like peppercorns', temp: 'Room/fridge', ratio: '1:5-8', time: '12-24h', notes: 'Maximum coarseness.' },
+      { name: 'Cupping', grind: 'Medium-Coarse', setting: [120, 145], texture: 'Like coarse sand', temp: '93-100°C', ratio: '1:15', time: '4 min + break', notes: 'Standard cupping protocol.' }
+    ]
+  },
+  'Baratza Encore': {
+    min: 1, max: 40, unit: '',
+    methods: [
+      { name: 'Turkish', grind: 'Extra Fine', setting: [1, 3], texture: 'Powdery, like flour', temp: '~95°C', ratio: '1:10', time: '2-3 min', notes: 'Encore struggles at this fineness. Not ideal for Turkish.' },
+      { name: 'Espresso', grind: 'Fine', setting: [3, 8], texture: 'Like table salt', temp: '93°C', ratio: '1:2', time: '25-30s', notes: 'Encore is not designed for espresso. Can work for pressurized baskets.' },
+      { name: 'AeroPress', grind: 'Medium-Fine', setting: [8, 14], texture: 'Between table salt and sand', temp: '85-100°C', ratio: '1:15-18', time: '2-3 min', notes: 'Good Encore range. ~12 for standard recipe.' },
+      { name: 'V60', grind: 'Medium-Fine', setting: [12, 18], texture: 'Like fine sand', temp: '93-100°C', ratio: '1:15-17', time: '2:30-3:30', notes: 'Start at 15, adjust based on draw-down time.' },
+      { name: 'Chemex', grind: 'Medium', setting: [16, 22], texture: 'Like sand', temp: '93-100°C', ratio: '1:15-17', time: '3:30-4:30', notes: 'Slightly coarser than V60 setting.' },
+      { name: 'Batch Brew', grind: 'Medium', setting: [18, 25], texture: 'Like coarse sand', temp: '92-96°C', ratio: '1:15-17', time: '4-6 min', notes: 'Sweet spot for the Encore. Great for drip machines.' },
+      { name: 'Moka Pot', grind: 'Fine-Medium', setting: [6, 12], texture: 'Between espresso and pour over', temp: 'Stovetop', ratio: 'Fill basket', time: '3-5 min', notes: 'Finer side of the Encore range.' },
+      { name: 'French Press', grind: 'Coarse', setting: [25, 33], texture: 'Like sea salt', temp: '93-100°C', ratio: '1:15-17', time: '4+ min', notes: 'Encore excels here. ~28 is a good starting point.' },
+      { name: 'Cold Brew', grind: 'Extra Coarse', setting: [33, 40], texture: 'Like peppercorns', temp: 'Room/fridge', ratio: '1:5-8', time: '12-24h', notes: 'Max coarseness on the Encore.' },
+      { name: 'Cupping', grind: 'Medium-Coarse', setting: [20, 26], texture: 'Like coarse sand', temp: '93-100°C', ratio: '1:15', time: '4 min + break', notes: 'Standard cupping protocol.' }
+    ]
+  }
+};
+
+let currentGrinder = 'Niche Zero';
+let selectedMethod = null;
+
+const grinderSelect = document.getElementById('grinder-select');
+const methodList = document.getElementById('method-list');
+const detailPanel = document.getElementById('detail-panel');
+
+// Populate grinder select
+Object.keys(GRINDERS).forEach(name => {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  grinderSelect.appendChild(opt);
+});
+
+grinderSelect.addEventListener('change', () => {
+  currentGrinder = grinderSelect.value;
+  selectedMethod = null;
+  render();
+});
+
+function render() {
+  const grinder = GRINDERS[currentGrinder];
+  const range = grinder.max - grinder.min;
+
+  methodList.innerHTML = grinder.methods.map((m, i) => {
+    const lo = ((m.setting[0] - grinder.min) / range) * 100;
+    const hi = ((m.setting[1] - grinder.min) / range) * 100;
+    const mid = (lo + hi) / 2;
+    const isActive = selectedMethod === i;
+
+    return '<div class="method-row' + (isActive ? ' active' : '') + '" data-idx="' + i + '">' +
+      '<div class="method-info">' +
+        '<span class="method-name">' + m.name + '</span>' +
+        '<span class="method-grind-label">' + m.grind + '</span>' +
+      '</div>' +
+      '<div class="method-detail">' +
+        '<div class="setting-bar">' +
+          '<div class="setting-track">' +
+            '<div class="setting-fill" style="left:' + lo + '%;width:' + (hi - lo) + '%"></div>' +
+            '<div class="setting-marker" style="left:' + mid + '%"></div>' +
+          '</div>' +
+          '<span class="setting-value">' + m.setting[0] + '-' + m.setting[1] + grinder.unit + '</span>' +
+        '</div>' +
+        '<span class="method-texture">' + m.texture + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  // Click handlers
+  methodList.querySelectorAll('.method-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const idx = +row.dataset.idx;
+      selectedMethod = selectedMethod === idx ? null : idx;
+      render();
+    });
+  });
+
+  // Detail panel
+  if (selectedMethod !== null) {
+    const m = grinder.methods[selectedMethod];
+    document.getElementById('detail-title').textContent = m.name;
+    document.getElementById('detail-grid').innerHTML =
+      '<div class="detail-item"><label>Setting</label><span>' + m.setting[0] + ' - ' + m.setting[1] + grinder.unit + '</span></div>' +
+      '<div class="detail-item"><label>Grind</label><span>' + m.grind + '</span></div>' +
+      '<div class="detail-item"><label>Temp</label><span>' + m.temp + '</span></div>' +
+      '<div class="detail-item"><label>Ratio</label><span>' + m.ratio + '</span></div>' +
+      '<div class="detail-item"><label>Time</label><span>' + m.time + '</span></div>' +
+      '<div class="detail-item"><label>Texture</label><span>' + m.texture + '</span></div>';
+    document.getElementById('detail-notes').textContent = m.notes;
+    detailPanel.classList.add('visible');
+  } else {
+    detailPanel.classList.remove('visible');
+  }
+}
+
+render();
+</script>
+</body>
+</html>
