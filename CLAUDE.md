@@ -14,7 +14,7 @@ Browser tools site for Andrei-Mihai Nicolae — hosted at `tools.nicolaeandrei.c
 
 ```
 index.html          ← landing page with search + category sections
-*.html              ← self-contained tool files (16 total)
+*.html              ← self-contained tool files (46 total)
 ```
 
 Each tool is a single HTML file with no external dependencies beyond CDN libraries. Tools run entirely in the browser.
@@ -39,7 +39,7 @@ Tools are grouped into themed sections:
 - **Data & health** — Apple Health Explorer, Fuel Log, Gym Tracker
 - **Sumo** — Sumo Day Companion, Sumo Stats, Grand Sumo Calendar
 - **Travel & social** — Wanderlog, Fedi Media Extractor
-- **Developer** — AI Agent Session Converter
+- **Developer** — Cron Builder, JWT Decoder, AI Agent Session Converter, Regex Tester, SQL Formatter, Base64/URL Encoder, HTML Entity Encoder, Hash Generator, DNS Lookup, Chmod Calculator, Unix Timestamp Converter, Data Format Converter, PG Explain Visualizer
 
 ## Related
 
