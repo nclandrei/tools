@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tire Pressure Calculator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  [data-theme="light"] {
+    --accent: #2563eb;
+    --accent-dim: rgba(37, 99, 235, 0.08);
+    --accent-hover: #1d4ed8;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  [data-theme="dark"] {
+    --accent: #60a5fa;
+    --accent-dim: rgba(96, 165, 250, 0.1);
+    --accent-hover: #3b82f6;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  .container { max-width: 520px; }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+  }
+
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.9rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .unit-toggle {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    border: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+
+  .unit-btn {
+    flex: 1;
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .unit-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* Results */
+  .results {
+    margin-top: 1.5rem;
+    animation: fadeUp 0.2s ease;
+  }
+
+  .results-header {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .tire-results {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .tire-card {
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-align: center;
+  }
+
+  .tire-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+  }
+
+  .tire-psi {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+
+  .tire-unit {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+  }
+
+  .tire-bar {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  /* Notes */
+  .notes-section {
+    margin-top: 1rem;
+  }
+
+  .note {
+    padding: 0.6rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+  }
+
+  .note strong { color: var(--text); }
+
+  /* Surface chips */
+  .surface-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+  }
+
+  .surface-chip {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
+    font-family: inherit;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .surface-chip.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .surface-chip:hover:not(.active) {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .surface-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 440px) {
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Tire Pressure Calculator</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Recommended tire pressure based on rider weight, tire width, and surface.</p>
+
+  <div class="unit-toggle">
+    <button class="unit-btn active" data-unit="metric" onclick="setUnit('metric')">Metric (kg)</button>
+    <button class="unit-btn" data-unit="imperial" onclick="setUnit('imperial')">Imperial (lb)</button>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label id="weight-label">Total weight (kg)</label>
+      <input type="number" id="rider-weight" value="80" min="40" max="200" step="1">
+    </div>
+    <div class="form-group">
+      <label>Tire width (mm)</label>
+      <select id="tire-width">
+        <option value="23">23mm</option>
+        <option value="25" selected>25mm</option>
+        <option value="28">28mm</option>
+        <option value="30">30mm</option>
+        <option value="32">32mm</option>
+        <option value="35">35mm</option>
+        <option value="38">38mm</option>
+        <option value="40">40mm</option>
+        <option value="42">42mm</option>
+        <option value="45">45mm</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Tire type</label>
+    <select id="tire-type">
+      <option value="clincher">Clincher</option>
+      <option value="tubeless">Tubeless</option>
+      <option value="tubular">Tubular</option>
+    </select>
+  </div>
+
+  <div class="surface-label">Surface</div>
+  <div class="surface-chips" id="surface-chips">
+    <button class="surface-chip active" data-surface="road">Smooth road</button>
+    <button class="surface-chip" data-surface="rough">Rough road</button>
+    <button class="surface-chip" data-surface="cobbles">Cobblestones</button>
+    <button class="surface-chip" data-surface="gravel">Gravel</button>
+    <button class="surface-chip" data-surface="mixed">Mixed</button>
+  </div>
+
+  <div class="results" id="results"></div>
+</div>
+
+<script src="/theme.js"></script>
+<script>
+let unit = 'metric';
+let surface = 'road';
+
+// Surface chip handlers
+document.querySelectorAll('.surface-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.surface-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    surface = chip.dataset.surface;
+    calculate();
+  });
+});
+
+// Live calculation
+document.getElementById('rider-weight').addEventListener('input', calculate);
+document.getElementById('tire-width').addEventListener('change', calculate);
+document.getElementById('tire-type').addEventListener('change', calculate);
+
+function setUnit(u) {
+  const weightInput = document.getElementById('rider-weight');
+  const currentVal = +weightInput.value;
+  unit = u;
+  document.querySelectorAll('.unit-btn').forEach(b => b.classList.toggle('active', b.dataset.unit === u));
+  if (u === 'imperial') {
+    document.getElementById('weight-label').textContent = 'Total weight (lb)';
+    weightInput.value = Math.round(currentVal * 2.205);
+    weightInput.min = 88;
+    weightInput.max = 440;
+  } else {
+    document.getElementById('weight-label').textContent = 'Total weight (kg)';
+    weightInput.value = Math.round(currentVal / 2.205);
+    weightInput.min = 40;
+    weightInput.max = 200;
+  }
+  calculate();
+}
+
+function getWeightKg() {
+  const val = +document.getElementById('rider-weight').value;
+  return unit === 'imperial' ? val / 2.205 : val;
+}
+
+function calculate() {
+  const weightKg = getWeightKg();
+  const tireWidth = +document.getElementById('tire-width').value;
+  const tireType = document.getElementById('tire-type').value;
+
+  if (weightKg < 30 || weightKg > 200 || isNaN(weightKg)) return;
+
+  // Base pressure calculation using SRAM/Zipp-style formula
+  // Base PSI for a 25mm tire at 80kg rider
+  const basePsi = 85;
+  const baseWidth = 25;
+  const baseWeight = 80;
+
+  // Weight factor: ~0.5 PSI per kg
+  const weightFactor = (weightKg - baseWeight) * 0.5;
+
+  // Width factor: narrower = more pressure, wider = less
+  const widthFactor = (baseWidth - tireWidth) * 2.5;
+
+  let rearPsi = basePsi + weightFactor + widthFactor;
+
+  // Front is ~10% less (less weight on front wheel)
+  let frontPsi = rearPsi * 0.9;
+
+  // Tire type adjustments
+  if (tireType === 'tubeless') {
+    frontPsi -= 8;
+    rearPsi -= 8;
+  } else if (tireType === 'tubular') {
+    frontPsi -= 3;
+    rearPsi -= 3;
+  }
+
+  // Surface adjustments
+  const surfaceAdj = { road: 0, rough: -5, cobbles: -10, gravel: -15, mixed: -8 };
+  frontPsi += (surfaceAdj[surface] || 0);
+  rearPsi += (surfaceAdj[surface] || 0);
+
+  // Clamp to reasonable ranges based on tire width
+  const minPsi = tireWidth >= 35 ? 25 : tireWidth >= 28 ? 40 : 55;
+  const maxPsi = tireWidth <= 25 ? 120 : tireWidth <= 28 ? 100 : tireWidth <= 32 ? 85 : 65;
+  frontPsi = Math.max(minPsi, Math.min(maxPsi, frontPsi));
+  rearPsi = Math.max(minPsi, Math.min(maxPsi, rearPsi));
+
+  // Round
+  frontPsi = Math.round(frontPsi);
+  rearPsi = Math.round(rearPsi);
+
+  const frontBar = (frontPsi * 0.0689476).toFixed(1);
+  const rearBar = (rearPsi * 0.0689476).toFixed(1);
+
+  let html = '<div class="results-header">Recommended pressure</div>' +
+    '<div class="tire-results">' +
+      '<div class="tire-card">' +
+        '<div class="tire-label">Front</div>' +
+        '<div class="tire-psi">' + frontPsi + '</div>' +
+        '<div class="tire-unit">PSI</div>' +
+        '<div class="tire-bar">' + frontBar + ' bar</div>' +
+      '</div>' +
+      '<div class="tire-card">' +
+        '<div class="tire-label">Rear</div>' +
+        '<div class="tire-psi">' + rearPsi + '</div>' +
+        '<div class="tire-unit">PSI</div>' +
+        '<div class="tire-bar">' + rearBar + ' bar</div>' +
+      '</div>' +
+    '</div>';
+
+  html += '<div class="notes-section">';
+
+  if (tireType === 'tubeless') {
+    html += '<div class="note"><strong>Tubeless:</strong> You can run lower pressures safely. Sealant handles small punctures, and there\'s no pinch flat risk.</div>';
+  }
+
+  if (surface === 'cobbles' || surface === 'gravel') {
+    html += '<div class="note"><strong>Rough surfaces:</strong> Lower pressure improves grip and comfort. The tire conforms to the surface instead of bouncing.</div>';
+  }
+
+  html += '<div class="note"><strong>Dial in:</strong> These are starting points. Adjust based on feel. Too high = harsh ride, less grip. Too low = sluggish, risk of rim damage or pinch flats.</div>';
+  html += '<div class="note"><strong>Weight:</strong> Include rider, clothing, bike, and any bags/bottles. The 40/60 front/rear split assumes a standard road position.</div>';
+  html += '</div>';
+
+  document.getElementById('results').innerHTML = html;
+}
+
+calculate();
+</script>
+</body>
+</html>
