@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tram Spotter Log</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  [data-theme="light"] {
+    --accent: #16a34a;
+    --accent-dim: rgba(22, 163, 74, 0.08);
+    --accent-hover: #15803d;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  [data-theme="dark"] {
+    --accent: #4ade80;
+    --accent-dim: rgba(74, 222, 128, 0.1);
+    --accent-hover: #22c55e;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  .container { max-width: 560px; }
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border);
+  }
+
+  .tab {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .tab.active { background: var(--accent); color: #fff; }
+  .tab:not(.active):hover { color: var(--text); }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+  }
+
+  .form-group input, .form-group select {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.88rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .form-group textarea {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.88rem;
+    border-radius: var(--radius-sm);
+    resize: vertical;
+    min-height: 50px;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+  }
+
+  .form-actions .btn { flex: 1; }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 1rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-accent:hover { background: var(--accent-hover); }
+
+  .btn-outline {
+    background: var(--surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 1rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-outline:hover { border-color: var(--border-hover); color: var(--text); }
+
+  /* Sighting cards */
+  .sighting-card {
+    padding: 0.75rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    transition: border-color 0.15s;
+  }
+
+  .sighting-card:hover { border-color: var(--accent); }
+
+  .sighting-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.25rem;
+  }
+
+  .sighting-model {
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+
+  .sighting-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .sighting-meta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .sighting-notes {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.25rem;
+  }
+
+  .sighting-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+    justify-content: flex-end;
+  }
+
+  .sighting-action-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0.2rem 0;
+  }
+
+  .sighting-action-btn:hover { color: var(--accent); }
+  .sighting-action-btn.danger:hover { color: var(--red); }
+
+  /* Stats */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    padding: 0.65rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .top-list {
+    margin-bottom: 1.5rem;
+  }
+
+  .top-list h3 {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .top-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.35rem 0;
+    font-size: 0.82rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .top-item:last-child { border-bottom: none; }
+  .top-item-name { color: var(--text); }
+  .top-item-count { color: var(--text-muted); }
+
+  .filter-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+
+  .filter-bar input {
+    flex: 1;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.85rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .filter-bar select {
+    padding: 0.45rem 0.5rem;
+    font-size: 0.82rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+
+  .export-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .export-bar .btn-outline { flex: 1; font-size: 0.78rem; padding: 0.5rem; }
+
+  @media (max-width: 440px) {
+    .form-row, .form-row-3 { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: 1fr 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Tram Spotter Log</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="log">Log</button>
+    <button class="tab" data-tab="add">Spot</button>
+    <button class="tab" data-tab="stats">Stats</button>
+  </div>
+
+  <div id="tab-add" style="display:none">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tram model</label>
+        <input type="text" id="tram-model" placeholder="e.g. Tatra T3" list="model-list">
+        <datalist id="model-list"></datalist>
+      </div>
+      <div class="form-group">
+        <label>Fleet number</label>
+        <input type="text" id="tram-number" placeholder="e.g. 8234">
+      </div>
+    </div>
+
+    <div class="form-row-3">
+      <div class="form-group">
+        <label>City</label>
+        <input type="text" id="tram-city" placeholder="e.g. Prague" list="city-list">
+        <datalist id="city-list"></datalist>
+      </div>
+      <div class="form-group">
+        <label>Line</label>
+        <input type="text" id="tram-line" placeholder="e.g. 22">
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="tram-date">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Operator</label>
+      <input type="text" id="tram-operator" placeholder="e.g. DPP" list="operator-list">
+      <datalist id="operator-list"></datalist>
+    </div>
+
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="tram-notes" placeholder="Livery, condition, location details..."></textarea>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-outline" onclick="resetForm()">Clear</button>
+      <button class="btn-accent" id="save-btn" onclick="saveSighting()">Log sighting</button>
+    </div>
+  </div>
+
+  <div id="tab-log">
+    <div class="filter-bar">
+      <input type="text" id="filter-search" placeholder="Search sightings...">
+      <select id="filter-sort">
+        <option value="date-desc">Newest</option>
+        <option value="date-asc">Oldest</option>
+        <option value="model-asc">Model A-Z</option>
+        <option value="city-asc">City A-Z</option>
+      </select>
+    </div>
+    <div id="sighting-list"></div>
+    <div class="export-bar">
+      <button class="btn-outline" onclick="exportJSON()">Export JSON</button>
+      <button class="btn-outline" onclick="importJSON()">Import JSON</button>
+    </div>
+    <input type="file" id="import-file" accept=".json" style="display:none">
+  </div>
+
+  <div id="tab-stats" style="display:none">
+    <div id="stats-content"></div>
+  </div>
+</div>
+
+<script src="/theme.js"></script>
+<script>
+const STORAGE_KEY = 'tram-spotter-log';
+let sightings = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let editingId = null;
+
+// Set default date to today
+document.getElementById('tram-date').valueAsDate = new Date();
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const name = tab.dataset.tab;
+    document.getElementById('tab-add').style.display = name === 'add' ? '' : 'none';
+    document.getElementById('tab-log').style.display = name === 'log' ? '' : 'none';
+    document.getElementById('tab-stats').style.display = name === 'stats' ? '' : 'none';
+    if (name === 'log') renderList();
+    if (name === 'stats') renderStats();
+  });
+});
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sightings));
+}
+
+function saveSighting() {
+  const model = document.getElementById('tram-model').value.trim();
+  if (!model) { document.getElementById('tram-model').focus(); return; }
+
+  const sighting = {
+    id: editingId || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    model,
+    number: document.getElementById('tram-number').value.trim(),
+    city: document.getElementById('tram-city').value.trim(),
+    line: document.getElementById('tram-line').value.trim(),
+    date: document.getElementById('tram-date').value || new Date().toISOString().slice(0, 10),
+    operator: document.getElementById('tram-operator').value.trim(),
+    notes: document.getElementById('tram-notes').value.trim()
+  };
+
+  if (editingId) {
+    const idx = sightings.findIndex(s => s.id === editingId);
+    if (idx >= 0) sightings[idx] = sighting;
+    editingId = null;
+    document.getElementById('save-btn').textContent = 'Log sighting';
+  } else {
+    sightings.push(sighting);
+  }
+
+  save();
+  resetForm();
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('[data-tab="log"]').classList.add('active');
+  document.getElementById('tab-add').style.display = 'none';
+  document.getElementById('tab-log').style.display = '';
+  renderList();
+}
+
+function resetForm() {
+  document.getElementById('tram-model').value = '';
+  document.getElementById('tram-number').value = '';
+  document.getElementById('tram-city').value = '';
+  document.getElementById('tram-line').value = '';
+  document.getElementById('tram-date').valueAsDate = new Date();
+  document.getElementById('tram-operator').value = '';
+  document.getElementById('tram-notes').value = '';
+  editingId = null;
+  document.getElementById('save-btn').textContent = 'Log sighting';
+}
+
+function editSighting(id) {
+  const s = sightings.find(x => x.id === id);
+  if (!s) return;
+  editingId = id;
+  document.getElementById('tram-model').value = s.model;
+  document.getElementById('tram-number').value = s.number || '';
+  document.getElementById('tram-city').value = s.city || '';
+  document.getElementById('tram-line').value = s.line || '';
+  document.getElementById('tram-date').value = s.date || '';
+  document.getElementById('tram-operator').value = s.operator || '';
+  document.getElementById('tram-notes').value = s.notes || '';
+  document.getElementById('save-btn').textContent = 'Update sighting';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('[data-tab="add"]').classList.add('active');
+  document.getElementById('tab-add').style.display = '';
+  document.getElementById('tab-log').style.display = 'none';
+  document.getElementById('tab-stats').style.display = 'none';
+}
+
+function deleteSighting(id) {
+  sightings = sightings.filter(s => s.id !== id);
+  save();
+  renderList();
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function renderList() {
+  const search = document.getElementById('filter-search').value.toLowerCase();
+  const sort = document.getElementById('filter-sort').value;
+
+  let filtered = sightings.filter(s => {
+    if (!search) return true;
+    return (s.model + ' ' + s.city + ' ' + s.line + ' ' + s.number + ' ' + s.operator).toLowerCase().includes(search);
+  });
+
+  filtered.sort((a, b) => {
+    switch (sort) {
+      case 'date-desc': return (b.date || '').localeCompare(a.date || '');
+      case 'date-asc': return (a.date || '').localeCompare(b.date || '');
+      case 'model-asc': return (a.model || '').localeCompare(b.model || '');
+      case 'city-asc': return (a.city || '').localeCompare(b.city || '');
+      default: return 0;
+    }
+  });
+
+  const container = document.getElementById('sighting-list');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state">' + (sightings.length === 0 ? 'No sightings yet. Spot your first tram.' : 'No sightings match your search.') + '</div>';
+    updateDatalists();
+    return;
+  }
+
+  container.innerHTML = filtered.map(s => {
+    const dateStr = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+    const meta = [s.city, s.line ? 'Line ' + s.line : '', s.operator].filter(Boolean).join(' \u00b7 ');
+    return '<div class="sighting-card">' +
+      '<div class="sighting-header">' +
+        '<span class="sighting-model">' + esc(s.model) + (s.number ? ' <span style="font-weight:400;color:var(--text-muted)">#' + esc(s.number) + '</span>' : '') + '</span>' +
+        '<span class="sighting-date">' + dateStr + '</span>' +
+      '</div>' +
+      (meta ? '<div class="sighting-meta">' + esc(meta) + '</div>' : '') +
+      (s.notes ? '<div class="sighting-notes">' + esc(s.notes) + '</div>' : '') +
+      '<div class="sighting-actions">' +
+        '<button class="sighting-action-btn" onclick="editSighting(\'' + s.id + '\')">Edit</button>' +
+        '<button class="sighting-action-btn danger" onclick="if(confirm(\'Delete this sighting?\'))deleteSighting(\'' + s.id + '\')">Delete</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  updateDatalists();
+}
+
+function updateDatalists() {
+  setDatalist('model-list', [...new Set(sightings.map(s => s.model).filter(Boolean))]);
+  setDatalist('city-list', [...new Set(sightings.map(s => s.city).filter(Boolean))]);
+  setDatalist('operator-list', [...new Set(sightings.map(s => s.operator).filter(Boolean))]);
+}
+
+function setDatalist(id, values) {
+  document.getElementById(id).innerHTML = values.map(v => '<option value="' + esc(v) + '">').join('');
+}
+
+function renderStats() {
+  const container = document.getElementById('stats-content');
+  if (sightings.length === 0) {
+    container.innerHTML = '<div class="empty-state">Spot some trams to see stats.</div>';
+    return;
+  }
+
+  const uniqueModels = new Set(sightings.map(s => s.model).filter(Boolean)).size;
+  const uniqueCities = new Set(sightings.map(s => s.city).filter(Boolean)).size;
+  const uniqueLines = new Set(sightings.map(s => (s.city || '') + ':' + (s.line || '')).filter(s => s !== ':')).size;
+
+  const modelCounts = {};
+  sightings.forEach(s => { if (s.model) modelCounts[s.model] = (modelCounts[s.model] || 0) + 1; });
+  const topModels = Object.entries(modelCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const cityCounts = {};
+  sightings.forEach(s => { if (s.city) cityCounts[s.city] = (cityCounts[s.city] || 0) + 1; });
+  const topCities = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const operatorCounts = {};
+  sightings.forEach(s => { if (s.operator) operatorCounts[s.operator] = (operatorCounts[s.operator] || 0) + 1; });
+  const topOperators = Object.entries(operatorCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  let html = '<div class="stat-grid">' +
+    '<div class="stat-card"><div class="stat-value">' + sightings.length + '</div><div class="stat-label">Sightings</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + uniqueModels + '</div><div class="stat-label">Models</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + uniqueCities + '</div><div class="stat-label">Cities</div></div>' +
+  '</div>';
+
+  if (topModels.length > 0) {
+    html += '<div class="top-list"><h3>Most spotted models</h3>' +
+      topModels.map(([n, c]) => '<div class="top-item"><span class="top-item-name">' + esc(n) + '</span><span class="top-item-count">' + c + '</span></div>').join('') + '</div>';
+  }
+
+  if (topCities.length > 0) {
+    html += '<div class="top-list"><h3>Top cities</h3>' +
+      topCities.map(([n, c]) => '<div class="top-item"><span class="top-item-name">' + esc(n) + '</span><span class="top-item-count">' + c + '</span></div>').join('') + '</div>';
+  }
+
+  if (topOperators.length > 0) {
+    html += '<div class="top-list"><h3>Top operators</h3>' +
+      topOperators.map(([n, c]) => '<div class="top-item"><span class="top-item-name">' + esc(n) + '</span><span class="top-item-count">' + c + '</span></div>').join('') + '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(sightings, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'tram-spotter-log.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importJSON() {
+  document.getElementById('import-file').click();
+}
+
+document.getElementById('import-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (Array.isArray(imported)) {
+        const existingIds = new Set(sightings.map(s => s.id));
+        let added = 0;
+        imported.forEach(s => {
+          if (s.model && !existingIds.has(s.id)) { sightings.push(s); added++; }
+        });
+        save();
+        renderList();
+        alert('Imported ' + added + ' sighting(s).');
+      }
+    } catch (err) { alert('Invalid JSON file.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+document.getElementById('filter-search').addEventListener('input', renderList);
+document.getElementById('filter-sort').addEventListener('change', renderList);
+
+renderList();
+</script>
+</body>
+</html>
