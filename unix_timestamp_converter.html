@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unix Timestamp Converter</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 560px; }
+
+  .live-clock {
+    padding: 0.85rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+
+  .live-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.2rem;
+  }
+
+  .live-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+
+  .live-value:hover { opacity: 0.8; }
+
+  .live-iso {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .input-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .input-group input {
+    flex: 1;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .input-group select {
+    padding: 0.55rem 0.5rem;
+    font-size: 0.82rem;
+    border-radius: 6px;
+  }
+
+  .btn-sm {
+    padding: 0.55rem 0.85rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+  .result-card {
+    padding: 0.85rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+  }
+
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-row:last-child { border-bottom: none; }
+
+  .result-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  .result-value {
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+
+  .result-value:hover { color: var(--accent); }
+
+  .relative-time {
+    padding: 0.75rem 1rem;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+  }
+
+  .error-msg {
+    padding: 0.6rem 0.8rem;
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    border-radius: 6px;
+    font-size: 0.82rem;
+    color: var(--red);
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  .datetime-input {
+    margin-bottom: 1.5rem;
+  }
+
+  .datetime-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .datetime-row input {
+    flex: 1;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.9rem;
+    border-radius: 6px;
+  }
+
+  .quick-stamps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .quick-stamp {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.72rem;
+    font-family: inherit;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .quick-stamp:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @media (max-width: 440px) {
+    .input-group { flex-wrap: wrap; }
+    .datetime-row { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Unix Timestamp Converter</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+
+  <div class="live-clock">
+    <div class="live-label">Current Unix Timestamp</div>
+    <div class="live-value" id="live-ts" onclick="copyText(this.textContent)"></div>
+    <div class="live-iso" id="live-iso"></div>
+  </div>
+
+  <div class="section-label">Timestamp to Date</div>
+  <div class="input-group">
+    <input type="text" id="ts-input" placeholder="e.g. 1711720800 or 1711720800000">
+    <select id="ts-unit">
+      <option value="auto">Auto</option>
+      <option value="s">Seconds</option>
+      <option value="ms">Milliseconds</option>
+    </select>
+    <button class="btn-sm" onclick="convertTimestamp()">Convert</button>
+  </div>
+
+  <div class="quick-stamps">
+    <button class="quick-stamp" onclick="setQuick(0)">Epoch (0)</button>
+    <button class="quick-stamp" onclick="setQuick(Date.now()/1000|0)">Now</button>
+    <button class="quick-stamp" onclick="setQuick(2147483647)">Y2K38</button>
+    <button class="quick-stamp" onclick="setQuick(1000000000)">1 Billion</button>
+    <button class="quick-stamp" onclick="setQuick(946684800)">Y2K</button>
+  </div>
+
+  <div class="error-msg" id="ts-error"></div>
+  <div id="ts-results"></div>
+
+  <div class="section-label" style="margin-top:1.5rem">Date to Timestamp</div>
+  <div class="datetime-input">
+    <div class="datetime-row">
+      <input type="datetime-local" id="dt-input" step="1">
+      <button class="btn-sm" onclick="convertDatetime()">Convert</button>
+      <button class="btn-sm" onclick="setNow()">Now</button>
+    </div>
+  </div>
+
+  <div id="dt-results"></div>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script src="/theme.js"></script>
+<script>
+// Live clock
+function updateClock() {
+  const now = Math.floor(Date.now() / 1000);
+  document.getElementById('live-ts').textContent = now;
+  document.getElementById('live-iso').textContent = new Date().toISOString();
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// Set now for datetime input
+function setNow() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  const local = new Date(now.getTime() - offset * 60000);
+  document.getElementById('dt-input').value = local.toISOString().slice(0, 19);
+  convertDatetime();
+}
+setNow();
+
+function setQuick(ts) {
+  document.getElementById('ts-input').value = ts;
+  convertTimestamp();
+}
+
+function convertTimestamp() {
+  const raw = document.getElementById('ts-input').value.trim();
+  const unitSel = document.getElementById('ts-unit').value;
+  const errEl = document.getElementById('ts-error');
+  const resEl = document.getElementById('ts-results');
+
+  errEl.style.display = 'none';
+  resEl.innerHTML = '';
+
+  if (!raw) return;
+
+  let num = Number(raw);
+  if (isNaN(num)) {
+    // Try parsing as ISO string
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) {
+      errEl.textContent = 'Invalid timestamp or date string.';
+      errEl.style.display = '';
+      return;
+    }
+    num = d.getTime() / 1000;
+  }
+
+  // Detect seconds vs milliseconds
+  let tsSeconds;
+  if (unitSel === 'ms') {
+    tsSeconds = num / 1000;
+  } else if (unitSel === 's') {
+    tsSeconds = num;
+  } else {
+    // Auto: if > 1e12, probably ms
+    tsSeconds = num > 1e12 ? num / 1000 : num;
+  }
+
+  const date = new Date(tsSeconds * 1000);
+  if (isNaN(date.getTime())) {
+    errEl.textContent = 'Invalid timestamp.';
+    errEl.style.display = '';
+    return;
+  }
+
+  const relative = getRelativeTime(date);
+
+  resEl.innerHTML =
+    '<div class="relative-time">' + esc(relative) + '</div>' +
+    '<div class="result-card">' +
+      row('Unix (seconds)', Math.floor(tsSeconds)) +
+      row('Unix (milliseconds)', Math.floor(tsSeconds * 1000)) +
+      row('ISO 8601', date.toISOString()) +
+      row('UTC', date.toUTCString()) +
+      row('Local', date.toString()) +
+      row('Date', date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })) +
+      row('Time', date.toLocaleTimeString()) +
+    '</div>';
+}
+
+function convertDatetime() {
+  const val = document.getElementById('dt-input').value;
+  const resEl = document.getElementById('dt-results');
+
+  if (!val) { resEl.innerHTML = ''; return; }
+
+  const date = new Date(val);
+  if (isNaN(date.getTime())) { resEl.innerHTML = ''; return; }
+
+  const ts = Math.floor(date.getTime() / 1000);
+  const relative = getRelativeTime(date);
+
+  resEl.innerHTML =
+    '<div class="relative-time">' + esc(relative) + '</div>' +
+    '<div class="result-card">' +
+      row('Unix (seconds)', ts) +
+      row('Unix (milliseconds)', ts * 1000) +
+      row('ISO 8601', date.toISOString()) +
+      row('UTC', date.toUTCString()) +
+    '</div>';
+}
+
+function row(label, value) {
+  return '<div class="result-row">' +
+    '<span class="result-label">' + label + '</span>' +
+    '<span class="result-value" onclick="copyText(\'' + esc(String(value)).replace(/'/g, "\\'") + '\')">' + esc(String(value)) + '</span>' +
+  '</div>';
+}
+
+function getRelativeTime(date) {
+  const now = Date.now();
+  const diff = date.getTime() - now;
+  const absDiff = Math.abs(diff);
+  const past = diff < 0;
+
+  if (absDiff < 1000) return 'just now';
+
+  const units = [
+    [31536000000, 'year'],
+    [2592000000, 'month'],
+    [86400000, 'day'],
+    [3600000, 'hour'],
+    [60000, 'minute'],
+    [1000, 'second']
+  ];
+
+  for (const [ms, unit] of units) {
+    const val = Math.floor(absDiff / ms);
+    if (val >= 1) {
+      const plural = val !== 1 ? 's' : '';
+      return past ? val + ' ' + unit + plural + ' ago' : 'in ' + val + ' ' + unit + plural;
+    }
+  }
+  return 'just now';
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('toast');
+    toast.textContent = 'Copied: ' + text.slice(0, 40);
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+
+// Convert on Enter
+document.getElementById('ts-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') convertTimestamp();
+});
+
+document.getElementById('dt-input').addEventListener('change', convertDatetime);
+
+// Auto-convert on load if there's something to show
+convertDatetime();
+</script>
+</body>
+</html>
