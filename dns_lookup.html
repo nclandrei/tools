@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DNS Lookup</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 600px; }
+
+  .input-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .input-group input {
+    flex: 1;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.92rem;
+    border-radius: 6px;
+  }
+
+  .btn-lookup {
+    padding: 0.6rem 1.2rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-lookup:hover { background: var(--accent-hover); }
+  .btn-lookup:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Status banner */
+  .status-banner {
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.92rem;
+    display: none;
+  }
+
+  .status-banner.taken {
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+    color: var(--green);
+    display: block;
+  }
+
+  .status-banner.available {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    display: block;
+  }
+
+  .status-banner.error {
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    color: var(--red);
+    display: block;
+  }
+
+  /* Record sections */
+  .record-section {
+    margin-bottom: 1rem;
+  }
+
+  .record-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    cursor: pointer;
+  }
+
+  .record-type {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .record-count {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+  }
+
+  .record-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .record-item {
+    padding: 0.55rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    word-break: break-all;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .record-value { flex: 1; }
+
+  .record-ttl {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .record-copy {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0.2rem;
+    transition: color 0.15s;
+  }
+
+  .record-copy:hover { color: var(--accent); }
+
+  .record-empty {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 0.3rem 0;
+  }
+
+  /* Loading */
+  .loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    display: none;
+  }
+
+  .loading.visible { display: block; }
+
+  .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Whois-style info */
+  .info-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.3rem 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .info-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    padding: 0.15rem 0;
+  }
+
+  .info-value {
+    font-size: 0.82rem;
+    padding: 0.15rem 0;
+    word-break: break-all;
+  }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @media (max-width: 440px) {
+    .input-group { flex-wrap: wrap; }
+    .btn-lookup { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>DNS Lookup</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Check if a domain is taken and view its DNS records. Uses DNS-over-HTTPS via Cloudflare.</p>
+
+  <div class="input-group">
+    <input type="text" id="domain-input" placeholder="e.g. example.com" autocomplete="off" autocapitalize="none" spellcheck="false">
+    <button class="btn-lookup" id="lookup-btn" onclick="lookup()">Lookup</button>
+  </div>
+
+  <div class="status-banner" id="status-banner"></div>
+  <div class="loading" id="loading"><span class="spinner"></span>Looking up DNS records...</div>
+  <div id="results"></div>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script src="/theme.js"></script>
+<script>
+const RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'SOA', 'CAA'];
+const DOH_URL = 'https://cloudflare-dns.com/dns-query';
+
+document.getElementById('domain-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') lookup();
+});
+
+async function lookup() {
+  let domain = document.getElementById('domain-input').value.trim();
+  if (!domain) return;
+
+  // Strip protocol and path
+  domain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+
+  const banner = document.getElementById('status-banner');
+  const loading = document.getElementById('loading');
+  const results = document.getElementById('results');
+  const btn = document.getElementById('lookup-btn');
+
+  banner.className = 'status-banner';
+  banner.style.display = 'none';
+  results.innerHTML = '';
+  loading.classList.add('visible');
+  btn.disabled = true;
+
+  try {
+    // Query all record types in parallel
+    const queries = RECORD_TYPES.map(type => queryDNS(domain, type));
+    const responses = await Promise.all(queries);
+
+    loading.classList.remove('visible');
+    btn.disabled = false;
+
+    // Build results map
+    const recordMap = {};
+    let hasAny = false;
+    RECORD_TYPES.forEach((type, i) => {
+      recordMap[type] = responses[i];
+      if (responses[i].length > 0) hasAny = true;
+    });
+
+    // Domain taken/available status
+    const hasA = recordMap.A.length > 0;
+    const hasAAAA = recordMap.AAAA.length > 0;
+    const hasNS = recordMap.NS.length > 0;
+    const hasCNAME = recordMap.CNAME.length > 0;
+
+    if (hasA || hasAAAA || hasNS || hasCNAME) {
+      banner.className = 'status-banner taken';
+      banner.textContent = domain + ' is taken';
+    } else {
+      banner.className = 'status-banner available';
+      banner.textContent = domain + ' appears available';
+    }
+
+    // Summary info
+    if (hasAny) {
+      let infoHtml = '<div class="info-grid">';
+      infoHtml += '<span class="info-label">Domain</span><span class="info-value">' + esc(domain) + '</span>';
+      if (recordMap.A.length > 0) {
+        infoHtml += '<span class="info-label">IPv4</span><span class="info-value">' + recordMap.A.map(r => esc(r.data)).join(', ') + '</span>';
+      }
+      if (recordMap.AAAA.length > 0) {
+        infoHtml += '<span class="info-label">IPv6</span><span class="info-value">' + recordMap.AAAA.map(r => esc(r.data)).join(', ') + '</span>';
+      }
+      if (recordMap.NS.length > 0) {
+        infoHtml += '<span class="info-label">Nameservers</span><span class="info-value">' + recordMap.NS.map(r => esc(r.data)).join(', ') + '</span>';
+      }
+      if (recordMap.MX.length > 0) {
+        infoHtml += '<span class="info-label">Mail</span><span class="info-value">' + recordMap.MX.map(r => esc(r.data)).join(', ') + '</span>';
+      }
+      infoHtml += '</div>';
+      results.innerHTML = infoHtml;
+    }
+
+    // Detailed records
+    let detailHtml = '';
+    RECORD_TYPES.forEach(type => {
+      const records = recordMap[type];
+      detailHtml += '<div class="record-section">' +
+        '<div class="record-header">' +
+          '<span class="record-type">' + type + ' Records</span>' +
+          '<span class="record-count">' + records.length + '</span>' +
+        '</div>' +
+        '<div class="record-list">';
+
+      if (records.length === 0) {
+        detailHtml += '<div class="record-empty">No ' + type + ' records found</div>';
+      } else {
+        records.forEach(r => {
+          detailHtml += '<div class="record-item">' +
+            '<span class="record-value">' + esc(r.data) + '</span>' +
+            '<span class="record-ttl">TTL ' + r.TTL + '</span>' +
+            '<button class="record-copy" onclick="copyText(\'' + esc(r.data).replace(/'/g, "\\'") + '\')" title="Copy">&#x2398;</button>' +
+          '</div>';
+        });
+      }
+
+      detailHtml += '</div></div>';
+    });
+
+    results.innerHTML += detailHtml;
+
+  } catch (err) {
+    loading.classList.remove('visible');
+    btn.disabled = false;
+    banner.className = 'status-banner error';
+    banner.textContent = 'Lookup failed: ' + err.message;
+  }
+}
+
+async function queryDNS(domain, type) {
+  try {
+    const url = DOH_URL + '?name=' + encodeURIComponent(domain) + '&type=' + type;
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/dns-json' }
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    if (!json.Answer) return [];
+    // Filter to only matching type records
+    const typeNum = { A: 1, AAAA: 28, CNAME: 5, MX: 15, NS: 2, TXT: 16, SOA: 6, CAA: 257 };
+    return json.Answer
+      .filter(a => a.type === typeNum[type])
+      .map(a => ({
+        data: a.data.replace(/^"|"$/g, ''),
+        TTL: a.TTL
+      }));
+  } catch (e) {
+    return [];
+  }
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('toast');
+    toast.textContent = 'Copied: ' + text.slice(0, 50);
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+</script>
+</body>
+</html>
