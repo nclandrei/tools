@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PG Explain Visualizer</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 1100px; }
+
+  .desc { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.5rem; }
+
+  .input-section { margin-bottom: 1.5rem; }
+
+  .input-section label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  textarea {
+    width: 100%;
+    padding: 0.75rem;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    resize: vertical;
+    outline: none;
+    tab-size: 2;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+
+  #plan-input { min-height: 200px; }
+  #query-input { min-height: 80px; }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-family: 'SF Mono', monospace;
+    font-size: 12px;
+    padding: 7px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .btn:hover { border-color: var(--border-hover); color: var(--text); }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 500;
+  }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+  /* ── Results ── */
+  .results { display: none; }
+  .results.visible { display: block; }
+
+  /* ── Stats bar ── */
+  .stats-bar {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 120px;
+  }
+
+  .stat-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .stat-value {
+    font-family: 'SF Mono', monospace;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  /* ── Plan tree ── */
+  .plan-tree {
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .node {
+    position: relative;
+    margin-left: 24px;
+    padding: 6px 10px;
+    border-left: 2px solid var(--border);
+  }
+
+  .node:last-child { border-left-color: transparent; }
+
+  .node::before {
+    content: '';
+    position: absolute;
+    left: -2px;
+    top: 0;
+    width: 16px;
+    height: 18px;
+    border-left: 2px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    border-bottom-left-radius: 6px;
+  }
+
+  .node:last-child::before {
+    border-left-color: var(--border);
+  }
+
+  .node-root {
+    margin-left: 0;
+    border-left: none;
+    padding-left: 0;
+  }
+  .node-root::before { display: none; }
+
+  .node-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.1s;
+  }
+
+  .node-header:hover { background: var(--surface-alt); }
+
+  .node-type {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .node-on {
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+
+  .node-timing {
+    font-size: 12px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .timing-fast { background: var(--green-dim); color: var(--green); }
+  .timing-medium { background: var(--amber-dim); color: var(--amber); }
+  .timing-slow { background: var(--red-dim); color: var(--red); }
+
+  .node-rows {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .node-details {
+    display: none;
+    margin-top: 4px;
+    margin-left: 6px;
+    padding: 8px 10px;
+    background: var(--surface-alt);
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+
+  .node-details.open { display: block; }
+
+  .detail-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .detail-key {
+    color: var(--text-muted);
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  .detail-val {
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .row-mismatch {
+    color: var(--red);
+    font-weight: 500;
+  }
+
+  /* ── Cost bar ── */
+  .cost-bar-wrap {
+    margin-top: 4px;
+    margin-left: 6px;
+  }
+
+  .cost-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    overflow: hidden;
+    max-width: 200px;
+  }
+
+  .cost-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  .fill-fast { background: var(--green); }
+  .fill-medium { background: var(--amber); }
+  .fill-slow { background: var(--red); }
+
+  /* ── Query display ── */
+  .query-display {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'SF Mono', monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .query-display-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  /* ── Warnings ── */
+  .warnings {
+    margin-bottom: 1rem;
+  }
+
+  .warning-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--amber-dim);
+    color: var(--amber);
+    border-radius: 6px;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .error-msg {
+    padding: 10px 14px;
+    background: var(--red-dim);
+    color: var(--red);
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 600px) {
+    .stats-bar { gap: 0.5rem; }
+    .stat { min-width: 90px; }
+    .node { margin-left: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>PG Explain Visualizer</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+  <p class="desc">Paste the output of <code>EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)</code> or plain text format to visualize your query plan.</p>
+
+  <div class="input-section">
+    <label for="plan-input">Plan (text or JSON)</label>
+    <textarea id="plan-input" placeholder="Paste execution plan here..."></textarea>
+  </div>
+
+  <div class="input-section">
+    <label for="query-input">Query (optional)</label>
+    <textarea id="query-input" placeholder="Paste the SQL query for reference"></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="analyze()">Analyze</button>
+    <button class="btn" onclick="loadSample()">Sample Plan</button>
+    <button class="btn" onclick="clearAll()">Clear</button>
+  </div>
+
+  <div id="error"></div>
+
+  <div id="results" class="results">
+    <div id="warnings" class="warnings"></div>
+    <div id="stats" class="stats-bar"></div>
+    <div id="tree" class="plan-tree"></div>
+    <div id="query-display-section"></div>
+  </div>
+</div>
+
+<script src="/theme.js"></script>
+<script>
+(function() {
+
+/* ── Parse ── */
+
+function parseInput(raw) {
+  raw = raw.trim();
+  if (!raw) throw new Error('No plan provided');
+
+  // Try JSON first
+  try {
+    // Strip leading QUERY PLAN header from psql JSON output
+    let jsonStr = raw.replace(/^\s*QUERY PLAN\s*\n[-─]+\n/i, '').trim();
+    // Sometimes psql wraps JSON rows with leading/trailing whitespace
+    if (jsonStr.startsWith('[') || jsonStr.startsWith('{')) {
+      const parsed = JSON.parse(jsonStr);
+      // EXPLAIN FORMAT JSON returns [{Plan: ...}]
+      if (Array.isArray(parsed) && parsed[0] && parsed[0].Plan) {
+        return { plan: parsed[0].Plan, meta: parsed[0] };
+      }
+      if (parsed.Plan) return { plan: parsed.Plan, meta: parsed };
+      throw new Error('JSON does not contain a Plan key');
+    }
+  } catch(e) {
+    if (e.message.includes('Plan key')) throw e;
+  }
+
+  // Parse text format
+  return { plan: parseTextPlan(raw), meta: null };
+}
+
+function parseTextPlan(text) {
+  // Remove QUERY PLAN header and dashes
+  const lines = text.split('\n')
+    .filter(l => !/^\s*QUERY PLAN\s*$/i.test(l))
+    .filter(l => !/^[-─]+$/.test(l.trim()))
+    .filter(l => l.trim() !== '');
+
+  if (!lines.length) throw new Error('Could not parse plan text');
+
+  const stack = []; // {indent, node}
+  let root = null;
+
+  for (const line of lines) {
+    const match = line.match(/^(\s*)(->)?\s*(.*)/);
+    if (!match) continue;
+
+    const indent = match[1].length + (match[2] ? 2 : 0);
+    const content = match[3].trim();
+
+    // Skip planning/execution time lines, but capture them
+    if (/^(Planning|Execution|Total)\s+(Time|Runtime)/i.test(content)) continue;
+    if (/^Trigger\s/i.test(content)) continue;
+
+    const node = parseTextNode(content);
+    if (!node) continue;
+
+    if (!root) {
+      root = node;
+      stack.push({ indent: -1, node: root });
+      continue;
+    }
+
+    // Pop stack to find parent
+    while (stack.length > 1 && stack[stack.length - 1].indent >= indent) {
+      stack.pop();
+    }
+
+    const parent = stack[stack.length - 1].node;
+    if (!parent.Plans) parent.Plans = [];
+    parent.Plans.push(node);
+    stack.push({ indent, node });
+  }
+
+  if (!root) throw new Error('Could not parse plan — check the format');
+  return root;
+}
+
+function parseTextNode(text) {
+  // Match: NodeType [on relation] (cost=X..Y rows=N width=W) (actual time=X..Y rows=N loops=L)
+  const re = /^([A-Za-z][A-Za-z ]*?)(?:\s+on\s+(\S+))?(?:\s+(\S+))?\s*\(cost=([\d.]+)\.\.([\d.]+)\s+rows=(\d+)\s+width=(\d+)\)(?:\s*\(actual time=([\d.]+)\.\.([\d.]+)\s+rows=(\d+)\s+loops=(\d+)\))?/;
+  const m = text.match(re);
+  if (!m) {
+    // Try simpler match without actual time (EXPLAIN without ANALYZE)
+    const re2 = /^([A-Za-z][A-Za-z ]*?)(?:\s+on\s+(\S+))?(?:\s+(\S+))?\s*\(cost=([\d.]+)\.\.([\d.]+)\s+rows=(\d+)\s+width=(\d+)\)/;
+    const m2 = text.match(re2);
+    if (!m2) return null;
+    const node = {
+      'Node Type': m2[1].trim(),
+      'Startup Cost': parseFloat(m2[4]),
+      'Total Cost': parseFloat(m2[5]),
+      'Plan Rows': parseInt(m2[6]),
+      'Plan Width': parseInt(m2[7])
+    };
+    if (m2[2]) node['Relation Name'] = m2[2];
+    if (m2[3]) node['Alias'] = m2[3];
+    parseExtraInfo(text, node);
+    return node;
+  }
+
+  const node = {
+    'Node Type': m[1].trim(),
+    'Startup Cost': parseFloat(m[4]),
+    'Total Cost': parseFloat(m[5]),
+    'Plan Rows': parseInt(m[6]),
+    'Plan Width': parseInt(m[7])
+  };
+  if (m[2]) node['Relation Name'] = m[2];
+  if (m[3]) node['Alias'] = m[3];
+  if (m[8] !== undefined) {
+    node['Actual Startup Time'] = parseFloat(m[8]);
+    node['Actual Total Time'] = parseFloat(m[9]);
+    node['Actual Rows'] = parseInt(m[10]);
+    node['Actual Loops'] = parseInt(m[11]);
+  }
+  parseExtraInfo(text, node);
+  return node;
+}
+
+function parseExtraInfo(text, node) {
+  // Extract additional info after the main pattern
+  const bufMatch = text.match(/Buffers:\s*(.*)/i);
+  if (bufMatch) node._buffers = bufMatch[1].trim();
+  const filterMatch = text.match(/Filter:\s*(.*)/i);
+  if (filterMatch) node['Filter'] = filterMatch[1].trim();
+  const sortMatch = text.match(/Sort Key:\s*(.*)/i);
+  if (sortMatch) node['Sort Key'] = sortMatch[1].trim();
+  const joinMatch = text.match(/(?:Hash|Merge|Join)\s+Cond:\s*(.*)/i);
+  if (joinMatch) node['Join Condition'] = joinMatch[1].trim();
+  const indexMatch = text.match(/Index Cond:\s*(.*)/i);
+  if (indexMatch) node['Index Cond'] = indexMatch[1].trim();
+}
+
+
+/* ── Analyze ── */
+
+function collectNodes(node, list) {
+  list = list || [];
+  list.push(node);
+  if (node.Plans) node.Plans.forEach(c => collectNodes(c, list));
+  return list;
+}
+
+function analyzeTree(plan, meta) {
+  const nodes = collectNodes(plan);
+  const hasActual = nodes.some(n => n['Actual Total Time'] !== undefined);
+
+  let totalTime = 0;
+  let maxTime = 0;
+  let slowestNode = '';
+  let totalRows = 0;
+  let totalCost = plan['Total Cost'] || 0;
+
+  if (hasActual) {
+    // Root node actual time is the total
+    totalTime = (plan['Actual Total Time'] || 0) * (plan['Actual Loops'] || 1);
+  }
+
+  // Find the exclusive time of each node
+  nodes.forEach(n => {
+    if (hasActual) {
+      const nodeTime = (n['Actual Total Time'] || 0) * (n['Actual Loops'] || 1);
+      // Exclusive time = total - children total
+      let childTime = 0;
+      if (n.Plans) {
+        n.Plans.forEach(c => {
+          childTime += (c['Actual Total Time'] || 0) * (c['Actual Loops'] || 1);
+        });
+      }
+      n._exclusiveTime = Math.max(0, nodeTime - childTime);
+      n._inclusiveTime = nodeTime;
+
+      if (n._exclusiveTime > maxTime) {
+        maxTime = n._exclusiveTime;
+        slowestNode = n['Node Type'];
+      }
+      totalRows += (n['Actual Rows'] || 0) * (n['Actual Loops'] || 1);
+    } else {
+      n._exclusiveTime = 0;
+      n._inclusiveTime = 0;
+    }
+  });
+
+  // Warnings
+  const warnings = [];
+  nodes.forEach(n => {
+    if (hasActual && n['Plan Rows'] && n['Actual Rows'] !== undefined) {
+      const est = n['Plan Rows'];
+      const act = n['Actual Rows'] * (n['Actual Loops'] || 1);
+      if (est > 0 && (act / est > 10 || est / Math.max(act,1) > 10)) {
+        warnings.push(`${n['Node Type']}: estimated ${est} rows, got ${act}`);
+      }
+    }
+    if (n['Node Type'] && /Seq Scan/i.test(n['Node Type']) && n['Relation Name']) {
+      if (hasActual && (n['Actual Rows'] || 0) * (n['Actual Loops'] || 1) > 10000) {
+        warnings.push(`Sequential scan on ${n['Relation Name']} returned ${(n['Actual Rows'] * (n['Actual Loops'] || 1)).toLocaleString()} rows — consider an index`);
+      }
+    }
+  });
+
+  // Execution time from meta
+  if (meta && meta['Execution Time']) totalTime = meta['Execution Time'];
+  if (meta && meta['Planning Time']) {
+    // keep for display
+  }
+
+  return {
+    totalTime,
+    planningTime: meta ? meta['Planning Time'] : null,
+    maxExclusiveTime: maxTime,
+    slowestNode,
+    totalCost,
+    totalRows,
+    nodeCount: nodes.length,
+    hasActual,
+    warnings
+  };
+}
+
+
+/* ── Render ── */
+
+function timingClass(exclusiveTime, maxTime) {
+  if (maxTime === 0) return 'fast';
+  const pct = exclusiveTime / maxTime;
+  if (pct > 0.5) return 'slow';
+  if (pct > 0.15) return 'medium';
+  return 'fast';
+}
+
+function renderNode(node, maxTime, isRoot) {
+  const cls = isRoot ? 'node node-root' : 'node';
+  const type = node['Node Type'] || 'Unknown';
+  const rel = node['Relation Name'] ? ` on ${node['Relation Name']}${node['Alias'] && node['Alias'] !== node['Relation Name'] ? ' ' + node['Alias'] : ''}` : '';
+  const hasActual = node['Actual Total Time'] !== undefined;
+  const excTime = node._exclusiveTime || 0;
+  const tc = timingClass(excTime, maxTime);
+
+  let timingHtml = '';
+  if (hasActual) {
+    timingHtml = `<span class="node-timing timing-${tc}">${excTime.toFixed(3)} ms</span>`;
+  }
+
+  let rowsHtml = '';
+  if (hasActual) {
+    const actual = (node['Actual Rows'] || 0) * (node['Actual Loops'] || 1);
+    const est = node['Plan Rows'] || 0;
+    const mismatch = est > 0 && (actual / est > 10 || est / Math.max(actual,1) > 10);
+    rowsHtml = `<span class="node-rows${mismatch ? ' row-mismatch' : ''}">${actual.toLocaleString()} rows (est. ${est.toLocaleString()})</span>`;
+  } else if (node['Plan Rows'] !== undefined) {
+    rowsHtml = `<span class="node-rows">est. ${node['Plan Rows'].toLocaleString()} rows</span>`;
+  }
+
+  // Cost bar
+  let barHtml = '';
+  if (hasActual && maxTime > 0) {
+    const pct = Math.max(1, (excTime / maxTime) * 100);
+    barHtml = `<div class="cost-bar-wrap"><div class="cost-bar"><div class="cost-bar-fill fill-${tc}" style="width:${pct}%"></div></div></div>`;
+  }
+
+  // Details panel
+  const details = [];
+  if (node['Total Cost'] !== undefined) details.push(['Cost', `${node['Startup Cost']}..${node['Total Cost']}`]);
+  if (hasActual) {
+    details.push(['Time', `${node['Actual Startup Time']}..${node['Actual Total Time']} ms`]);
+    details.push(['Exclusive Time', `${excTime.toFixed(3)} ms`]);
+    if (node['Actual Loops'] > 1) details.push(['Loops', node['Actual Loops']]);
+  }
+  if (node['Plan Width']) details.push(['Width', `${node['Plan Width']} bytes`]);
+  if (node['Filter']) details.push(['Filter', node['Filter']]);
+  if (node['Index Cond']) details.push(['Index Cond', node['Index Cond']]);
+  if (node['Hash Cond']) details.push(['Hash Cond', node['Hash Cond']]);
+  if (node['Merge Cond']) details.push(['Merge Cond', node['Merge Cond']]);
+  if (node['Join Filter']) details.push(['Join Filter', node['Join Filter']]);
+  if (node['Join Condition']) details.push(['Join Cond', node['Join Condition']]);
+  if (node['Sort Key']) details.push(['Sort Key', Array.isArray(node['Sort Key']) ? node['Sort Key'].join(', ') : node['Sort Key']]);
+  if (node['Sort Method']) details.push(['Sort Method', `${node['Sort Method']}${node['Sort Space Used'] ? ' (' + node['Sort Space Used'] + ' kB)' : ''}`]);
+  if (node['Group Key']) details.push(['Group Key', Array.isArray(node['Group Key']) ? node['Group Key'].join(', ') : node['Group Key']]);
+  if (node['Strategy']) details.push(['Strategy', node['Strategy']]);
+  if (node['Partial Mode']) details.push(['Partial Mode', node['Partial Mode']]);
+  if (node['Workers Planned']) details.push(['Workers Planned', node['Workers Planned']]);
+  if (node['Workers Launched']) details.push(['Workers Launched', node['Workers Launched']]);
+  if (node['Rows Removed by Filter'] !== undefined) details.push(['Rows Removed by Filter', node['Rows Removed by Filter'].toLocaleString()]);
+  if (node['Rows Removed by Join Filter'] !== undefined) details.push(['Rows Removed by Join Filter', node['Rows Removed by Join Filter'].toLocaleString()]);
+  if (node['Shared Hit Blocks']) details.push(['Shared Hit', `${node['Shared Hit Blocks']} blocks`]);
+  if (node['Shared Read Blocks']) details.push(['Shared Read', `${node['Shared Read Blocks']} blocks`]);
+  if (node['Temp Read Blocks']) details.push(['Temp Read', `${node['Temp Read Blocks']} blocks`]);
+  if (node['Temp Written Blocks']) details.push(['Temp Written', `${node['Temp Written Blocks']} blocks`]);
+  if (node._buffers) details.push(['Buffers', node._buffers]);
+  if (node['Index Name']) details.push(['Index', node['Index Name']]);
+  if (node['Scan Direction']) details.push(['Scan Direction', node['Scan Direction']]);
+  if (node['Output']) details.push(['Output', Array.isArray(node['Output']) ? node['Output'].join(', ') : node['Output']]);
+
+  const detailsHtml = details.map(([k, v]) =>
+    `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${escHtml(String(v))}</span></div>`
+  ).join('');
+
+  const id = 'd' + Math.random().toString(36).slice(2, 8);
+
+  let childrenHtml = '';
+  if (node.Plans) {
+    childrenHtml = node.Plans.map(c => renderNode(c, maxTime, false)).join('');
+  }
+
+  return `<div class="${cls}">
+    <div class="node-header" onclick="toggleDetail('${id}')">
+      <span class="node-type">${escHtml(type)}</span>
+      <span class="node-on">${escHtml(rel)}</span>
+      ${timingHtml}
+      ${rowsHtml}
+    </div>
+    ${barHtml}
+    <div class="node-details" id="${id}">${detailsHtml}</div>
+    ${childrenHtml}
+  </div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+window.toggleDetail = function(id) {
+  document.getElementById(id).classList.toggle('open');
+};
+
+
+/* ── Main ── */
+
+window.analyze = function() {
+  const raw = document.getElementById('plan-input').value;
+  const query = document.getElementById('query-input').value.trim();
+  const errEl = document.getElementById('error');
+  const results = document.getElementById('results');
+
+  errEl.innerHTML = '';
+  results.classList.remove('visible');
+
+  try {
+    const { plan, meta } = parseInput(raw);
+    const stats = analyzeTree(plan, meta);
+
+    // Warnings
+    const warningsEl = document.getElementById('warnings');
+    if (stats.warnings.length) {
+      warningsEl.innerHTML = stats.warnings.map(w =>
+        `<div class="warning-item">&#9888; ${escHtml(w)}</div>`
+      ).join('');
+    } else {
+      warningsEl.innerHTML = '';
+    }
+
+    // Stats bar
+    const statsEl = document.getElementById('stats');
+    let statsHtml = '';
+    if (stats.hasActual) {
+      statsHtml += `<div class="stat"><span class="stat-label">Execution Time</span><span class="stat-value">${stats.totalTime.toFixed(3)} ms</span></div>`;
+    }
+    if (stats.planningTime !== null && stats.planningTime !== undefined) {
+      statsHtml += `<div class="stat"><span class="stat-label">Planning Time</span><span class="stat-value">${stats.planningTime.toFixed(3)} ms</span></div>`;
+    }
+    statsHtml += `<div class="stat"><span class="stat-label">Total Cost</span><span class="stat-value">${stats.totalCost.toFixed(2)}</span></div>`;
+    statsHtml += `<div class="stat"><span class="stat-label">Nodes</span><span class="stat-value">${stats.nodeCount}</span></div>`;
+    if (stats.hasActual && stats.slowestNode) {
+      statsHtml += `<div class="stat"><span class="stat-label">Slowest Node</span><span class="stat-value" style="color:var(--red)">${escHtml(stats.slowestNode)}</span></div>`;
+    }
+    if (stats.hasActual) {
+      statsHtml += `<div class="stat"><span class="stat-label">Total Rows</span><span class="stat-value">${stats.totalRows.toLocaleString()}</span></div>`;
+    }
+    statsEl.innerHTML = statsHtml;
+
+    // Tree
+    document.getElementById('tree').innerHTML = renderNode(plan, stats.maxExclusiveTime, true);
+
+    // Query
+    const qSection = document.getElementById('query-display-section');
+    if (query) {
+      qSection.innerHTML = `<div class="query-display-label">Query</div><div class="query-display">${escHtml(query)}</div>`;
+    } else {
+      qSection.innerHTML = '';
+    }
+
+    results.classList.add('visible');
+  } catch(e) {
+    errEl.innerHTML = `<div class="error-msg">${escHtml(e.message)}</div>`;
+  }
+};
+
+window.clearAll = function() {
+  document.getElementById('plan-input').value = '';
+  document.getElementById('query-input').value = '';
+  document.getElementById('results').classList.remove('visible');
+  document.getElementById('error').innerHTML = '';
+};
+
+window.loadSample = function() {
+  document.getElementById('plan-input').value = JSON.stringify([
+    {
+      "Plan": {
+        "Node Type": "Sort",
+        "Startup Cost": 291.79,
+        "Total Cost": 293.15,
+        "Plan Rows": 544,
+        "Plan Width": 224,
+        "Actual Startup Time": 60.754,
+        "Actual Total Time": 60.760,
+        "Actual Rows": 69,
+        "Actual Loops": 1,
+        "Sort Key": ["n.nspname", "p.proname", "(pg_get_function_arguments(p.oid))"],
+        "Sort Method": "quicksort",
+        "Sort Space Used": 38,
+        "Sort Space Type": "Memory",
+        "Shared Hit Blocks": 97,
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Parent Relationship": "Outer",
+            "Startup Cost": 1.08,
+            "Total Cost": 223.93,
+            "Plan Rows": 544,
+            "Plan Width": 224,
+            "Actual Startup Time": 11.679,
+            "Actual Total Time": 60.696,
+            "Actual Rows": 69,
+            "Actual Loops": 1,
+            "Hash Cond": "(p.pronamespace = n.oid)",
+            "Shared Hit Blocks": 97,
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Parent Relationship": "Outer",
+                "Relation Name": "pg_proc",
+                "Alias": "p",
+                "Startup Cost": 0.00,
+                "Total Cost": 210.17,
+                "Plan Rows": 1087,
+                "Plan Width": 73,
+                "Actual Startup Time": 0.067,
+                "Actual Total Time": 59.669,
+                "Actual Rows": 3320,
+                "Actual Loops": 1,
+                "Filter": "pg_function_is_visible(oid)",
+                "Rows Removed by Filter": 12,
+                "Shared Hit Blocks": 96
+              },
+              {
+                "Node Type": "Hash",
+                "Parent Relationship": "Inner",
+                "Startup Cost": 1.06,
+                "Total Cost": 1.06,
+                "Plan Rows": 2,
+                "Plan Width": 68,
+                "Actual Startup Time": 0.011,
+                "Actual Total Time": 0.011,
+                "Actual Rows": 2,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 1,
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Relation Name": "pg_namespace",
+                    "Alias": "n",
+                    "Startup Cost": 0.00,
+                    "Total Cost": 1.06,
+                    "Plan Rows": 2,
+                    "Plan Width": 68,
+                    "Actual Startup Time": 0.004,
+                    "Actual Total Time": 0.006,
+                    "Actual Rows": 2,
+                    "Actual Loops": 1,
+                    "Filter": "((nspname <> 'pg_catalog'::name) AND (nspname <> 'information_schema'::name))",
+                    "Rows Removed by Filter": 2,
+                    "Shared Hit Blocks": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "Planning Time": 0.432,
+      "Execution Time": 60.999
+    }
+  ], null, 2);
+
+  document.getElementById('query-input').value =
+    "SELECT * FROM some_view\nWHERE nspname NOT IN ('pg_catalog', 'information_schema')\nORDER BY 1, 2, 3;";
+
+  analyze();
+};
+
+// Allow Ctrl+Enter to analyze
+document.getElementById('plan-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    analyze();
+  }
+});
+
+})();
+</script>
+</body>
+</html>
