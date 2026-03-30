@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compound Interest Calculator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  .container { max-width: 820px; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+  .form-group.full-width { grid-column: 1 / -1; }
+
+  .form-group label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .form-group input,
+  .form-group select {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.92rem;
+    border-radius: 6px;
+  }
+
+  .inflation-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .inflation-toggle label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .inflation-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .inflation-row {
+    display: none;
+    margin-bottom: 1.5rem;
+  }
+  .inflation-row.visible { display: block; }
+
+  .inflation-row .form-group {
+    max-width: 240px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  /* Summary cards */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+  }
+
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+  }
+
+  .summary-card .label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+  }
+
+  .summary-card .value {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .summary-card.accent .value { color: var(--accent); }
+  .summary-card.green .value { color: var(--green); }
+
+  /* Chart */
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .chart-wrap canvas {
+    width: 100% !important;
+    max-height: 360px;
+  }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+  }
+
+  thead th {
+    background: var(--surface-alt);
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    padding: 0.65rem 0.75rem;
+    text-align: right;
+    position: sticky;
+    top: 0;
+    white-space: nowrap;
+  }
+
+  thead th:first-child { text-align: center; }
+
+  tbody td {
+    padding: 0.55rem 0.75rem;
+    border-top: 1px solid var(--border);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  tbody td:first-child { text-align: center; font-weight: 500; }
+
+  tbody tr:hover { background: var(--surface-alt); }
+
+  .hidden { display: none; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .summary { grid-template-columns: 1fr; }
+    .summary-card .value { font-size: 1.1rem; }
+    .chart-wrap { padding: 0.5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Compound Interest Calculator</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+
+  <p class="desc">Calculate compound interest with monthly contributions, inflation adjustment, and year-by-year breakdown.</p>
+
+  <div class="form-grid">
+    <div class="form-group">
+      <label for="principal">Initial Principal ($)</label>
+      <input type="number" id="principal" value="10000" min="0" step="100">
+    </div>
+    <div class="form-group">
+      <label for="contribution">Monthly Contribution ($)</label>
+      <input type="number" id="contribution" value="500" min="0" step="50">
+    </div>
+    <div class="form-group">
+      <label for="rate">Annual Interest Rate (%)</label>
+      <input type="number" id="rate" value="7" min="0" max="100" step="0.1">
+    </div>
+    <div class="form-group">
+      <label for="compounding">Compounding Frequency</label>
+      <select id="compounding">
+        <option value="12">Monthly</option>
+        <option value="4">Quarterly</option>
+        <option value="1">Annually</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="years">Time Period (Years)</label>
+      <input type="number" id="years" value="20" min="1" max="100" step="1">
+    </div>
+  </div>
+
+  <div class="inflation-toggle">
+    <input type="checkbox" id="inflationToggle">
+    <label for="inflationToggle">Adjust for inflation</label>
+  </div>
+
+  <div class="inflation-row" id="inflationRow">
+    <div class="form-group">
+      <label for="inflation">Annual Inflation Rate (%)</label>
+      <input type="number" id="inflation" value="3" min="0" max="50" step="0.1">
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="calculateBtn">Calculate</button>
+    <button class="btn btn-secondary hidden" id="csvBtn">Download CSV</button>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="summary">
+      <div class="summary-card accent">
+        <div class="label">Final Balance</div>
+        <div class="value" id="finalBalance">-</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Total Contributions</div>
+        <div class="value" id="totalContributions">-</div>
+      </div>
+      <div class="summary-card green">
+        <div class="label">Total Interest</div>
+        <div class="value" id="totalInterest">-</div>
+      </div>
+    </div>
+
+    <div id="inflationSummary" class="summary hidden">
+      <div class="summary-card">
+        <div class="label">Inflation-Adjusted Balance</div>
+        <div class="value" id="adjustedBalance">-</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Purchasing Power Lost</div>
+        <div class="value" id="purchasingPowerLost" style="color: var(--red);">-</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Real Return Rate</div>
+        <div class="value" id="realReturnRate">-</div>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <canvas id="growthChart"></canvas>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr id="tableHead">
+            <th>Year</th>
+            <th>Starting Balance</th>
+            <th>Contributions</th>
+            <th>Interest Earned</th>
+            <th>Ending Balance</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/theme.js"></script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const fmt = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+  const fmtPct = n => n.toFixed(2) + '%';
+
+  let chart = null;
+  let tableData = [];
+
+  // Inflation toggle
+  $('inflationToggle').addEventListener('change', function () {
+    $('inflationRow').classList.toggle('visible', this.checked);
+  });
+
+  // Calculate on button click
+  $('calculateBtn').addEventListener('click', calculate);
+
+  // Also calculate on Enter in any input
+  document.querySelectorAll('input, select').forEach(el => {
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); });
+  });
+
+  function calculate() {
+    const principal = parseFloat($('principal').value) || 0;
+    const monthly = parseFloat($('contribution').value) || 0;
+    const annualRate = (parseFloat($('rate').value) || 0) / 100;
+    const n = parseInt($('compounding').value); // compounding periods per year
+    const years = parseInt($('years').value) || 1;
+    const useInflation = $('inflationToggle').checked;
+    const inflationRate = useInflation ? (parseFloat($('inflation').value) || 0) / 100 : 0;
+
+    const ratePerPeriod = annualRate / n;
+    const periodsPerYear = n;
+
+    // Build year-by-year data
+    tableData = [];
+    let balance = principal;
+    let totalContrib = principal;
+    let totalInterestAccum = 0;
+
+    // Labels and data arrays for chart
+    const labels = ['0'];
+    const balanceData = [principal];
+    const contribData = [principal];
+    const adjustedData = useInflation ? [principal] : [];
+
+    for (let year = 1; year <= years; year++) {
+      const startBalance = balance;
+      let yearInterest = 0;
+      const yearContrib = monthly * 12;
+
+      // Calculate compound growth within each period
+      for (let p = 0; p < periodsPerYear; p++) {
+        // Add monthly contributions for the months in this period
+        const monthsInPeriod = 12 / periodsPerYear;
+        balance += monthly * monthsInPeriod;
+
+        // Apply interest for this compounding period
+        const interest = balance * ratePerPeriod;
+        balance += interest;
+        yearInterest += interest;
+      }
+
+      totalContrib += yearContrib;
+      totalInterestAccum += yearInterest;
+
+      tableData.push({
+        year,
+        startBalance,
+        contributions: yearContrib,
+        interest: yearInterest,
+        endBalance: balance,
+        adjustedBalance: useInflation ? balance / Math.pow(1 + inflationRate, year) : null
+      });
+
+      labels.push(String(year));
+      balanceData.push(balance);
+      contribData.push(totalContrib);
+      if (useInflation) {
+        adjustedData.push(balance / Math.pow(1 + inflationRate, year));
+      }
+    }
+
+    const finalBalance = balance;
+    const totalInterest = totalInterestAccum;
+
+    // Update summary
+    $('finalBalance').textContent = fmt(finalBalance);
+    $('totalContributions').textContent = fmt(totalContrib);
+    $('totalInterest').textContent = fmt(totalInterest);
+
+    if (useInflation) {
+      const adjustedFinal = finalBalance / Math.pow(1 + inflationRate, years);
+      const powerLost = finalBalance - adjustedFinal;
+      // Real return: approximate using Fisher equation
+      const realRate = ((1 + annualRate) / (1 + inflationRate) - 1) * 100;
+
+      $('adjustedBalance').textContent = fmt(adjustedFinal);
+      $('purchasingPowerLost').textContent = fmt(powerLost);
+      $('realReturnRate').textContent = fmtPct(realRate);
+      $('inflationSummary').classList.remove('hidden');
+    } else {
+      $('inflationSummary').classList.add('hidden');
+    }
+
+    // Update table
+    renderTable(useInflation);
+
+    // Update chart
+    renderChart(labels, balanceData, contribData, adjustedData, useInflation);
+
+    // Show results
+    $('results').classList.remove('hidden');
+    $('csvBtn').classList.remove('hidden');
+  }
+
+  function renderTable(useInflation) {
+    const head = $('tableHead');
+    head.innerHTML = '<th>Year</th><th>Starting Balance</th><th>Contributions</th><th>Interest Earned</th><th>Ending Balance</th>';
+    if (useInflation) {
+      const th = document.createElement('th');
+      th.textContent = 'Inflation-Adjusted';
+      head.appendChild(th);
+    }
+
+    const tbody = $('tableBody');
+    tbody.innerHTML = '';
+    for (const row of tableData) {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + row.year + '</td>' +
+        '<td>' + fmt(row.startBalance) + '</td>' +
+        '<td>' + fmt(row.contributions) + '</td>' +
+        '<td>' + fmt(row.interest) + '</td>' +
+        '<td>' + fmt(row.endBalance) + '</td>' +
+        (useInflation ? '<td>' + fmt(row.adjustedBalance) + '</td>' : '');
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderChart(labels, balanceData, contribData, adjustedData, useInflation) {
+    const ctx = $('growthChart').getContext('2d');
+    const style = getComputedStyle(document.documentElement);
+    const accent = style.getPropertyValue('--accent').trim();
+    const green = style.getPropertyValue('--green').trim();
+    const blue = style.getPropertyValue('--blue').trim();
+    const textMuted = style.getPropertyValue('--text-muted').trim();
+    const border = style.getPropertyValue('--border').trim();
+
+    if (chart) chart.destroy();
+
+    const datasets = [
+      {
+        label: 'Total Balance',
+        data: balanceData,
+        borderColor: accent,
+        backgroundColor: accent + '18',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        pointHitRadius: 10,
+        borderWidth: 2
+      },
+      {
+        label: 'Total Contributions',
+        data: contribData,
+        borderColor: blue,
+        backgroundColor: 'transparent',
+        borderDash: [5, 3],
+        tension: 0.3,
+        pointRadius: 0,
+        pointHitRadius: 10,
+        borderWidth: 2
+      }
+    ];
+
+    if (useInflation && adjustedData.length) {
+      datasets.push({
+        label: 'Inflation-Adjusted',
+        data: adjustedData,
+        borderColor: green,
+        backgroundColor: 'transparent',
+        borderDash: [2, 2],
+        tension: 0.3,
+        pointRadius: 0,
+        pointHitRadius: 10,
+        borderWidth: 2
+      });
+    }
+
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: textMuted,
+              font: { family: 'Inter', size: 12 },
+              boxWidth: 14,
+              padding: 16
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return context.dataset.label + ': ' + fmt(context.parsed.y);
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Year', color: textMuted, font: { family: 'Inter', size: 12 } },
+            ticks: { color: textMuted, font: { family: 'Inter', size: 11 } },
+            grid: { color: border }
+          },
+          y: {
+            title: { display: true, text: 'Balance ($)', color: textMuted, font: { family: 'Inter', size: 12 } },
+            ticks: {
+              color: textMuted,
+              font: { family: 'Inter', size: 11 },
+              callback: function (value) {
+                if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
+                if (value >= 1000) return '$' + (value / 1000).toFixed(0) + 'K';
+                return '$' + value;
+              }
+            },
+            grid: { color: border }
+          }
+        }
+      }
+    });
+  }
+
+  // CSV download
+  $('csvBtn').addEventListener('click', function () {
+    if (!tableData.length) return;
+    const useInflation = $('inflationToggle').checked;
+
+    let csv = 'Year,Starting Balance,Contributions,Interest Earned,Ending Balance';
+    if (useInflation) csv += ',Inflation-Adjusted Balance';
+    csv += '\n';
+
+    for (const row of tableData) {
+      csv += row.year + ',' +
+        row.startBalance.toFixed(2) + ',' +
+        row.contributions.toFixed(2) + ',' +
+        row.interest.toFixed(2) + ',' +
+        row.endBalance.toFixed(2);
+      if (useInflation) csv += ',' + (row.adjustedBalance || 0).toFixed(2);
+      csv += '\n';
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'compound_interest.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Run initial calculation
+  calculate();
+})();
+</script>
+</body>
+</html>
