@@ -41,7 +41,7 @@ No build, no install, no tests. Just serve and open.
    <link rel="stylesheet" href="/theme.css">
    <!-- page-specific <style> goes here -->
    ```
-3. End body with `<script src="/theme.js"></script>` for the theme toggle
+3. Do **not** include `theme.js` — the theme toggle lives only on the index page. Tools inherit the theme via the inline script in step 2 and `theme.css`.
 4. Use `.container` wrapper (override `max-width` if needed), `header` with `<h1>` + back link `<a href="/">&larr; All tools</a>`
 5. Add a `<a class="tool-card">` entry in the appropriate category in `index.html`:
    ```html
