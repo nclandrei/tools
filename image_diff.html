@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Diff</title>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .container { max-width: 1000px; }
+
+    header { margin-bottom: 2rem; animation: fadeUp .4s ease; }
+    h1 { font-size: 1.75rem; }
+
+    .upload-area {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 1rem;
+      align-items: stretch;
+      margin-bottom: 1.5rem;
+      animation: fadeUp .4s ease .05s both;
+    }
+
+    .upload-box {
+      position: relative;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 140px;
+    }
+    .upload-box:hover, .upload-box.dragover {
+      border-color: var(--accent);
+      background: var(--drop-hover);
+    }
+    .upload-box.has-image {
+      padding: 0.5rem;
+      border-style: solid;
+    }
+    .upload-box input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .upload-box .icon { font-size: 2rem; margin-bottom: 0.5rem; color: var(--text-muted); line-height: 1; }
+    .upload-box p { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+    .upload-box .label { font-size: 0.75rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .upload-box img.preview {
+      max-width: 100%;
+      max-height: 120px;
+      object-fit: contain;
+      border-radius: 4px;
+    }
+    .upload-box .file-name {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.4rem;
+      word-break: break-all;
+    }
+    .upload-box .dims {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .swap-col {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .swap-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      transition: all 0.15s;
+    }
+    .swap-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .mode-tabs {
+      display: flex;
+      gap: 0.25rem;
+      background: var(--surface-alt);
+      border-radius: 8px;
+      padding: 0.25rem;
+      margin-bottom: 1rem;
+    }
+    .mode-tab {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: none;
+      background: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .mode-tab:hover { color: var(--text); }
+    .mode-tab.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .controls-bar label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .controls-bar input[type="range"] {
+      width: 160px;
+      height: 4px;
+    }
+    .controls-bar .val {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: var(--text);
+      min-width: 2rem;
+    }
+
+    .compare-viewport {
+      position: relative;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+      /* checkerboard pattern for transparency */
+      background-image:
+        linear-gradient(45deg, var(--border) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--border) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    }
+
+    /* Slider mode */
+    .slider-container {
+      position: relative;
+      width: 100%;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .slider-container img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .slider-after-wrap {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      overflow: hidden;
+      width: 50%;
+    }
+    .slider-after-wrap img {
+      display: block;
+      height: 100%;
+      width: auto;
+      min-width: 0;
+    }
+    .slider-handle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: #fff;
+      box-shadow: 0 0 6px rgba(0,0,0,0.4);
+      cursor: ew-resize;
+      z-index: 10;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .slider-handle::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .slider-handle::before {
+      content: '\2194';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 11;
+      font-size: 1.1rem;
+      color: #333;
+      line-height: 1;
+    }
+    .slider-label {
+      position: absolute;
+      top: 0.5rem;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      border-radius: 4px;
+      z-index: 5;
+      pointer-events: none;
+    }
+    .slider-label-before { left: 0.5rem; }
+    .slider-label-after { right: 0.5rem; }
+
+    /* Side by side mode */
+    .side-by-side {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+    }
+    .side-by-side .sbs-panel {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .side-by-side img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .sbs-label {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.5rem;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    /* Pixel diff mode */
+    .diff-canvas-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .diff-canvas-wrap canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+    }
+    .stat-item { display: flex; align-items: center; gap: 0.4rem; }
+    .stat-label { color: var(--text-muted); font-weight: 500; }
+    .stat-value { font-family: monospace; color: var(--text); }
+    .stat-value.changed { color: var(--red); }
+    .stat-value.match { color: var(--green); }
+
+    .action-buttons {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 600px) {
+      .upload-area {
+        grid-template-columns: 1fr;
+      }
+      .swap-col {
+        order: -1;
+        justify-content: flex-start;
+      }
+      .swap-btn { border-radius: 8px; width: auto; padding: 0.4rem 1rem; }
+      .side-by-side {
+        grid-template-columns: 1fr;
+      }
+      .controls-bar input[type="range"] { width: 120px; }
+      .action-buttons { flex-direction: column; }
+      .action-buttons .btn { width: 100%; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Image Diff</h1>
+      <a href="/">&larr; All tools</a>
+    </header>
+
+    <p class="desc">Compare two images with a slider overlay, side-by-side view, or pixel diff highlighting.</p>
+
+    <div class="upload-area">
+      <div class="upload-box" id="uploadBefore">
+        <input type="file" accept="image/png,image/jpeg,image/webp" id="inputBefore">
+        <div class="label">Before</div>
+        <div class="icon">&#128444;</div>
+        <p>Drop image or click</p>
+      </div>
+      <div class="swap-col">
+        <button class="swap-btn" id="swapBtn" title="Swap images">&#8646;</button>
+      </div>
+      <div class="upload-box" id="uploadAfter">
+        <input type="file" accept="image/png,image/jpeg,image/webp" id="inputAfter">
+        <div class="label">After</div>
+        <div class="icon">&#128444;</div>
+        <p>Drop image or click</p>
+      </div>
+    </div>
+
+    <div id="compareSection" style="display:none;">
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="slider">Slider</button>
+        <button class="mode-tab" data-mode="sidebyside">Side by side</button>
+        <button class="mode-tab" data-mode="diff">Pixel diff</button>
+      </div>
+
+      <div id="diffControls" class="controls-bar" style="display:none;">
+        <label>Sensitivity threshold</label>
+        <input type="range" id="thresholdSlider" min="0" max="128" value="10">
+        <span class="val" id="thresholdVal">10</span>
+      </div>
+
+      <div class="stats-bar" id="statsBar" style="display:none;">
+        <div class="stat-item">
+          <span class="stat-label">Changed pixels:</span>
+          <span class="stat-value" id="statChanged">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Total pixels:</span>
+          <span class="stat-value" id="statTotal">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Difference:</span>
+          <span class="stat-value" id="statPercent">0%</span>
+        </div>
+      </div>
+
+      <div class="compare-viewport" id="viewport"></div>
+
+      <div class="action-buttons" id="actionButtons">
+        <button class="btn btn-secondary" id="downloadDiffBtn" style="display:none;">Download diff image</button>
+      </div>
+    </div>
+
+    <div class="empty-state" id="emptyState">
+      Upload a "Before" and "After" image to begin comparing.
+    </div>
+  </div>
+
+  <script>
+    // State
+    let beforeImg = null;
+    let afterImg = null;
+    let beforeFile = null;
+    let afterFile = null;
+    let currentMode = 'slider';
+    let diffCanvas = null;
+    let sliderDragging = false;
+
+    // Elements
+    const uploadBefore = document.getElementById('uploadBefore');
+    const uploadAfter = document.getElementById('uploadAfter');
+    const inputBefore = document.getElementById('inputBefore');
+    const inputAfter = document.getElementById('inputAfter');
+    const swapBtn = document.getElementById('swapBtn');
+    const compareSection = document.getElementById('compareSection');
+    const emptyState = document.getElementById('emptyState');
+    const viewport = document.getElementById('viewport');
+    const modeTabs = document.querySelectorAll('.mode-tab');
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const thresholdVal = document.getElementById('thresholdVal');
+    const diffControls = document.getElementById('diffControls');
+    const statsBar = document.getElementById('statsBar');
+    const statChanged = document.getElementById('statChanged');
+    const statTotal = document.getElementById('statTotal');
+    const statPercent = document.getElementById('statPercent');
+    const downloadDiffBtn = document.getElementById('downloadDiffBtn');
+
+    // Upload handling
+    function setupUploadBox(box, input, side) {
+      ['dragenter', 'dragover'].forEach(e => box.addEventListener(e, ev => {
+        ev.preventDefault(); ev.stopPropagation(); box.classList.add('dragover');
+      }));
+      ['dragleave', 'drop'].forEach(e => box.addEventListener(e, ev => {
+        ev.stopPropagation(); box.classList.remove('dragover');
+      }));
+      box.addEventListener('drop', ev => {
+        ev.preventDefault();
+        const file = ev.dataTransfer.files[0];
+        if (file && file.type.match(/^image\/(png|jpeg|webp)$/)) {
+          loadImage(file, side);
+        }
+      });
+      input.addEventListener('change', () => {
+        if (input.files[0]) {
+          loadImage(input.files[0], side);
+          input.value = '';
+        }
+      });
+    }
+
+    setupUploadBox(uploadBefore, inputBefore, 'before');
+    setupUploadBox(uploadAfter, inputAfter, 'after');
+
+    function loadImage(file, side) {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        if (side === 'before') {
+          beforeImg = img;
+          beforeFile = file;
+          updateUploadBox(uploadBefore, img, file);
+        } else {
+          afterImg = img;
+          afterFile = file;
+          updateUploadBox(uploadAfter, img, file);
+        }
+        checkReady();
+      };
+      img.src = url;
+    }
+
+    function updateUploadBox(box, img, file) {
+      box.classList.add('has-image');
+      const label = box.querySelector('.label').outerHTML;
+      const input = box.querySelector('input[type="file"]');
+      box.innerHTML = '';
+      box.innerHTML = label;
+      box.appendChild(input);
+
+      const preview = document.createElement('img');
+      preview.className = 'preview';
+      preview.src = img.src;
+      box.appendChild(preview);
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'file-name';
+      nameEl.textContent = file.name;
+      box.appendChild(nameEl);
+
+      const dimsEl = document.createElement('div');
+      dimsEl.className = 'dims';
+      dimsEl.textContent = img.naturalWidth + ' \u00d7 ' + img.naturalHeight;
+      box.appendChild(dimsEl);
+    }
+
+    function resetUploadBox(box, side) {
+      box.classList.remove('has-image');
+      const input = box.querySelector('input[type="file"]');
+      box.innerHTML = '';
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = side === 'before' ? 'Before' : 'After';
+      box.appendChild(label);
+      box.appendChild(input);
+      const icon = document.createElement('div');
+      icon.className = 'icon';
+      icon.innerHTML = '&#128444;';
+      box.appendChild(icon);
+      const p = document.createElement('p');
+      p.textContent = 'Drop image or click';
+      box.appendChild(p);
+    }
+
+    // Swap
+    swapBtn.addEventListener('click', () => {
+      const tmpImg = beforeImg;
+      const tmpFile = beforeFile;
+      beforeImg = afterImg;
+      beforeFile = afterFile;
+      afterImg = tmpImg;
+      afterFile = tmpFile;
+
+      if (beforeImg) updateUploadBox(uploadBefore, beforeImg, beforeFile);
+      else resetUploadBox(uploadBefore, 'before');
+
+      if (afterImg) updateUploadBox(uploadAfter, afterImg, afterFile);
+      else resetUploadBox(uploadAfter, 'after');
+
+      if (beforeImg && afterImg) render();
+    });
+
+    function checkReady() {
+      if (beforeImg && afterImg) {
+        emptyState.style.display = 'none';
+        compareSection.style.display = '';
+        render();
+      }
+    }
+
+    // Mode tabs
+    modeTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        modeTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentMode = tab.dataset.mode;
+        render();
+      });
+    });
+
+    // Threshold slider
+    thresholdSlider.addEventListener('input', () => {
+      thresholdVal.textContent = thresholdSlider.value;
+      if (currentMode === 'diff') renderDiff();
+    });
+
+    // Download diff
+    downloadDiffBtn.addEventListener('click', () => {
+      if (!diffCanvas) return;
+      const a = document.createElement('a');
+      a.href = diffCanvas.toDataURL('image/png');
+      a.download = 'image_diff.png';
+      a.click();
+    });
+
+    // Render
+    function render() {
+      viewport.innerHTML = '';
+      diffControls.style.display = 'none';
+      statsBar.style.display = 'none';
+      downloadDiffBtn.style.display = 'none';
+      diffCanvas = null;
+
+      if (currentMode === 'slider') renderSlider();
+      else if (currentMode === 'sidebyside') renderSideBySide();
+      else if (currentMode === 'diff') renderDiff();
+    }
+
+    // Get display dimensions — always fit to viewport width
+    function getDisplaySize() {
+      const maxW = viewport.clientWidth || 960;
+      const w = Math.max(beforeImg.naturalWidth, afterImg.naturalWidth);
+      const h = Math.max(beforeImg.naturalHeight, afterImg.naturalHeight);
+      const scale = maxW / w;
+      return { width: Math.round(w * scale), height: Math.round(h * scale) };
+    }
+
+    // Slider mode
+    function renderSlider() {
+      const size = getDisplaySize();
+      viewport.style.height = size.height + 'px';
+
+      const container = document.createElement('div');
+      container.className = 'slider-container';
+      container.style.width = size.width + 'px';
+      container.style.height = size.height + 'px';
+
+      // Before (background)
+      const beforeEl = document.createElement('img');
+      beforeEl.src = beforeImg.src;
+      beforeEl.style.width = size.width + 'px';
+      beforeEl.style.height = size.height + 'px';
+      beforeEl.draggable = false;
+      container.appendChild(beforeEl);
+
+      // After (clipped overlay)
+      const afterWrap = document.createElement('div');
+      afterWrap.className = 'slider-after-wrap';
+      afterWrap.style.width = '50%';
+      const afterEl = document.createElement('img');
+      afterEl.src = afterImg.src;
+      afterEl.style.width = size.width + 'px';
+      afterEl.style.height = size.height + 'px';
+      afterEl.draggable = false;
+      afterWrap.appendChild(afterEl);
+      container.appendChild(afterWrap);
+
+      // Handle
+      const handle = document.createElement('div');
+      handle.className = 'slider-handle';
+      handle.style.left = '50%';
+      container.appendChild(handle);
+
+      // Labels
+      const lblBefore = document.createElement('div');
+      lblBefore.className = 'slider-label slider-label-before';
+      lblBefore.textContent = 'Before';
+      container.appendChild(lblBefore);
+
+      const lblAfter = document.createElement('div');
+      lblAfter.className = 'slider-label slider-label-after';
+      lblAfter.textContent = 'After';
+      container.appendChild(lblAfter);
+
+      viewport.appendChild(container);
+
+      // Drag logic
+      function onMove(clientX) {
+        const rect = container.getBoundingClientRect();
+        let x = clientX - rect.left;
+        x = Math.max(0, Math.min(x, rect.width));
+        const pct = (x / rect.width) * 100;
+        afterWrap.style.width = pct + '%';
+        handle.style.left = pct + '%';
+      }
+
+      handle.addEventListener('mousedown', e => { e.preventDefault(); sliderDragging = true; });
+      container.addEventListener('mousedown', e => {
+        sliderDragging = true;
+        onMove(e.clientX);
+      });
+      document.addEventListener('mousemove', e => {
+        if (sliderDragging) onMove(e.clientX);
+      });
+      document.addEventListener('mouseup', () => { sliderDragging = false; });
+
+      // Touch
+      handle.addEventListener('touchstart', e => { e.preventDefault(); sliderDragging = true; });
+      container.addEventListener('touchstart', e => {
+        sliderDragging = true;
+        onMove(e.touches[0].clientX);
+      });
+      document.addEventListener('touchmove', e => {
+        if (sliderDragging) onMove(e.touches[0].clientX);
+      });
+      document.addEventListener('touchend', () => { sliderDragging = false; });
+    }
+
+    // Side by side mode
+    function renderSideBySide() {
+      viewport.style.height = '';
+      const grid = document.createElement('div');
+      grid.className = 'side-by-side';
+
+      const panelA = document.createElement('div');
+      panelA.className = 'sbs-panel';
+      const imgA = document.createElement('img');
+      imgA.src = beforeImg.src;
+      imgA.draggable = false;
+      panelA.appendChild(imgA);
+      const lblA = document.createElement('div');
+      lblA.className = 'sbs-label';
+      lblA.textContent = 'Before';
+      panelA.appendChild(lblA);
+
+      const panelB = document.createElement('div');
+      panelB.className = 'sbs-panel';
+      const imgB = document.createElement('img');
+      imgB.src = afterImg.src;
+      imgB.draggable = false;
+      panelB.appendChild(imgB);
+      const lblB = document.createElement('div');
+      lblB.className = 'sbs-label';
+      lblB.textContent = 'After';
+      panelB.appendChild(lblB);
+
+      grid.appendChild(panelA);
+      grid.appendChild(panelB);
+      viewport.appendChild(grid);
+    }
+
+    // Pixel diff mode
+    function renderDiff() {
+      viewport.style.height = '';
+      viewport.innerHTML = '';
+      diffControls.style.display = '';
+      statsBar.style.display = '';
+      downloadDiffBtn.style.display = '';
+
+      const w = Math.max(beforeImg.naturalWidth, afterImg.naturalWidth);
+      const h = Math.max(beforeImg.naturalHeight, afterImg.naturalHeight);
+
+      // Draw both images to off-screen canvases
+      const canvasA = document.createElement('canvas');
+      canvasA.width = w; canvasA.height = h;
+      const ctxA = canvasA.getContext('2d');
+      ctxA.drawImage(beforeImg, 0, 0, beforeImg.naturalWidth, beforeImg.naturalHeight);
+
+      const canvasB = document.createElement('canvas');
+      canvasB.width = w; canvasB.height = h;
+      const ctxB = canvasB.getContext('2d');
+      ctxB.drawImage(afterImg, 0, 0, afterImg.naturalWidth, afterImg.naturalHeight);
+
+      const dataA = ctxA.getImageData(0, 0, w, h);
+      const dataB = ctxB.getImageData(0, 0, w, h);
+
+      // Create diff output
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      const output = ctx.createImageData(w, h);
+
+      const threshold = parseInt(thresholdSlider.value);
+      let changedCount = 0;
+      const totalPixels = w * h;
+
+      for (let i = 0; i < dataA.data.length; i += 4) {
+        const rA = dataA.data[i], gA = dataA.data[i+1], bA = dataA.data[i+2], aA = dataA.data[i+3];
+        const rB = dataB.data[i], gB = dataB.data[i+1], bB = dataB.data[i+2], aB = dataB.data[i+3];
+
+        const diff = Math.abs(rA - rB) + Math.abs(gA - gB) + Math.abs(bA - bB) + Math.abs(aA - aB);
+
+        if (diff > threshold) {
+          // Changed pixel — red highlight
+          output.data[i]   = 220;  // R
+          output.data[i+1] = 38;   // G
+          output.data[i+2] = 38;   // B
+          output.data[i+3] = 200;  // A
+          changedCount++;
+        } else {
+          // Unchanged — dimmed original
+          output.data[i]   = Math.round(rA * 0.3);
+          output.data[i+1] = Math.round(gA * 0.3);
+          output.data[i+2] = Math.round(bA * 0.3);
+          output.data[i+3] = aA > 0 ? 180 : 0;
+        }
+      }
+
+      ctx.putImageData(output, 0, 0);
+      diffCanvas = canvas;
+
+      // Stats
+      const pct = totalPixels > 0 ? ((changedCount / totalPixels) * 100).toFixed(2) : '0.00';
+      statChanged.textContent = changedCount.toLocaleString();
+      statTotal.textContent = totalPixels.toLocaleString();
+      statPercent.textContent = pct + '%';
+      statPercent.className = 'stat-value ' + (changedCount > 0 ? 'changed' : 'match');
+
+      // Display
+      const wrap = document.createElement('div');
+      wrap.className = 'diff-canvas-wrap';
+      wrap.appendChild(canvas);
+      viewport.appendChild(wrap);
+    }
+  </script>
+  <script src="/theme.js"></script>
+</body>
+</html>
