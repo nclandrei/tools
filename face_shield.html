@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Face Shield — Tools</title>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .container { max-width: 800px; }
+
+    .model-status {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+    .model-status.ready { color: var(--green); }
+    .model-status.error { color: var(--red); }
+
+    #workspace { display: none; }
+    #workspace.active { display: block; }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+
+    .style-options { display: flex; gap: 0.4rem; }
+
+    .style-btn {
+      padding: 0.4rem 0.8rem;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .style-btn:hover { border-color: var(--accent); }
+    .style-btn.active { border-color: var(--accent); background: var(--accent-dim); }
+
+    .face-info {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .canvas-container {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface-alt);
+    }
+
+    #canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: crosshair;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.45);
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 500;
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .action-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .action-bar .spacer { flex: 1; }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Face Shield</h1>
+      <a href="/">&larr; All tools</a>
+    </header>
+    <p class="desc">Hide faces in photos before sharing on social media. Detected faces can be covered with a paper bag, cat face, or blur. Everything runs in your browser — nothing is uploaded.</p>
+
+    <div id="dropZone" class="drop-zone">
+      Drop a photo here, click to browse, or paste from clipboard
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+    </div>
+    <div id="modelStatus" class="model-status">Loading face detection model…</div>
+
+    <div id="workspace">
+      <div class="toolbar">
+        <div class="style-options">
+          <button class="style-btn active" data-style="paper-bag">Paper Bag</button>
+          <button class="style-btn" data-style="cat">Cat Face</button>
+          <button class="style-btn" data-style="blur">Blur</button>
+        </div>
+        <span class="face-info" id="faceInfo"></span>
+      </div>
+
+      <div class="canvas-container" id="canvasContainer">
+        <canvas id="canvas"></canvas>
+        <div class="overlay" id="overlay" style="display:none">Detecting faces…</div>
+      </div>
+      <p class="hint" id="hint">Click or tap faces to select which ones to hide.</p>
+
+      <div class="action-bar">
+        <button class="btn btn-secondary" id="selectAllBtn">Select all</button>
+        <button class="btn btn-secondary" id="deselectAllBtn">Deselect all</button>
+        <span class="spacer"></span>
+        <button class="btn btn-primary" id="downloadBtn" disabled>Download</button>
+        <button class="btn btn-secondary" id="newBtn">New photo</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/theme.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/dist/face-api.js"></script>
+  <script>
+  (function() {
+    'use strict';
+
+    /* ---- state ---- */
+    const S = {
+      image: null,
+      faces: [],
+      style: 'paper-bag',
+      modelReady: false,
+      blurCache: null,
+    };
+
+    /* ---- DOM refs ---- */
+    const $ = id => document.getElementById(id);
+    const dropZone     = $('dropZone');
+    const fileInput    = $('fileInput');
+    const workspace    = $('workspace');
+    const canvas       = $('canvas');
+    const ctx          = canvas.getContext('2d');
+    const overlay      = $('overlay');
+    const faceInfo     = $('faceInfo');
+    const hint         = $('hint');
+    const modelStatus  = $('modelStatus');
+    const downloadBtn  = $('downloadBtn');
+    const selectAllBtn = $('selectAllBtn');
+    const deselectBtn  = $('deselectAllBtn');
+    const newBtn       = $('newBtn');
+
+    /* ---- model loading ---- */
+    async function loadModel() {
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri(
+          'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/model'
+        );
+        S.modelReady = true;
+        modelStatus.textContent = 'Face detection model ready.';
+        modelStatus.classList.add('ready');
+        setTimeout(() => { modelStatus.style.display = 'none'; }, 2000);
+      } catch (err) {
+        modelStatus.textContent = 'Failed to load face detection model. Please refresh.';
+        modelStatus.classList.add('error');
+        console.error('Model load error:', err);
+      }
+    }
+    loadModel();
+
+    /* ---- file handling ---- */
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) handleFile(file);
+    });
+    document.addEventListener('paste', e => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) { handleFile(item.getAsFile()); break; }
+      }
+    });
+
+    async function handleFile(file) {
+      const img = new Image();
+      img.onload = async () => {
+        /* limit canvas to reasonable size */
+        const MAX = 3000;
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > MAX || h > MAX) {
+          const ratio = Math.min(MAX / w, MAX / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        canvas.width = w;
+        canvas.height = h;
+        S.image = img;
+        S.faces = [];
+        S.blurCache = null;
+        dropZone.style.display = 'none';
+        modelStatus.style.display = 'none';
+        workspace.classList.add('active');
+        drawCanvas();
+        await detectFaces();
+      };
+      img.src = URL.createObjectURL(file);
+    }
+
+    /* ---- face detection ---- */
+    async function detectFaces() {
+      if (!S.modelReady) {
+        overlay.textContent = 'Loading model…';
+        overlay.style.display = '';
+        await new Promise(resolve => {
+          const iv = setInterval(() => { if (S.modelReady) { clearInterval(iv); resolve(); } }, 200);
+        });
+      }
+      overlay.textContent = 'Detecting faces…';
+      overlay.style.display = '';
+
+      try {
+        const detections = await faceapi.detectAllFaces(
+          canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 })
+        );
+        S.faces = detections.map(d => ({
+          x: d.box.x * (canvas.width / canvas.width),  // already in canvas coords
+          y: d.box.y,
+          w: d.box.width,
+          h: d.box.height,
+          selected: true,  // auto-select all faces
+        }));
+        /* expand boxes a bit for better coverage */
+        S.faces.forEach(f => {
+          const padX = f.w * 0.1, padY = f.h * 0.15;
+          f.x = Math.max(0, f.x - padX);
+          f.y = Math.max(0, f.y - padY);
+          f.w = Math.min(canvas.width - f.x, f.w + padX * 2);
+          f.h = Math.min(canvas.height - f.y, f.h + padY * 2);
+        });
+      } catch (err) {
+        console.error('Detection error:', err);
+        S.faces = [];
+      }
+
+      overlay.style.display = 'none';
+      buildBlurCache();
+      drawCanvas();
+      updateUI();
+    }
+
+    /* ---- blur cache ---- */
+    function buildBlurCache() {
+      if (!S.image) return;
+      const bc = document.createElement('canvas');
+      bc.width = canvas.width;
+      bc.height = canvas.height;
+      const bctx = bc.getContext('2d');
+      const blur = Math.max(canvas.width, canvas.height) / 30;
+      bctx.filter = 'blur(' + blur + 'px)';
+      bctx.drawImage(S.image, 0, 0, canvas.width, canvas.height);
+      bctx.filter = 'none';
+      S.blurCache = bc;
+    }
+
+    /* ---- drawing ---- */
+    function drawCanvas(forExport) {
+      if (!S.image) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(S.image, 0, 0, canvas.width, canvas.height);
+
+      for (const face of S.faces) {
+        if (face.selected) {
+          if (S.style === 'paper-bag') drawPaperBag(ctx, face);
+          else if (S.style === 'cat') drawCatFace(ctx, face);
+          else if (S.style === 'blur') drawBlur(ctx, face);
+        } else if (!forExport) {
+          /* dashed outline for unselected detected faces */
+          ctx.save();
+          ctx.setLineDash([6, 4]);
+          ctx.strokeStyle = 'rgba(124,58,237,0.5)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(face.x, face.y, face.w, face.h);
+          ctx.restore();
+        }
+      }
+    }
+
+    /* -- paper bag -- */
+    function drawPaperBag(ctx, f) {
+      const pad = f.w * 0.15;
+      const bx = f.x - pad;
+      const by = f.y - f.h * 0.25;
+      const bw = f.w + pad * 2;
+      const bh = f.h + f.h * 0.35;
+
+      ctx.save();
+      /* shadow */
+      ctx.shadowColor = 'rgba(0,0,0,0.25)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 4;
+
+      /* body */
+      ctx.fillStyle = '#c8a878';
+      roundRect(ctx, bx, by, bw, bh, 4);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
+      /* top fold */
+      ctx.fillStyle = '#b89868';
+      ctx.fillRect(bx, by, bw, bh * 0.09);
+
+      /* fold crease */
+      ctx.strokeStyle = '#a08050';
+      ctx.lineWidth = Math.max(1, bw * 0.005);
+      ctx.beginPath();
+      ctx.moveTo(bx + bw * 0.05, by + bh * 0.09);
+      ctx.lineTo(bx + bw * 0.95, by + bh * 0.09);
+      ctx.stroke();
+
+      /* vertical wrinkles */
+      ctx.strokeStyle = 'rgba(140,110,70,0.25)';
+      ctx.lineWidth = Math.max(1, bw * 0.004);
+      for (let i = 0.18; i < 0.9; i += 0.14) {
+        ctx.beginPath();
+        ctx.moveTo(bx + bw * i, by + bh * 0.12);
+        ctx.lineTo(bx + bw * (i + 0.01), by + bh * 0.88);
+        ctx.stroke();
+      }
+
+      /* eye holes */
+      const eyeY = by + bh * 0.42;
+      const eyeRx = bw * 0.08;
+      const eyeRy = bw * 0.055;
+      ctx.fillStyle = '#1a1008';
+      ctx.beginPath();
+      ctx.ellipse(bx + bw * 0.35, eyeY, eyeRx, eyeRy, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(bx + bw * 0.65, eyeY, eyeRx, eyeRy, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    /* -- cat face -- */
+    function drawCatFace(ctx, f) {
+      const cx = f.x + f.w / 2;
+      const cy = f.y + f.h / 2;
+      const r = Math.max(f.w, f.h) * 0.6;
+
+      ctx.save();
+
+      /* shadow */
+      ctx.shadowColor = 'rgba(0,0,0,0.18)';
+      ctx.shadowBlur = 10;
+
+      /* face circle */
+      ctx.fillStyle = '#f5e6d0';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
+      ctx.strokeStyle = '#d4c0a8';
+      ctx.lineWidth = Math.max(2, r * 0.02);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      /* ears */
+      function ear(sign) {
+        ctx.fillStyle = '#f5e6d0';
+        ctx.beginPath();
+        ctx.moveTo(cx + sign * r * 0.55, cy - r * 0.7);
+        ctx.lineTo(cx + sign * r * 0.8, cy - r * 1.35);
+        ctx.lineTo(cx + sign * r * 0.15, cy - r * 0.85);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        /* inner pink */
+        ctx.fillStyle = '#f0b0b0';
+        ctx.beginPath();
+        ctx.moveTo(cx + sign * r * 0.52, cy - r * 0.72);
+        ctx.lineTo(cx + sign * r * 0.72, cy - r * 1.2);
+        ctx.lineTo(cx + sign * r * 0.22, cy - r * 0.84);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ear(-1); ear(1);
+
+      /* eyes */
+      const eyeY = cy - r * 0.08;
+      const eyeR = r * 0.17;
+      [-1, 1].forEach(sign => {
+        const ex = cx + sign * r * 0.3;
+        /* white */
+        ctx.fillStyle = '#fffef0';
+        ctx.beginPath();
+        ctx.ellipse(ex, eyeY, eyeR, eyeR * 0.85, 0, 0, Math.PI * 2);
+        ctx.fill();
+        /* iris */
+        ctx.fillStyle = '#6db86d';
+        ctx.beginPath();
+        ctx.ellipse(ex, eyeY, eyeR * 0.7, eyeR * 0.75, 0, 0, Math.PI * 2);
+        ctx.fill();
+        /* pupil slit */
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.ellipse(ex, eyeY, eyeR * 0.15, eyeR * 0.65, 0, 0, Math.PI * 2);
+        ctx.fill();
+        /* highlight */
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.beginPath();
+        ctx.arc(ex + eyeR * 0.25, eyeY - eyeR * 0.25, eyeR * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      /* nose */
+      ctx.fillStyle = '#e88ca0';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + r * 0.12);
+      ctx.lineTo(cx - r * 0.07, cy + r * 0.22);
+      ctx.lineTo(cx + r * 0.07, cy + r * 0.22);
+      ctx.closePath();
+      ctx.fill();
+
+      /* mouth */
+      ctx.strokeStyle = '#c07070';
+      ctx.lineWidth = Math.max(1.5, r * 0.015);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + r * 0.22);
+      ctx.quadraticCurveTo(cx - r * 0.08, cy + r * 0.32, cx - r * 0.14, cy + r * 0.28);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + r * 0.22);
+      ctx.quadraticCurveTo(cx + r * 0.08, cy + r * 0.32, cx + r * 0.14, cy + r * 0.28);
+      ctx.stroke();
+
+      /* whiskers */
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = Math.max(1, r * 0.012);
+      [-1, 1].forEach(sign => {
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(cx + sign * r * 0.15, cy + r * 0.18 + i * r * 0.06);
+          ctx.lineTo(cx + sign * r * 0.75, cy + r * 0.12 + i * r * 0.12);
+          ctx.stroke();
+        }
+      });
+
+      ctx.restore();
+    }
+
+    /* -- blur -- */
+    function drawBlur(ctx, f) {
+      if (!S.blurCache) return;
+      const pad = Math.max(f.w, f.h) * 0.1;
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(f.x + f.w / 2, f.y + f.h / 2,
+                  f.w / 2 + pad, f.h / 2 + pad, 0, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(S.blurCache, 0, 0);
+      ctx.restore();
+    }
+
+    /* -- util -- */
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    /* ---- interaction ---- */
+    canvas.addEventListener('click', e => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = canvas.width / rect.width;
+      const sy = canvas.height / rect.height;
+      const mx = (e.clientX - rect.left) * sx;
+      const my = (e.clientY - rect.top) * sy;
+
+      for (let i = S.faces.length - 1; i >= 0; i--) {
+        const f = S.faces[i];
+        if (mx >= f.x && mx <= f.x + f.w && my >= f.y && my <= f.y + f.h) {
+          f.selected = !f.selected;
+          drawCanvas();
+          updateUI();
+          return;
+        }
+      }
+    });
+
+    /* style buttons */
+    document.querySelectorAll('.style-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        S.style = btn.dataset.style;
+        drawCanvas();
+      });
+    });
+
+    selectAllBtn.addEventListener('click', () => {
+      S.faces.forEach(f => f.selected = true);
+      drawCanvas();
+      updateUI();
+    });
+
+    deselectBtn.addEventListener('click', () => {
+      S.faces.forEach(f => f.selected = false);
+      drawCanvas();
+      updateUI();
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      drawCanvas(true); /* export mode — no selection indicators */
+      canvas.toBlob(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'face-shield-' + Date.now() + '.jpg';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        drawCanvas(); /* restore editing indicators */
+      }, 'image/jpeg', 0.92);
+    });
+
+    newBtn.addEventListener('click', () => {
+      S.image = null;
+      S.faces = [];
+      S.blurCache = null;
+      workspace.classList.remove('active');
+      dropZone.style.display = '';
+      fileInput.value = '';
+      updateUI();
+    });
+
+    function updateUI() {
+      const sel = S.faces.filter(f => f.selected).length;
+      const total = S.faces.length;
+      if (total === 0) {
+        faceInfo.textContent = 'No faces detected — try another photo';
+        hint.textContent = 'No faces were found. You can try a different photo.';
+      } else {
+        faceInfo.textContent = sel + ' of ' + total + ' face' + (total !== 1 ? 's' : '') + ' selected';
+        hint.textContent = 'Click or tap faces to toggle selection. Purple dashed = unselected.';
+      }
+      downloadBtn.disabled = sel === 0;
+    }
+
+  })();
+  </script>
+</body>
+</html>
