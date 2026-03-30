@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSH Config Generator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 820px; }
+
+  .desc { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 2rem; }
+
+  /* Host list sidebar / tabs */
+  .layout {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+
+  .host-sidebar {
+    flex: 0 0 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .host-tab {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .host-tab:hover { border-color: var(--accent); }
+
+  .host-tab.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .host-tab .host-tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .host-tab .remove-host {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 0 0 0.4rem;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+  }
+
+  .host-tab:hover .remove-host { opacity: 1; }
+  .host-tab .remove-host:hover { color: var(--red); }
+
+  .add-host-btn {
+    padding: 0.45rem 0.7rem;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .add-host-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .editor-pane {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Form grid */
+  .form-section {
+    margin-bottom: 1.25rem;
+  }
+
+  .form-section-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+  }
+
+  .form-grid.full-width {
+    grid-template-columns: 1fr;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .form-group.span-2 {
+    grid-column: 1 / -1;
+  }
+
+  .form-group label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .form-group input,
+  .form-group select {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    font-family: inherit;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus {
+    border-color: var(--accent);
+  }
+
+  .form-group input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  /* Toggle row for boolean */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0;
+  }
+
+  .toggle-row label {
+    font-size: 0.82rem;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .toggle-switch {
+    position: relative;
+    width: 34px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle-slider::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 2px;
+    top: 2px;
+    background: var(--bg);
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+
+  .toggle-switch input:checked + .toggle-slider {
+    background: var(--accent);
+  }
+
+  .toggle-switch input:checked + .toggle-slider::after {
+    transform: translateX(14px);
+  }
+
+  /* Forward entries */
+  .forward-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .forward-entry {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .forward-entry input {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.82rem;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    font-family: inherit;
+  }
+
+  .forward-entry input:focus {
+    border-color: var(--accent);
+  }
+
+  .forward-entry input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  .forward-entry .remove-forward {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.2rem;
+  }
+
+  .forward-entry .remove-forward:hover { color: var(--red); }
+
+  .add-forward-btn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.2rem 0;
+    text-align: left;
+  }
+
+  .add-forward-btn:hover { text-decoration: underline; }
+
+  /* Action bar */
+  .action-bar {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Preview */
+  .preview-section {
+    margin-top: 1.5rem;
+  }
+
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .preview-header .form-section-title {
+    margin-bottom: 0;
+  }
+
+  .preview-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    white-space: pre;
+    tab-size: 4;
+  }
+
+  .preview-box .kw { color: var(--accent); font-weight: 600; }
+  .preview-box .val { color: var(--text); }
+  .preview-box .comment { color: var(--text-muted); font-style: italic; }
+  .preview-box .host-line { color: var(--green); font-weight: 600; }
+
+  .preview-box:empty::before {
+    content: 'Fill in the form above to generate config...';
+    color: var(--text-muted);
+    font-style: italic;
+    font-family: inherit;
+  }
+
+  /* Import modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.visible {
+    display: flex;
+  }
+
+  .modal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .modal h2 {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .modal textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 0.75rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    resize: vertical;
+    outline: none;
+  }
+
+  .modal textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .modal textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.82rem;
+    color: var(--text);
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    z-index: 2000;
+    pointer-events: none;
+  }
+
+  .toast.visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .layout {
+      flex-direction: column;
+    }
+
+    .host-sidebar {
+      flex: none;
+      flex-direction: row;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .host-tab { flex: 0 0 auto; }
+
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .form-group.span-2 {
+      grid-column: auto;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>SSH Config Generator</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+
+  <p class="desc">Generate SSH config blocks visually. Fill in host fields, add multiple entries, preview the output, and copy or import existing configs.</p>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" id="copy-btn">Copy config</button>
+    <button class="btn btn-secondary" id="import-btn">Import config</button>
+    <button class="btn btn-secondary" id="clear-btn">Clear all</button>
+  </div>
+
+  <div class="layout">
+    <div class="host-sidebar" id="host-sidebar">
+      <!-- host tabs rendered here -->
+    </div>
+
+    <div class="editor-pane" id="editor-pane">
+      <!-- form rendered here -->
+    </div>
+  </div>
+
+  <div class="preview-section">
+    <div class="preview-header">
+      <div class="form-section-title">Preview</div>
+    </div>
+    <div class="preview-box" id="preview"></div>
+  </div>
+</div>
+
+<!-- Import modal -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <h2>Import SSH Config</h2>
+    <textarea id="import-text" placeholder="Paste your ~/.ssh/config content here..."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="import-cancel">Cancel</button>
+      <button class="btn btn-primary" id="import-confirm">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="/theme.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ── Data model ──
+  const FIELDS = [
+    { key: 'Host',                label: 'Host (alias)',          placeholder: 'myserver',                  section: 'basic',    type: 'text' },
+    { key: 'HostName',            label: 'HostName',              placeholder: '192.168.1.100 or host.com', section: 'basic',    type: 'text' },
+    { key: 'User',                label: 'User',                  placeholder: 'root',                      section: 'basic',    type: 'text' },
+    { key: 'Port',                label: 'Port',                  placeholder: '22',                        section: 'basic',    type: 'text' },
+    { key: 'IdentityFile',        label: 'IdentityFile',          placeholder: '~/.ssh/id_ed25519',         section: 'auth',     type: 'text' },
+    { key: 'IdentitiesOnly',      label: 'IdentitiesOnly',        placeholder: '',                          section: 'auth',     type: 'toggle' },
+    { key: 'ForwardAgent',        label: 'ForwardAgent',          placeholder: '',                          section: 'auth',     type: 'toggle' },
+    { key: 'ProxyJump',           label: 'ProxyJump',             placeholder: 'bastion-host',              section: 'proxy',    type: 'text' },
+    { key: 'ProxyCommand',        label: 'ProxyCommand',          placeholder: 'ssh -W %h:%p bastion',     section: 'proxy',    type: 'text' },
+    { key: 'LocalForward',        label: 'LocalForward',          placeholder: '8080 localhost:80',         section: 'forward',  type: 'multi' },
+    { key: 'RemoteForward',       label: 'RemoteForward',         placeholder: '9090 localhost:3000',       section: 'forward',  type: 'multi' },
+    { key: 'DynamicForward',      label: 'DynamicForward',        placeholder: '1080',                      section: 'forward',  type: 'text' },
+    { key: 'ServerAliveInterval', label: 'ServerAliveInterval',   placeholder: '60',                        section: 'keepalive', type: 'text' },
+    { key: 'ServerAliveCountMax', label: 'ServerAliveCountMax',   placeholder: '3',                         section: 'keepalive', type: 'text' },
+    { key: 'ConnectTimeout',      label: 'ConnectTimeout',        placeholder: '10',                        section: 'keepalive', type: 'text' },
+    { key: 'Compression',         label: 'Compression',           placeholder: '',                          section: 'options',  type: 'toggle' },
+    { key: 'RequestTTY',          label: 'RequestTTY',            placeholder: '',                          section: 'options',  type: 'select', options: ['', 'yes', 'no', 'force', 'auto'] },
+    { key: 'AddKeysToAgent',      label: 'AddKeysToAgent',        placeholder: '',                          section: 'options',  type: 'toggle' },
+    { key: 'StrictHostKeyChecking', label: 'StrictHostKeyChecking', placeholder: '',                        section: 'options',  type: 'select', options: ['', 'yes', 'no', 'ask', 'accept-new'] },
+  ];
+
+  const SECTIONS = [
+    { key: 'basic',     title: 'Connection' },
+    { key: 'auth',      title: 'Authentication' },
+    { key: 'proxy',     title: 'Proxy' },
+    { key: 'forward',   title: 'Port forwarding' },
+    { key: 'keepalive', title: 'Keep-alive' },
+    { key: 'options',   title: 'Options' },
+  ];
+
+  function createDefaultHost() {
+    var data = {};
+    FIELDS.forEach(function(f) {
+      if (f.type === 'multi') {
+        data[f.key] = [''];
+      } else if (f.type === 'toggle') {
+        data[f.key] = false;
+      } else {
+        data[f.key] = '';
+      }
+    });
+    return data;
+  }
+
+  var hosts = [createDefaultHost()];
+  var activeIndex = 0;
+
+  // ── DOM refs ──
+  var sidebar = document.getElementById('host-sidebar');
+  var editorPane = document.getElementById('editor-pane');
+  var previewBox = document.getElementById('preview');
+  var toastEl = document.getElementById('toast');
+  var importModal = document.getElementById('import-modal');
+  var importText = document.getElementById('import-text');
+
+  // ── Toast ──
+  var toastTimer = null;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() {
+      toastEl.classList.remove('visible');
+    }, 2000);
+  }
+
+  // ── Host sidebar ──
+  function renderSidebar() {
+    sidebar.innerHTML = '';
+    hosts.forEach(function(h, i) {
+      var tab = document.createElement('div');
+      tab.className = 'host-tab' + (i === activeIndex ? ' active' : '');
+
+      var nameSpan = document.createElement('span');
+      nameSpan.className = 'host-tab-name';
+      nameSpan.textContent = h.Host || 'Host ' + (i + 1);
+      tab.appendChild(nameSpan);
+
+      if (hosts.length > 1) {
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-host';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.title = 'Remove host';
+        removeBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          hosts.splice(i, 1);
+          if (activeIndex >= hosts.length) activeIndex = hosts.length - 1;
+          renderSidebar();
+          renderForm();
+          renderPreview();
+        });
+        tab.appendChild(removeBtn);
+      }
+
+      tab.addEventListener('click', function() {
+        activeIndex = i;
+        renderSidebar();
+        renderForm();
+      });
+      sidebar.appendChild(tab);
+    });
+
+    var addBtn = document.createElement('button');
+    addBtn.className = 'add-host-btn';
+    addBtn.textContent = '+ Add host';
+    addBtn.addEventListener('click', function() {
+      hosts.push(createDefaultHost());
+      activeIndex = hosts.length - 1;
+      renderSidebar();
+      renderForm();
+      renderPreview();
+    });
+    sidebar.appendChild(addBtn);
+  }
+
+  // ── Form ──
+  function renderForm() {
+    editorPane.innerHTML = '';
+    var host = hosts[activeIndex];
+
+    SECTIONS.forEach(function(section) {
+      var fields = FIELDS.filter(function(f) { return f.section === section.key; });
+      if (fields.length === 0) return;
+
+      var sectionDiv = document.createElement('div');
+      sectionDiv.className = 'form-section';
+
+      var title = document.createElement('div');
+      title.className = 'form-section-title';
+      title.textContent = section.title;
+      sectionDiv.appendChild(title);
+
+      var grid = document.createElement('div');
+      grid.className = 'form-grid';
+
+      fields.forEach(function(f) {
+        if (f.type === 'text' || f.type === 'select') {
+          var group = document.createElement('div');
+          group.className = 'form-group';
+
+          var lbl = document.createElement('label');
+          lbl.textContent = f.label;
+          group.appendChild(lbl);
+
+          if (f.type === 'select') {
+            var sel = document.createElement('select');
+            f.options.forEach(function(opt) {
+              var o = document.createElement('option');
+              o.value = opt;
+              o.textContent = opt || '(default)';
+              if (host[f.key] === opt) o.selected = true;
+              sel.appendChild(o);
+            });
+            sel.addEventListener('change', function() {
+              host[f.key] = sel.value;
+              renderPreview();
+            });
+            group.appendChild(sel);
+          } else {
+            var inp = document.createElement('input');
+            inp.type = 'text';
+            inp.placeholder = f.placeholder;
+            inp.value = host[f.key];
+            inp.addEventListener('input', function() {
+              host[f.key] = inp.value;
+              if (f.key === 'Host') renderSidebar();
+              renderPreview();
+            });
+            group.appendChild(inp);
+          }
+
+          grid.appendChild(group);
+        } else if (f.type === 'toggle') {
+          var row = document.createElement('div');
+          row.className = 'form-group';
+
+          var toggleRow = document.createElement('div');
+          toggleRow.className = 'toggle-row';
+
+          var toggleWrap = document.createElement('label');
+          toggleWrap.className = 'toggle-switch';
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = host[f.key] === true || host[f.key] === 'yes';
+          var slider = document.createElement('span');
+          slider.className = 'toggle-slider';
+          toggleWrap.appendChild(cb);
+          toggleWrap.appendChild(slider);
+          toggleRow.appendChild(toggleWrap);
+
+          var lbl2 = document.createElement('label');
+          lbl2.textContent = f.label;
+          lbl2.style.cursor = 'pointer';
+          lbl2.addEventListener('click', function() { cb.click(); });
+          toggleRow.appendChild(lbl2);
+
+          cb.addEventListener('change', function() {
+            host[f.key] = cb.checked;
+            renderPreview();
+          });
+
+          row.appendChild(toggleRow);
+          grid.appendChild(row);
+        } else if (f.type === 'multi') {
+          var mGroup = document.createElement('div');
+          mGroup.className = 'form-group span-2';
+
+          var mLbl = document.createElement('label');
+          mLbl.textContent = f.label;
+          mGroup.appendChild(mLbl);
+
+          var entriesDiv = document.createElement('div');
+          entriesDiv.className = 'forward-entries';
+
+          var values = host[f.key];
+          if (!Array.isArray(values)) values = [''];
+
+          values.forEach(function(val, vi) {
+            var entryRow = document.createElement('div');
+            entryRow.className = 'forward-entry';
+
+            var mInp = document.createElement('input');
+            mInp.type = 'text';
+            mInp.placeholder = f.placeholder;
+            mInp.value = val;
+            mInp.addEventListener('input', function() {
+              host[f.key][vi] = mInp.value;
+              renderPreview();
+            });
+            entryRow.appendChild(mInp);
+
+            if (values.length > 1) {
+              var removeForward = document.createElement('button');
+              removeForward.className = 'remove-forward';
+              removeForward.innerHTML = '&times;';
+              removeForward.addEventListener('click', function() {
+                host[f.key].splice(vi, 1);
+                renderForm();
+                renderPreview();
+              });
+              entryRow.appendChild(removeForward);
+            }
+
+            entriesDiv.appendChild(entryRow);
+          });
+
+          var addForward = document.createElement('button');
+          addForward.className = 'add-forward-btn';
+          addForward.textContent = '+ Add ' + f.label.toLowerCase();
+          addForward.addEventListener('click', function() {
+            host[f.key].push('');
+            renderForm();
+          });
+          entriesDiv.appendChild(addForward);
+
+          mGroup.appendChild(entriesDiv);
+          grid.appendChild(mGroup);
+        }
+      });
+
+      sectionDiv.appendChild(grid);
+      editorPane.appendChild(sectionDiv);
+    });
+  }
+
+  // ── Generate config text ──
+  function generateConfig() {
+    var lines = [];
+    hosts.forEach(function(host, hi) {
+      if (hi > 0) lines.push('');
+
+      var hostAlias = host.Host || '*';
+      lines.push('Host ' + hostAlias);
+
+      FIELDS.forEach(function(f) {
+        if (f.key === 'Host') return;
+
+        if (f.type === 'multi') {
+          var vals = host[f.key];
+          if (Array.isArray(vals)) {
+            vals.forEach(function(v) {
+              if (v && v.trim()) {
+                lines.push('    ' + f.key + ' ' + v.trim());
+              }
+            });
+          }
+        } else if (f.type === 'toggle') {
+          if (host[f.key] === true || host[f.key] === 'yes') {
+            lines.push('    ' + f.key + ' yes');
+          }
+        } else if (f.type === 'select') {
+          if (host[f.key]) {
+            lines.push('    ' + f.key + ' ' + host[f.key]);
+          }
+        } else {
+          if (host[f.key] && String(host[f.key]).trim()) {
+            lines.push('    ' + f.key + ' ' + String(host[f.key]).trim());
+          }
+        }
+      });
+    });
+    return lines.join('\n');
+  }
+
+  // ── Preview with syntax highlighting ──
+  function renderPreview() {
+    var config = generateConfig();
+    if (!config.trim()) {
+      previewBox.innerHTML = '';
+      return;
+    }
+
+    var html = config.split('\n').map(function(line) {
+      if (!line.trim()) return '';
+
+      // Host line
+      if (/^Host\s+/.test(line)) {
+        var parts = line.match(/^(Host)(\s+)(.+)$/);
+        if (parts) {
+          return '<span class="host-line">' + esc(parts[1]) + '</span>' +
+                 parts[2] + '<span class="host-line">' + esc(parts[3]) + '</span>';
+        }
+      }
+
+      // Comment
+      if (/^\s*#/.test(line)) {
+        return '<span class="comment">' + esc(line) + '</span>';
+      }
+
+      // Key value
+      var match = line.match(/^(\s+)(\S+)(\s+)(.+)$/);
+      if (match) {
+        return match[1] + '<span class="kw">' + esc(match[2]) + '</span>' +
+               match[3] + '<span class="val">' + esc(match[4]) + '</span>';
+      }
+
+      return esc(line);
+    }).join('\n');
+
+    previewBox.innerHTML = html;
+  }
+
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ── Copy ──
+  document.getElementById('copy-btn').addEventListener('click', function() {
+    var config = generateConfig();
+    if (!config.trim()) {
+      showToast('Nothing to copy');
+      return;
+    }
+    navigator.clipboard.writeText(config).then(function() {
+      showToast('Copied to clipboard');
+    });
+  });
+
+  // ── Clear all ──
+  document.getElementById('clear-btn').addEventListener('click', function() {
+    hosts = [createDefaultHost()];
+    activeIndex = 0;
+    renderSidebar();
+    renderForm();
+    renderPreview();
+    showToast('Cleared');
+  });
+
+  // ── Import ──
+  document.getElementById('import-btn').addEventListener('click', function() {
+    importText.value = '';
+    importModal.classList.add('visible');
+    importText.focus();
+  });
+
+  document.getElementById('import-cancel').addEventListener('click', function() {
+    importModal.classList.remove('visible');
+  });
+
+  importModal.addEventListener('click', function(e) {
+    if (e.target === importModal) importModal.classList.remove('visible');
+  });
+
+  document.getElementById('import-confirm').addEventListener('click', function() {
+    var text = importText.value;
+    if (!text.trim()) {
+      importModal.classList.remove('visible');
+      return;
+    }
+    var parsed = parseSSHConfig(text);
+    if (parsed.length === 0) {
+      showToast('No valid Host blocks found');
+      return;
+    }
+    hosts = parsed;
+    activeIndex = 0;
+    importModal.classList.remove('visible');
+    renderSidebar();
+    renderForm();
+    renderPreview();
+    showToast('Imported ' + parsed.length + ' host' + (parsed.length > 1 ? 's' : ''));
+  });
+
+  // ── SSH config parser ──
+  function parseSSHConfig(text) {
+    var lines = text.split('\n');
+    var result = [];
+    var current = null;
+
+    // Map of lowercase key -> FIELDS entry for quick lookup
+    var fieldMap = {};
+    FIELDS.forEach(function(f) {
+      fieldMap[f.key.toLowerCase()] = f;
+    });
+
+    lines.forEach(function(line) {
+      var trimmed = line.trim();
+      // Skip comments and empty lines
+      if (!trimmed || trimmed.charAt(0) === '#') return;
+
+      // Match key-value: key followed by space or = then value
+      var m = trimmed.match(/^(\S+)\s*[=\s]\s*(.+)$/);
+      if (!m) return;
+
+      var key = m[1];
+      var value = m[2].trim();
+
+      if (key.toLowerCase() === 'host') {
+        current = createDefaultHost();
+        current.Host = value;
+        result.push(current);
+        return;
+      }
+
+      if (!current) {
+        // Directives before any Host block - create a wildcard host
+        current = createDefaultHost();
+        current.Host = '*';
+        result.push(current);
+      }
+
+      var fieldDef = fieldMap[key.toLowerCase()];
+      if (!fieldDef) return; // Skip unknown directives
+
+      var realKey = fieldDef.key;
+
+      if (fieldDef.type === 'toggle') {
+        current[realKey] = (value.toLowerCase() === 'yes');
+      } else if (fieldDef.type === 'multi') {
+        if (!Array.isArray(current[realKey])) current[realKey] = [];
+        // Replace the initial empty string
+        if (current[realKey].length === 1 && current[realKey][0] === '') {
+          current[realKey][0] = value;
+        } else {
+          current[realKey].push(value);
+        }
+      } else {
+        current[realKey] = value;
+      }
+    });
+
+    return result;
+  }
+
+  // ── Keyboard shortcut: Escape to close modal ──
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && importModal.classList.contains('visible')) {
+      importModal.classList.remove('visible');
+    }
+  });
+
+  // ── Init ──
+  renderSidebar();
+  renderForm();
+  renderPreview();
+})();
+</script>
+</body>
+</html>
