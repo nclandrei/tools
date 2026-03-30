@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Counter &amp; Reading Time</title>
+
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+
+<style>
+  .container { max-width: 820px; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 2px;
+  }
+
+  .stat-card.accent .stat-value { color: var(--accent); }
+
+  textarea {
+    width: 100%;
+    min-height: 220px;
+    padding: 14px;
+    font-family: inherit;
+    font-size: 0.92rem;
+    line-height: 1.7;
+    resize: vertical;
+    margin-bottom: 1rem;
+  }
+
+  textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .search-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .search-row input {
+    flex: 1;
+    min-width: 160px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.88rem;
+  }
+
+  .search-result {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .search-result strong {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .section-title {
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .readability {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 1.5rem;
+  }
+
+  .readability-score {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .readability-desc {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .frequency-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 2rem;
+  }
+
+  .freq-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+  }
+
+  .freq-rank {
+    width: 22px;
+    text-align: right;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    flex-shrink: 0;
+  }
+
+  .freq-word {
+    font-weight: 500;
+    color: var(--text);
+    min-width: 80px;
+  }
+
+  .freq-bar-wrap {
+    flex: 1;
+    height: 20px;
+    background: var(--surface-alt);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .freq-bar {
+    height: 100%;
+    background: var(--accent-dim);
+    border-right: 2px solid var(--accent);
+    border-radius: 4px 0 0 4px;
+    min-width: 2px;
+    transition: width 0.2s ease;
+  }
+
+  .freq-count {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    min-width: 24px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+
+  @media (max-width: 540px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .stat-value { font-size: 1.2rem; }
+    .freq-word { min-width: 60px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Word Counter &amp; Reading Time</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+  <p class="desc">Paste or type text to see live word count, reading time, readability score, and word frequency analysis.</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value" id="words">0</div>
+      <div class="stat-label">Words</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="chars">0</div>
+      <div class="stat-label">Characters</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="chars-no-spaces">0</div>
+      <div class="stat-label">Chars (no spaces)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="sentences">0</div>
+      <div class="stat-label">Sentences</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="paragraphs">0</div>
+      <div class="stat-label">Paragraphs</div>
+    </div>
+    <div class="stat-card accent">
+      <div class="stat-value" id="reading-time">0s</div>
+      <div class="stat-label">Reading time</div>
+    </div>
+    <div class="stat-card accent">
+      <div class="stat-value" id="speaking-time">0s</div>
+      <div class="stat-label">Speaking time</div>
+    </div>
+  </div>
+
+  <textarea id="input" placeholder="Paste or type your text here..." autofocus></textarea>
+
+  <div class="toolbar">
+    <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+  </div>
+
+  <div class="search-row">
+    <input type="text" id="search-input" placeholder="Search for a word or character...">
+    <span class="search-result" id="search-result"></span>
+  </div>
+
+  <div id="readability-section" style="display:none;">
+    <div class="section-title">Readability</div>
+    <div class="readability">
+      <div class="readability-score" id="readability-score"></div>
+      <div class="readability-desc" id="readability-desc"></div>
+    </div>
+  </div>
+
+  <div id="frequency-section" style="display:none;">
+    <div class="section-title">Top words (excluding stop words)</div>
+    <div class="frequency-list" id="frequency-list"></div>
+  </div>
+</div>
+
+<script src="/theme.js"></script>
+<script>
+(function() {
+  var READING_WPM = 238;
+  var SPEAKING_WPM = 150;
+
+  var STOP_WORDS = new Set([
+    'a','about','above','after','again','against','all','am','an','and','any','are',
+    "aren't",'as','at','be','because','been','before','being','below','between','both',
+    'but','by','can','could',"couldn't",'did',"didn't",'do','does',"doesn't",'doing',
+    "don't",'down','during','each','few','for','from','further','get','got','had',
+    "hadn't",'has',"hasn't",'have',"haven't",'having','he',"he'd","he'll","he's",'her',
+    'here',"here's",'hers','herself','him','himself','his','how',"how's",'i',"i'd",
+    "i'll","i'm","i've",'if','in','into','is',"isn't",'it',"it's",'its','itself',
+    "let's",'me','more','most',"mustn't",'my','myself','no','nor','not','of','off',
+    'on','once','only','or','other','ought','our','ours','ourselves','out','over',
+    'own','same',"shan't",'she',"she'd","she'll","she's",'should',"shouldn't",'so',
+    'some','such','than','that',"that's",'the','their','theirs','them','themselves',
+    'then','there',"there's",'these','they',"they'd","they'll","they're","they've",
+    'this','those','through','to','too','under','until','up','very','was',"wasn't",
+    'we',"we'd","we'll","we're","we've",'were',"weren't",'what',"what's",'when',
+    "when's",'where',"where's",'which','while','who',"who's",'whom','why',"why's",
+    'will','with',"won't",'would',"wouldn't",'you',"you'd","you'll","you're","you've",
+    'your','yours','yourself','yourselves','just','also','like','one','two','three',
+    'even','well','back','still','way','take','since','another','however','us',
+    'much','many','may','might','shall','thing','things','go','going','went','been'
+  ]);
+
+  var inputEl = document.getElementById('input');
+  var searchInput = document.getElementById('search-input');
+
+  function getWords(text) {
+    if (!text.trim()) return [];
+    return text.match(/[\w']+(?:-[\w']+)*/g) || [];
+  }
+
+  function getSentences(text) {
+    if (!text.trim()) return [];
+    // Split on sentence-ending punctuation followed by space or end of string
+    var sentences = text.split(/[.!?]+(?:\s|$)/).filter(function(s) { return s.trim().length > 0; });
+    return sentences;
+  }
+
+  function getParagraphs(text) {
+    if (!text.trim()) return [];
+    return text.split(/\n\s*\n/).filter(function(p) { return p.trim().length > 0; });
+  }
+
+  function countSyllables(word) {
+    word = word.toLowerCase().replace(/[^a-z]/g, '');
+    if (word.length <= 2) return 1;
+    // Remove trailing silent e
+    word = word.replace(/e$/, '');
+    // Count vowel groups
+    var matches = word.match(/[aeiouy]+/g);
+    var count = matches ? matches.length : 1;
+    return Math.max(1, count);
+  }
+
+  function formatTime(minutes) {
+    if (minutes < 1/60) return '0s';
+    if (minutes < 1) return Math.round(minutes * 60) + 's';
+    var m = Math.floor(minutes);
+    var s = Math.round((minutes - m) * 60);
+    if (s === 60) { m++; s = 0; }
+    if (s === 0) return m + 'min';
+    return m + 'min ' + s + 's';
+  }
+
+  function fleschKincaid(words, sentences, syllables) {
+    if (words === 0 || sentences === 0) return null;
+    var grade = 0.39 * (words / sentences) + 11.8 * (syllables / words) - 15.59;
+    return Math.round(grade * 10) / 10;
+  }
+
+  function gradeDescription(grade) {
+    if (grade === null) return '';
+    if (grade < 1) return 'Very easy to read. Understandable by kindergartners.';
+    if (grade < 6) return 'Easy to read. Understandable by elementary school students.';
+    if (grade < 9) return 'Fairly easy to read. Understandable by middle school students.';
+    if (grade < 12) return 'Standard difficulty. Understandable by high school students.';
+    if (grade < 16) return 'Fairly difficult. Understandable by college students.';
+    return 'Very difficult. Best understood by college graduates.';
+  }
+
+  function getWordFrequency(words) {
+    var freq = {};
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i].toLowerCase().replace(/^'+|'+$/g, '');
+      if (w.length < 2) continue;
+      if (STOP_WORDS.has(w)) continue;
+      freq[w] = (freq[w] || 0) + 1;
+    }
+    var entries = Object.keys(freq).map(function(k) { return { word: k, count: freq[k] }; });
+    entries.sort(function(a, b) { return b.count - a.count; });
+    return entries.slice(0, 10);
+  }
+
+  function update() {
+    var text = inputEl.value;
+    var words = getWords(text);
+    var wordCount = words.length;
+    var charCount = text.length;
+    var charNoSpaces = text.replace(/\s/g, '').length;
+    var sentenceCount = getSentences(text).length;
+    var paragraphCount = getParagraphs(text).length;
+
+    document.getElementById('words').textContent = wordCount.toLocaleString();
+    document.getElementById('chars').textContent = charCount.toLocaleString();
+    document.getElementById('chars-no-spaces').textContent = charNoSpaces.toLocaleString();
+    document.getElementById('sentences').textContent = sentenceCount.toLocaleString();
+    document.getElementById('paragraphs').textContent = paragraphCount.toLocaleString();
+
+    document.getElementById('reading-time').textContent = formatTime(wordCount / READING_WPM);
+    document.getElementById('speaking-time').textContent = formatTime(wordCount / SPEAKING_WPM);
+
+    // Readability
+    var readSection = document.getElementById('readability-section');
+    if (wordCount >= 10 && sentenceCount >= 1) {
+      var totalSyllables = 0;
+      for (var i = 0; i < words.length; i++) {
+        totalSyllables += countSyllables(words[i]);
+      }
+      var grade = fleschKincaid(wordCount, sentenceCount, totalSyllables);
+      readSection.style.display = '';
+      document.getElementById('readability-score').textContent =
+        'Flesch-Kincaid Grade Level: ' + (grade !== null ? grade : 'N/A');
+      document.getElementById('readability-desc').textContent = gradeDescription(grade);
+    } else {
+      readSection.style.display = 'none';
+    }
+
+    // Word frequency
+    var freqSection = document.getElementById('frequency-section');
+    var freqList = document.getElementById('frequency-list');
+    var topWords = getWordFrequency(words);
+    if (topWords.length > 0) {
+      freqSection.style.display = '';
+      var maxCount = topWords[0].count;
+      var html = '';
+      for (var j = 0; j < topWords.length; j++) {
+        var pct = Math.round((topWords[j].count / maxCount) * 100);
+        html += '<div class="freq-row">' +
+          '<span class="freq-rank">' + (j + 1) + '.</span>' +
+          '<span class="freq-word">' + escapeHtml(topWords[j].word) + '</span>' +
+          '<div class="freq-bar-wrap"><div class="freq-bar" style="width:' + pct + '%"></div></div>' +
+          '<span class="freq-count">' + topWords[j].count + '</span>' +
+          '</div>';
+      }
+      freqList.innerHTML = html;
+    } else {
+      freqSection.style.display = 'none';
+      freqList.innerHTML = '';
+    }
+
+    updateSearch();
+  }
+
+  function updateSearch() {
+    var query = searchInput.value.trim();
+    var resultEl = document.getElementById('search-result');
+    if (!query) {
+      resultEl.textContent = '';
+      return;
+    }
+    var text = inputEl.value;
+    if (!text) {
+      resultEl.innerHTML = '<strong>0</strong> occurrences';
+      return;
+    }
+    var escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var matches = text.match(new RegExp(escaped, 'gi'));
+    var count = matches ? matches.length : 0;
+    resultEl.innerHTML = '<strong>' + count + '</strong> occurrence' + (count !== 1 ? 's' : '') +
+      ' of "' + escapeHtml(query) + '"';
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  window.clearAll = function() {
+    inputEl.value = '';
+    searchInput.value = '';
+    update();
+  };
+
+  inputEl.addEventListener('input', update);
+  searchInput.addEventListener('input', updateSearch);
+
+  // Initial state
+  update();
+})();
+</script>
+</body>
+</html>
