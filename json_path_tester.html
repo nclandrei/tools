@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSONPath Tester</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 960px; }
+
+  label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 700px) {
+    .panels { grid-template-columns: 1fr; }
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+  }
+
+  .panel-header label { margin-bottom: 0; }
+
+  .panel-actions {
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .panel-actions button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .panel-actions button:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .json-editor {
+    width: 100%;
+    min-height: 320px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    padding: 0.75rem;
+    resize: vertical;
+    outline: none;
+    tab-size: 2;
+    white-space: pre;
+    overflow: auto;
+  }
+
+  .json-editor:focus {
+    border-color: var(--accent);
+  }
+
+  .json-editor.error-border {
+    border-color: var(--red);
+  }
+
+  .json-editor.dragover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .query-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: stretch;
+  }
+
+  .query-input-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+
+  .query-input-wrap:focus-within {
+    border-color: var(--accent);
+  }
+
+  .query-input-wrap.error {
+    border-color: var(--red);
+  }
+
+  .query-prefix {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent);
+    padding: 0 0 0 0.75rem;
+    user-select: none;
+    font-weight: 600;
+  }
+
+  #query-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    padding: 0.65rem 0.5rem;
+    outline: none;
+  }
+
+  .error-msg {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--red);
+    margin-bottom: 0.75rem;
+    display: none;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .stat strong {
+    color: var(--accent);
+  }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+  }
+
+  .results-header label { margin-bottom: 0; }
+
+  .json-output {
+    width: 100%;
+    min-height: 320px;
+    max-height: 600px;
+    overflow: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    padding: 0.75rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--text);
+  }
+
+  .json-output .empty-state {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.8rem;
+  }
+
+  /* Syntax highlighting */
+  .syn-key { color: var(--blue); }
+  .syn-str { color: var(--green); }
+  .syn-num { color: var(--amber); }
+  .syn-bool { color: var(--accent); }
+  .syn-null { color: var(--red); }
+
+  /* Path list */
+  .paths-list {
+    margin-bottom: 1rem;
+  }
+
+  .path-item {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    background: var(--accent-dim);
+    color: var(--accent);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin: 0 0.25rem 0.25rem 0;
+  }
+
+  /* Examples section */
+  .examples-section {
+    margin-bottom: 2rem;
+  }
+
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .section-title .toggle-icon {
+    font-size: 0.6rem;
+    transition: transform 0.15s;
+  }
+
+  .section-title .toggle-icon.collapsed {
+    transform: rotate(-90deg);
+  }
+
+  .examples-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .example-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .example-card:hover {
+    border-color: var(--accent);
+  }
+
+  .example-query {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    margin-bottom: 0.2rem;
+  }
+
+  .example-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  /* Reference section */
+  .ref-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+  }
+
+  @media (max-width: 600px) {
+    .ref-grid { grid-template-columns: 1fr; }
+  }
+
+  .ref-group h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+  }
+
+  .ref-group table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+  }
+
+  .ref-group td {
+    padding: 0.2rem 0;
+    vertical-align: top;
+  }
+
+  .ref-group td:first-child {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    min-width: 100px;
+    padding-right: 0.5rem;
+  }
+
+  .ref-group td:last-child {
+    color: var(--text-muted);
+  }
+
+  .copy-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.82rem;
+    color: var(--green);
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  .copy-toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  .drop-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>JSONPath Tester</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+  <p class="desc">Test JSONPath expressions against JSON data. Paste JSON, write queries, see matches in real time.</p>
+
+  <!-- Query input -->
+  <label for="query-input">JSONPath Query</label>
+  <div class="query-row">
+    <div class="query-input-wrap" id="query-wrap">
+      <span class="query-prefix">$</span>
+      <input type="text" id="query-input" placeholder=".store.book[*].author" spellcheck="false" autocomplete="off" autofocus>
+    </div>
+    <button class="btn btn-primary" id="run-btn">Run</button>
+  </div>
+  <div class="error-msg" id="error-msg"></div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="stats-row"></div>
+
+  <!-- Matched paths -->
+  <div class="paths-list" id="paths-list"></div>
+
+  <!-- Panels: JSON input + Results -->
+  <div class="panels">
+    <div>
+      <div class="panel-header">
+        <label for="json-input">JSON Input</label>
+        <div class="panel-actions">
+          <button id="format-btn" title="Format JSON">Format</button>
+          <button id="minify-btn" title="Minify JSON">Minify</button>
+          <button id="sample-btn" title="Load sample JSON">Sample</button>
+        </div>
+      </div>
+      <textarea id="json-input" class="json-editor" spellcheck="false" placeholder="Paste JSON here or drop a .json file..."></textarea>
+      <p class="drop-hint">Drop a .json file or paste from clipboard</p>
+      <div class="error-msg" id="json-error"></div>
+    </div>
+    <div>
+      <div class="results-header">
+        <label>Results</label>
+        <div class="panel-actions">
+          <button id="copy-results-btn" title="Copy results to clipboard">Copy</button>
+        </div>
+      </div>
+      <div class="json-output" id="results-output">
+        <span class="empty-state">Run a JSONPath query to see results here</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Example queries -->
+  <div class="examples-section">
+    <div class="section-title" data-toggle="examples-content">
+      <span class="toggle-icon">&#9660;</span> Example Queries
+    </div>
+    <div id="examples-content" class="collapsible">
+      <div class="examples-grid" id="examples-grid"></div>
+    </div>
+  </div>
+
+  <!-- JSONPath Reference -->
+  <div>
+    <div class="section-title" data-toggle="ref-content">
+      <span class="toggle-icon collapsed">&#9660;</span> JSONPath Reference
+    </div>
+    <div id="ref-content" class="collapsible" style="display:none;">
+      <div class="ref-grid">
+        <div class="ref-group">
+          <h3>Operators</h3>
+          <table>
+            <tr><td>$</td><td>Root object/element</td></tr>
+            <tr><td>@</td><td>Current object/element</td></tr>
+            <tr><td>.key</td><td>Child operator</td></tr>
+            <tr><td>..key</td><td>Recursive descent</td></tr>
+            <tr><td>[*]</td><td>Wildcard (all elements)</td></tr>
+            <tr><td>[0]</td><td>Array index</td></tr>
+            <tr><td>[0,1]</td><td>Array union</td></tr>
+            <tr><td>[0:3]</td><td>Array slice (start:end)</td></tr>
+            <tr><td>[-1:]</td><td>Last element</td></tr>
+          </table>
+        </div>
+        <div class="ref-group">
+          <h3>Filters &amp; Scripts</h3>
+          <table>
+            <tr><td>[?()]</td><td>Filter expression</td></tr>
+            <tr><td>@.price</td><td>Current node property</td></tr>
+            <tr><td>@.price&lt;10</td><td>Comparison filter</td></tr>
+            <tr><td>@.color=='red'</td><td>Equality filter</td></tr>
+            <tr><td>@.isbn</td><td>Existence check</td></tr>
+            <tr><td>&amp;&amp; ||</td><td>Logical operators</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="copy-toast" id="copy-toast">Copied to clipboard</div>
+
+<script src="https://unpkg.com/jsonpath-plus@10.3.0/dist/index-browser-umd.min.cjs"></script>
+<script src="/theme.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  var jsonInput = document.getElementById('json-input');
+  var queryInput = document.getElementById('query-input');
+  var queryWrap = document.getElementById('query-wrap');
+  var errorMsg = document.getElementById('error-msg');
+  var jsonError = document.getElementById('json-error');
+  var statsRow = document.getElementById('stats-row');
+  var pathsList = document.getElementById('paths-list');
+  var resultsOutput = document.getElementById('results-output');
+  var runBtn = document.getElementById('run-btn');
+  var formatBtn = document.getElementById('format-btn');
+  var minifyBtn = document.getElementById('minify-btn');
+  var sampleBtn = document.getElementById('sample-btn');
+  var copyResultsBtn = document.getElementById('copy-results-btn');
+  var copyToast = document.getElementById('copy-toast');
+  var examplesGrid = document.getElementById('examples-grid');
+
+  var SAMPLE_JSON = {
+    "store": {
+      "book": [
+        { "category": "reference", "author": "Nigel Rees", "title": "Sayings of the Century", "price": 8.95 },
+        { "category": "fiction", "author": "Evelyn Waugh", "title": "Sword of Honour", "price": 12.99 },
+        { "category": "fiction", "author": "Herman Melville", "title": "Moby Dick", "isbn": "0-553-21311-3", "price": 8.99 },
+        { "category": "fiction", "author": "J. R. R. Tolkien", "title": "The Lord of the Rings", "isbn": "0-395-19395-8", "price": 22.99 }
+      ],
+      "bicycle": {
+        "color": "red",
+        "price": 399.99
+      }
+    },
+    "warehouse": {
+      "locations": ["New York", "London", "Tokyo"],
+      "active": true,
+      "manager": null
+    }
+  };
+
+  var EXAMPLES = [
+    { query: '$.store.book[*].author', desc: 'All authors of all books' },
+    { query: '$..author', desc: 'All authors (recursive)' },
+    { query: '$.store.*', desc: 'All direct children of store' },
+    { query: '$..price', desc: 'All prices in the data' },
+    { query: '$.store.book[2]', desc: 'Third book (index 2)' },
+    { query: '$.store.book[-1:]', desc: 'Last book in the array' },
+    { query: '$.store.book[0:2]', desc: 'First two books (slice)' },
+    { query: '$.store.book[?(@.isbn)]', desc: 'Books that have an ISBN' },
+    { query: '$.store.book[?(@.price<10)]', desc: 'Books cheaper than 10' },
+    { query: "$.store.book[?(@.category=='fiction')]", desc: 'Fiction books only' },
+    { query: '$.store.book[*].title', desc: 'All book titles' },
+    { query: '$..book[0,1]', desc: 'First two books (union)' }
+  ];
+
+  var lastResultValues = null;
+  var parsedJson = null;
+
+  function buildExamples() {
+    EXAMPLES.forEach(function(ex) {
+      var card = document.createElement('div');
+      card.className = 'example-card';
+      card.innerHTML = '<div class="example-query">' + escapeHtml(ex.query) + '</div>' +
+                       '<div class="example-desc">' + escapeHtml(ex.desc) + '</div>';
+      card.addEventListener('click', function() {
+        queryInput.value = ex.query.startsWith('$') ? ex.query.slice(1) : ex.query;
+        if (!jsonInput.value.trim()) {
+          jsonInput.value = JSON.stringify(SAMPLE_JSON, null, 2);
+        }
+        runQuery();
+      });
+      examplesGrid.appendChild(card);
+    });
+  }
+
+  // Collapsible sections
+  document.querySelectorAll('.section-title[data-toggle]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      var target = document.getElementById(el.dataset.toggle);
+      var icon = el.querySelector('.toggle-icon');
+      if (target.style.display === 'none') {
+        target.style.display = '';
+        icon.classList.remove('collapsed');
+      } else {
+        target.style.display = 'none';
+        icon.classList.add('collapsed');
+      }
+    });
+  });
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function showToast(msg) {
+    copyToast.textContent = msg || 'Copied to clipboard';
+    copyToast.classList.add('show');
+    setTimeout(function() { copyToast.classList.remove('show'); }, 1500);
+  }
+
+  function highlightJson(jsonStr) {
+    var escaped = escapeHtml(jsonStr);
+    escaped = escaped.replace(/(&quot;)((?:[^&]|&(?!quot;))*)(&quot;)\s*:/g, '<span class="syn-key">&quot;$2&quot;</span>:');
+    escaped = escaped.replace(/(&quot;)((?:[^&]|&(?!quot;))*)(&quot;)/g, '<span class="syn-str">&quot;$2&quot;</span>');
+    escaped = escaped.replace(/\b(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, '<span class="syn-num">$1</span>');
+    escaped = escaped.replace(/\b(true|false)\b/g, '<span class="syn-bool">$1</span>');
+    escaped = escaped.replace(/\bnull\b/g, '<span class="syn-null">null</span>');
+    return escaped;
+  }
+
+  function parseJson() {
+    var text = jsonInput.value.trim();
+    jsonError.style.display = 'none';
+    jsonInput.classList.remove('error-border');
+
+    if (!text) {
+      parsedJson = null;
+      return null;
+    }
+
+    try {
+      parsedJson = JSON.parse(text);
+      return parsedJson;
+    } catch (e) {
+      jsonInput.classList.add('error-border');
+      jsonError.textContent = 'Invalid JSON: ' + e.message;
+      jsonError.style.display = 'block';
+      parsedJson = null;
+      return null;
+    }
+  }
+
+  function runQuery() {
+    errorMsg.style.display = 'none';
+    queryWrap.classList.remove('error');
+    statsRow.innerHTML = '';
+    pathsList.innerHTML = '';
+    lastResultValues = null;
+
+    var json = parseJson();
+    if (json === null && jsonInput.value.trim()) {
+      resultsOutput.innerHTML = '<span class="empty-state">Fix JSON errors first</span>';
+      return;
+    }
+    if (json === null) {
+      resultsOutput.innerHTML = '<span class="empty-state">Paste JSON data and enter a query</span>';
+      return;
+    }
+
+    var query = queryInput.value.trim();
+    if (!query) {
+      resultsOutput.innerHTML = '<span class="empty-state">Enter a JSONPath query above</span>';
+      return;
+    }
+
+    var fullQuery = query.startsWith('$') ? query : '$' + query;
+
+    try {
+      var results = JSONPath.JSONPath({ path: fullQuery, json: json, resultType: 'all' });
+
+      if (!results || results.length === 0) {
+        statsRow.innerHTML = '<span class="stat">No matches</span>';
+        resultsOutput.innerHTML = '<span class="empty-state">No matches found for this query</span>';
+        return;
+      }
+
+      var values = results.map(function(r) { return r.value; });
+      lastResultValues = values;
+
+      // Stats
+      statsRow.innerHTML = '<span class="stat"><strong>' + results.length + '</strong> match' + (results.length !== 1 ? 'es' : '') + '</span>';
+
+      // Paths
+      var pathsHtml = results.map(function(r) {
+        return '<span class="path-item">' + escapeHtml(r.pointer || r.path) + '</span>';
+      }).join('');
+      pathsList.innerHTML = pathsHtml;
+
+      // Results output with syntax highlighting
+      var resultStr = JSON.stringify(values, null, 2);
+      resultsOutput.innerHTML = highlightJson(resultStr);
+
+    } catch (e) {
+      queryWrap.classList.add('error');
+      errorMsg.textContent = 'Query error: ' + (e.message || String(e));
+      errorMsg.style.display = 'block';
+      resultsOutput.innerHTML = '<span class="empty-state">Fix query errors to see results</span>';
+    }
+  }
+
+  // Event listeners
+  runBtn.addEventListener('click', runQuery);
+
+  queryInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      runQuery();
+    }
+  });
+
+  // Auto-run on query changes (debounced)
+  var debounceTimer;
+  queryInput.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runQuery, 300);
+  });
+
+  jsonInput.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function() {
+      if (queryInput.value.trim()) runQuery();
+    }, 500);
+  });
+
+  formatBtn.addEventListener('click', function() {
+    var json = parseJson();
+    if (json !== null) {
+      jsonInput.value = JSON.stringify(json, null, 2);
+    }
+  });
+
+  minifyBtn.addEventListener('click', function() {
+    var json = parseJson();
+    if (json !== null) {
+      jsonInput.value = JSON.stringify(json);
+    }
+  });
+
+  sampleBtn.addEventListener('click', function() {
+    jsonInput.value = JSON.stringify(SAMPLE_JSON, null, 2);
+    jsonError.style.display = 'none';
+    jsonInput.classList.remove('error-border');
+    parsedJson = SAMPLE_JSON;
+    if (queryInput.value.trim()) runQuery();
+  });
+
+  copyResultsBtn.addEventListener('click', function() {
+    if (!lastResultValues || lastResultValues.length === 0) return;
+    var text = JSON.stringify(lastResultValues, null, 2);
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('Copied to clipboard');
+    });
+  });
+
+  // File drop
+  jsonInput.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    jsonInput.classList.add('dragover');
+  });
+
+  jsonInput.addEventListener('dragleave', function() {
+    jsonInput.classList.remove('dragover');
+  });
+
+  jsonInput.addEventListener('drop', function(e) {
+    e.preventDefault();
+    jsonInput.classList.remove('dragover');
+    var file = e.dataTransfer.files[0];
+    if (file) {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        jsonInput.value = ev.target.result;
+        parseJson();
+        if (queryInput.value.trim()) runQuery();
+      };
+      reader.readAsText(file);
+    }
+  });
+
+  // Tab key inserts spaces in textarea
+  jsonInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      var start = this.selectionStart;
+      var end = this.selectionEnd;
+      this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+      this.selectionStart = this.selectionEnd = start + 2;
+    }
+  });
+
+  buildExamples();
+})();
+</script>
+</body>
+</html>
