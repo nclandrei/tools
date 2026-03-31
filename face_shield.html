@@ -200,9 +200,6 @@
   </div>
 
   <script type="module">
-  import vision from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm';
-  const { FaceDetector, FilesetResolver } = vision;
-
   (function() {
     'use strict';
 
@@ -236,6 +233,8 @@
     /* ---- model loading ---- */
     async function loadModel() {
       try {
+        const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm');
+        const { FaceDetector, FilesetResolver } = vision;
         const wasmFileset = await FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'
         );
