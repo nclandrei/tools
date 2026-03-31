@@ -30,7 +30,7 @@
       margin-bottom: 0.75rem;
     }
 
-    .style-options { display: flex; gap: 0.4rem; }
+    .style-options { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
     .style-btn {
       padding: 0.4rem 0.8rem;
@@ -46,6 +46,45 @@
     }
     .style-btn:hover { border-color: var(--accent); }
     .style-btn.active { border-color: var(--accent); background: var(--accent-dim); }
+
+    .emoji-bar {
+      display: flex;
+      gap: 0.3rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .emoji-btn {
+      width: 2.2rem;
+      height: 2.2rem;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s, transform 0.1s;
+      padding: 0;
+    }
+    .emoji-btn:hover { border-color: var(--accent); transform: scale(1.1); }
+    .emoji-btn.active { border-color: var(--accent); background: var(--accent-dim); }
+    .emoji-custom {
+      width: 3rem;
+      height: 2.2rem;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 1.1rem;
+      text-align: center;
+      font-family: inherit;
+      padding: 0;
+      outline: none;
+    }
+    .emoji-custom:focus { border-color: var(--accent); }
+    .emoji-custom::placeholder { font-size: 0.7rem; color: var(--text-muted); }
 
     .face-info {
       font-size: 0.82rem;
@@ -105,7 +144,7 @@
       <h1>Face Shield</h1>
       <a href="/">&larr; All tools</a>
     </header>
-    <p class="desc">Hide faces in photos before sharing on social media. Detected faces can be covered with a paper bag, cat face, sunglasses, emoji, mosaic, or blur. Everything runs in your browser — nothing is uploaded.</p>
+    <p class="desc">Hide faces in photos before sharing on social media. Detected faces can be covered with a paper bag, cat face, stormtrooper helmet, any emoji, mosaic, or blur. Everything runs in your browser — nothing is uploaded.</p>
 
     <div id="dropZone" class="drop-zone">
       Drop a photo here, click to browse, or paste from clipboard
@@ -118,12 +157,30 @@
         <div class="style-options">
           <button class="style-btn active" data-style="paper-bag">Paper Bag</button>
           <button class="style-btn" data-style="cat">Cat Face</button>
-          <button class="style-btn" data-style="sunglasses">Sunglasses</button>
+          <button class="style-btn" data-style="stormtrooper">Stormtrooper</button>
           <button class="style-btn" data-style="emoji">Emoji</button>
           <button class="style-btn" data-style="mosaic">Mosaic</button>
           <button class="style-btn" data-style="blur">Blur</button>
         </div>
         <span class="face-info" id="faceInfo"></span>
+      </div>
+      <div class="emoji-bar" id="emojiBar" style="display:none">
+        <button class="emoji-btn active" data-emoji="😎">😎</button>
+        <button class="emoji-btn" data-emoji="🤡">🤡</button>
+        <button class="emoji-btn" data-emoji="👽">👽</button>
+        <button class="emoji-btn" data-emoji="💀">💀</button>
+        <button class="emoji-btn" data-emoji="🤖">🤖</button>
+        <button class="emoji-btn" data-emoji="👻">👻</button>
+        <button class="emoji-btn" data-emoji="🎃">🎃</button>
+        <button class="emoji-btn" data-emoji="🐶">🐶</button>
+        <button class="emoji-btn" data-emoji="🦊">🦊</button>
+        <button class="emoji-btn" data-emoji="🐵">🐵</button>
+        <button class="emoji-btn" data-emoji="🤠">🤠</button>
+        <button class="emoji-btn" data-emoji="🥸">🥸</button>
+        <button class="emoji-btn" data-emoji="😈">😈</button>
+        <button class="emoji-btn" data-emoji="🤯">🤯</button>
+        <button class="emoji-btn" data-emoji="🥶">🥶</button>
+        <input type="text" class="emoji-custom" id="customEmoji" placeholder="✏️" title="Type any emoji">
       </div>
 
       <div class="canvas-container" id="canvasContainer">
@@ -154,6 +211,7 @@
       image: null,
       faces: [],
       style: 'paper-bag',
+      emoji: '😎',
       detector: null,
       modelReady: false,
       blurCache: null,
@@ -320,8 +378,8 @@
         if (face.selected) {
           if (S.style === 'paper-bag') drawPaperBag(ctx, face);
           else if (S.style === 'cat') drawCatFace(ctx, face);
-          else if (S.style === 'sunglasses') drawSunglasses(ctx, face);
-          else if (S.style === 'emoji') drawEmoji(ctx, face);
+          else if (S.style === 'stormtrooper') drawStormtrooper(ctx, face);
+          else if (S.style === 'emoji') drawEmojiShield(ctx, face);
           else if (S.style === 'mosaic') drawMosaic(ctx, face);
           else if (S.style === 'blur') drawBlur(ctx, face);
         } else if (!forExport) {
@@ -483,132 +541,120 @@
       ctx.restore();
     }
 
-    /* -- sunglasses -- */
-    function drawSunglasses(ctx, f) {
+    /* -- stormtrooper helmet -- */
+    function drawStormtrooper(ctx, f) {
       const cx = f.x + f.w / 2;
-      const cy = f.y + f.h * 0.38;
-      const lensW = f.w * 0.32;
-      const lensH = f.w * 0.22;
-      const gap = f.w * 0.04;
-      const armLen = f.w * 0.18;
+      const cy = f.y + f.h / 2;
+      const hw = f.w * 0.7;
+      const hh = f.h * 0.75;
 
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.3)';
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetY = 3;
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 4;
 
-      /* lenses */
-      ctx.fillStyle = '#1a1a2e';
-      [-1, 1].forEach(sign => {
-        const lx = cx + sign * (gap + lensW / 2);
-        roundRect(ctx, lx - lensW / 2, cy - lensH / 2, lensW, lensH, lensH * 0.3);
-        ctx.fill();
-      });
+      /* helmet shell — white rounded shape */
+      ctx.fillStyle = '#f0f0f0';
+      ctx.beginPath();
+      ctx.moveTo(cx - hw * 0.5, cy + hh * 0.5);
+      ctx.lineTo(cx - hw * 0.55, cy - hh * 0.05);
+      ctx.quadraticCurveTo(cx - hw * 0.55, cy - hh * 0.55, cx, cy - hh * 0.58);
+      ctx.quadraticCurveTo(cx + hw * 0.55, cy - hh * 0.55, cx + hw * 0.55, cy - hh * 0.05);
+      ctx.lineTo(cx + hw * 0.5, cy + hh * 0.5);
+      ctx.quadraticCurveTo(cx + hw * 0.45, cy + hh * 0.6, cx, cy + hh * 0.62);
+      ctx.quadraticCurveTo(cx - hw * 0.45, cy + hh * 0.6, cx - hw * 0.5, cy + hh * 0.5);
+      ctx.closePath();
+      ctx.fill();
       ctx.shadowColor = 'transparent';
 
-      /* lens shine */
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
-      [-1, 1].forEach(sign => {
-        const lx = cx + sign * (gap + lensW / 2);
-        ctx.beginPath();
-        ctx.ellipse(lx - lensW * 0.1, cy - lensH * 0.12, lensW * 0.2, lensH * 0.15, -0.3, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      /* frame */
-      ctx.strokeStyle = '#111';
-      ctx.lineWidth = Math.max(2, f.w * 0.02);
-      ctx.lineCap = 'round';
-
-      [-1, 1].forEach(sign => {
-        const lx = cx + sign * (gap + lensW / 2);
-        roundRect(ctx, lx - lensW / 2, cy - lensH / 2, lensW, lensH, lensH * 0.3);
-        ctx.stroke();
-      });
-
-      /* bridge */
-      ctx.beginPath();
-      ctx.moveTo(cx - gap, cy);
-      ctx.quadraticCurveTo(cx, cy - lensH * 0.25, cx + gap, cy);
+      /* helmet outline */
+      ctx.strokeStyle = '#bbb';
+      ctx.lineWidth = Math.max(1.5, hw * 0.012);
       ctx.stroke();
 
-      /* arms */
-      [-1, 1].forEach(sign => {
-        const startX = cx + sign * (gap + lensW);
+      /* visor — dark eye strip */
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath();
+      ctx.moveTo(cx - hw * 0.38, cy - hh * 0.12);
+      ctx.quadraticCurveTo(cx - hw * 0.42, cy - hh * 0.02, cx - hw * 0.2, cy + hh * 0.02);
+      ctx.lineTo(cx - hw * 0.06, cy - hh * 0.06);
+      ctx.lineTo(cx - hw * 0.06, cy - hh * 0.14);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(cx + hw * 0.38, cy - hh * 0.12);
+      ctx.quadraticCurveTo(cx + hw * 0.42, cy - hh * 0.02, cx + hw * 0.2, cy + hh * 0.02);
+      ctx.lineTo(cx + hw * 0.06, cy - hh * 0.06);
+      ctx.lineTo(cx + hw * 0.06, cy - hh * 0.14);
+      ctx.closePath();
+      ctx.fill();
+
+      /* visor shine */
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.beginPath();
+      ctx.ellipse(cx - hw * 0.22, cy - hh * 0.1, hw * 0.08, hh * 0.03, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(cx + hw * 0.22, cy - hh * 0.1, hw * 0.08, hh * 0.03, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      /* nose bridge — dark center line */
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = Math.max(1, hw * 0.015);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - hh * 0.18);
+      ctx.lineTo(cx, cy + hh * 0.08);
+      ctx.stroke();
+
+      /* mouth grille */
+      ctx.fillStyle = '#2a2a2a';
+      roundRect(ctx, cx - hw * 0.18, cy + hh * 0.12, hw * 0.36, hh * 0.2, hw * 0.03);
+      ctx.fill();
+
+      /* grille slits */
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = Math.max(1, hw * 0.008);
+      for (let i = 0; i < 5; i++) {
+        const gy = cy + hh * 0.15 + i * hh * 0.04;
         ctx.beginPath();
-        ctx.moveTo(startX, cy);
-        ctx.lineTo(startX + sign * armLen, cy + armLen * 0.3);
+        ctx.moveTo(cx - hw * 0.14, gy);
+        ctx.lineTo(cx + hw * 0.14, gy);
+        ctx.stroke();
+      }
+
+      /* cheek tubes */
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = Math.max(1.5, hw * 0.015);
+      [-1, 1].forEach(sign => {
+        ctx.beginPath();
+        ctx.moveTo(cx + sign * hw * 0.22, cy + hh * 0.14);
+        ctx.quadraticCurveTo(cx + sign * hw * 0.35, cy + hh * 0.2, cx + sign * hw * 0.4, cy + hh * 0.35);
         ctx.stroke();
       });
+
+      /* brow line */
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = Math.max(1, hw * 0.01);
+      ctx.beginPath();
+      ctx.moveTo(cx - hw * 0.42, cy - hh * 0.18);
+      ctx.quadraticCurveTo(cx, cy - hh * 0.25, cx + hw * 0.42, cy - hh * 0.18);
+      ctx.stroke();
 
       ctx.restore();
     }
 
-    /* -- emoji (smiley) -- */
-    function drawEmoji(ctx, f) {
+    /* -- emoji (user-picked) -- */
+    function drawEmojiShield(ctx, f) {
       const cx = f.x + f.w / 2;
       const cy = f.y + f.h / 2;
-      const r = Math.max(f.w, f.h) * 0.55;
+      const size = Math.max(f.w, f.h) * 1.1;
 
       ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.2)';
-      ctx.shadowBlur = 10;
-
-      /* yellow circle */
-      ctx.fillStyle = '#ffdd57';
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowColor = 'transparent';
-
-      /* subtle gradient overlay */
-      const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
-      grad.addColorStop(0, 'rgba(255,255,255,0.2)');
-      grad.addColorStop(1, 'rgba(0,0,0,0.05)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-
-      /* outline */
-      ctx.strokeStyle = '#e6c74a';
-      ctx.lineWidth = Math.max(2, r * 0.025);
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.stroke();
-
-      /* eyes */
-      ctx.fillStyle = '#333';
-      [-1, 1].forEach(sign => {
-        const ex = cx + sign * r * 0.3;
-        const ey = cy - r * 0.15;
-        ctx.beginPath();
-        ctx.ellipse(ex, ey, r * 0.08, r * 0.12, 0, 0, Math.PI * 2);
-        ctx.fill();
-        /* eye highlight */
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.beginPath();
-        ctx.arc(ex + r * 0.025, ey - r * 0.05, r * 0.03, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#333';
-      });
-
-      /* smile */
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = Math.max(2, r * 0.035);
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.arc(cx, cy + r * 0.05, r * 0.45, 0.15 * Math.PI, 0.85 * Math.PI);
-      ctx.stroke();
-
-      /* cheek blush */
-      ctx.fillStyle = 'rgba(255,150,120,0.25)';
-      [-1, 1].forEach(sign => {
-        ctx.beginPath();
-        ctx.ellipse(cx + sign * r * 0.5, cy + r * 0.2, r * 0.12, r * 0.08, 0, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
+      ctx.font = size + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(S.emoji, cx, cy);
       ctx.restore();
     }
 
@@ -716,13 +762,39 @@
     });
 
     /* style buttons */
+    const emojiBar = $('emojiBar');
+    const customEmojiInput = $('customEmoji');
+
     document.querySelectorAll('.style-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         S.style = btn.dataset.style;
+        emojiBar.style.display = S.style === 'emoji' ? 'flex' : 'none';
         drawCanvas();
       });
+    });
+
+    /* emoji quick-pick buttons */
+    document.querySelectorAll('.emoji-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        customEmojiInput.value = '';
+        S.emoji = btn.dataset.emoji;
+        drawCanvas();
+      });
+    });
+
+    /* custom emoji input */
+    customEmojiInput.addEventListener('input', () => {
+      const val = [...customEmojiInput.value].slice(-1).join('');
+      if (val) {
+        customEmojiInput.value = val;
+        document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('active'));
+        S.emoji = val;
+        drawCanvas();
+      }
     });
 
     selectAllBtn.addEventListener('click', () => {
