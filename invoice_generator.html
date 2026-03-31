@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice Generator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 860px; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+  .form-group.full-width { grid-column: 1 / -1; }
+
+  .form-group label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.92rem;
+    border-radius: 6px;
+  }
+
+  .form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+    line-height: 1.5;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .saved-profiles {
+    margin-bottom: 2rem;
+  }
+
+  .saved-profiles label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+
+  .profile-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .profile-row select {
+    flex: 1;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.92rem;
+    border-radius: 6px;
+  }
+
+  .profile-row button {
+    flex-shrink: 0;
+  }
+
+  /* Invoice preview */
+  .invoice-preview {
+    background: #fff;
+    color: #1a1a1a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .invoice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid #7c3aed;
+  }
+
+  .invoice-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #7c3aed;
+    letter-spacing: -0.02em;
+  }
+
+  .invoice-meta {
+    text-align: right;
+    font-size: 0.85rem;
+    color: #666;
+  }
+
+  .invoice-meta strong {
+    color: #1a1a1a;
+    display: block;
+    font-size: 0.95rem;
+  }
+
+  .invoice-parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .invoice-parties h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #999;
+    margin-bottom: 0.4rem;
+  }
+
+  .invoice-parties p {
+    font-size: 0.9rem;
+    color: #333;
+  }
+
+  .invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 2rem;
+  }
+
+  .invoice-table th {
+    text-align: left;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #999;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid #e5e5e0;
+  }
+
+  .invoice-table th:last-child {
+    text-align: right;
+  }
+
+  .invoice-table td {
+    padding: 0.8rem 0;
+    border-bottom: 1px solid #f0f0ee;
+    vertical-align: top;
+  }
+
+  .invoice-table td:last-child {
+    text-align: right;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .invoice-table .desc-cell {
+    font-size: 0.85rem;
+    color: #666;
+    padding-top: 0.2rem;
+  }
+
+  .invoice-total {
+    text-align: right;
+    padding-top: 1rem;
+    border-top: 2px solid #1a1a1a;
+    margin-top: -1px;
+  }
+
+  .invoice-total .label {
+    font-size: 0.85rem;
+    color: #666;
+  }
+
+  .invoice-total .amount {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .invoice-footer {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e5e0;
+    font-size: 0.82rem;
+    color: #999;
+  }
+
+  #preview-section { display: none; }
+
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .invoice-preview { padding: 1.5rem; }
+    .invoice-header { flex-direction: column; gap: 1rem; }
+    .invoice-meta { text-align: left; }
+    .invoice-parties { grid-template-columns: 1fr; }
+  }
+
+  @media print {
+    body { background: #fff; }
+    .container { padding: 0; max-width: none; }
+    header, .desc, .form-grid, .actions, .saved-profiles, #preview-section .actions { display: none !important; }
+    .invoice-preview { border: none; border-radius: 0; padding: 2rem 0; }
+    #preview-section { display: block !important; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <a href="/">&larr; All tools</a>
+      <h1>Invoice Generator</h1>
+    </div>
+  </header>
+  <p class="desc">Generate professional invoices. Defaults to the previous full month. Saves company profiles locally for reuse.</p>
+
+  <div class="saved-profiles" id="profiles-section" style="display:none">
+    <label>Saved Profiles</label>
+    <div class="profile-row">
+      <select id="profile-select"><option value="">Select a saved profile...</option></select>
+      <button class="btn btn-secondary" onclick="loadProfile()">Load</button>
+      <button class="btn btn-secondary" onclick="deleteProfile()" style="color:var(--red)">Delete</button>
+    </div>
+  </div>
+
+  <div class="form-grid">
+    <div class="form-group">
+      <label for="from-name">Your Name / Company</label>
+      <input type="text" id="from-name" placeholder="Acme Ltd">
+    </div>
+    <div class="form-group">
+      <label for="from-details">Your Details (address, VAT, etc.)</label>
+      <input type="text" id="from-details" placeholder="123 Main St, London, UK">
+    </div>
+    <div class="form-group">
+      <label for="to-name">Bill To (Company Name)</label>
+      <input type="text" id="to-name" placeholder="Client Corp">
+    </div>
+    <div class="form-group">
+      <label for="to-details">Client Details (address, etc.)</label>
+      <input type="text" id="to-details" placeholder="456 Oak Ave, Berlin, DE">
+    </div>
+    <div class="form-group">
+      <label for="period-start">Period Start</label>
+      <input type="date" id="period-start">
+    </div>
+    <div class="form-group">
+      <label for="period-end">Period End</label>
+      <input type="date" id="period-end">
+    </div>
+    <div class="form-group">
+      <label for="issue-date">Issue Date</label>
+      <input type="date" id="issue-date">
+    </div>
+    <div class="form-group">
+      <label for="due-date">Due Date</label>
+      <input type="date" id="due-date">
+    </div>
+    <div class="form-group">
+      <label for="amount">Amount</label>
+      <input type="number" id="amount" step="0.01" min="0" placeholder="5000.00">
+    </div>
+    <div class="form-group">
+      <label for="currency">Currency</label>
+      <select id="currency">
+        <option value="EUR">EUR</option>
+        <option value="USD">USD</option>
+        <option value="GBP">GBP</option>
+        <option value="RON">RON</option>
+        <option value="CHF">CHF</option>
+        <option value="JPY">JPY</option>
+        <option value="CAD">CAD</option>
+        <option value="AUD">AUD</option>
+      </select>
+    </div>
+    <div class="form-group full-width">
+      <label for="description">Description of Services</label>
+      <textarea id="description" placeholder="Software development services for the month of March 2026."></textarea>
+    </div>
+    <div class="form-group full-width">
+      <label for="notes">Footer Notes (optional)</label>
+      <input type="text" id="notes" placeholder="Payment via bank transfer. Thank you for your business.">
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="generateInvoice()">Generate Invoice</button>
+    <button class="btn btn-secondary" onclick="saveProfile()">Save as Profile</button>
+  </div>
+
+  <div id="preview-section">
+    <div class="invoice-preview" id="invoice-preview"></div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="downloadPDF()">Download PDF</button>
+      <button class="btn btn-secondary" onclick="window.print()">Print</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'invoice_profiles';
+
+  // --- Default dates: previous full month ---
+  function getDefaultDates() {
+    const now = new Date();
+    // Go to first day of current month, then back one month
+    const firstOfCurrent = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(firstOfCurrent);
+    lastMonth.setDate(lastMonth.getDate() - 1); // last day of previous month
+
+    const start = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+    const end = lastMonth;
+
+    return {
+      periodStart: fmt(start),
+      periodEnd: fmt(end),
+      issueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 1, 1)), // 1st of current month
+      dueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 1, 15))   // 15th of current month
+    };
+  }
+
+  function fmt(d) {
+    return d.toISOString().split('T')[0];
+  }
+
+  function init() {
+    const defaults = getDefaultDates();
+    document.getElementById('period-start').value = defaults.periodStart;
+    document.getElementById('period-end').value = defaults.periodEnd;
+    document.getElementById('issue-date').value = defaults.issueDate;
+    document.getElementById('due-date').value = defaults.dueDate;
+    refreshProfiles();
+  }
+
+  // --- Profiles ---
+  function getProfiles() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch { return {}; }
+  }
+
+  function refreshProfiles() {
+    const profiles = getProfiles();
+    const keys = Object.keys(profiles);
+    const section = document.getElementById('profiles-section');
+    const select = document.getElementById('profile-select');
+
+    if (keys.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = '';
+    select.innerHTML = '<option value="">Select a saved profile...</option>';
+    keys.sort().forEach(k => {
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = k;
+      select.appendChild(opt);
+    });
+  }
+
+  function saveProfile() {
+    const toName = document.getElementById('to-name').value.trim();
+    if (!toName) { alert('Enter a company name first.'); return; }
+
+    const profiles = getProfiles();
+    const key = toName;
+    profiles[key] = {
+      fromName: document.getElementById('from-name').value,
+      fromDetails: document.getElementById('from-details').value,
+      toName: toName,
+      toDetails: document.getElementById('to-details').value,
+      amount: document.getElementById('amount').value,
+      currency: document.getElementById('currency').value,
+      description: document.getElementById('description').value,
+      notes: document.getElementById('notes').value
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+    refreshProfiles();
+    document.getElementById('profile-select').value = key;
+  }
+
+  function loadProfile() {
+    const key = document.getElementById('profile-select').value;
+    if (!key) return;
+    const profiles = getProfiles();
+    const p = profiles[key];
+    if (!p) return;
+
+    document.getElementById('from-name').value = p.fromName || '';
+    document.getElementById('from-details').value = p.fromDetails || '';
+    document.getElementById('to-name').value = p.toName || '';
+    document.getElementById('to-details').value = p.toDetails || '';
+    document.getElementById('amount').value = p.amount || '';
+    document.getElementById('currency').value = p.currency || 'EUR';
+    document.getElementById('description').value = p.description || '';
+    document.getElementById('notes').value = p.notes || '';
+  }
+
+  function deleteProfile() {
+    const key = document.getElementById('profile-select').value;
+    if (!key) return;
+    if (!confirm('Delete profile "' + key + '"?')) return;
+    const profiles = getProfiles();
+    delete profiles[key];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+    refreshProfiles();
+  }
+
+  // --- Invoice ID ---
+  function generateInvoiceId(companyName, periodStart, periodEnd) {
+    const slug = companyName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6);
+    const s = periodStart.replace(/-/g, '');
+    const e = periodEnd.replace(/-/g, '');
+    return 'INV-' + slug + '-' + s + '-' + e;
+  }
+
+  // --- Format currency ---
+  function formatMoney(amount, currency) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2
+    }).format(amount);
+  }
+
+  function formatDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  // --- Generate ---
+  function generateInvoice() {
+    const fromName = document.getElementById('from-name').value.trim();
+    const fromDetails = document.getElementById('from-details').value.trim();
+    const toName = document.getElementById('to-name').value.trim();
+    const toDetails = document.getElementById('to-details').value.trim();
+    const periodStart = document.getElementById('period-start').value;
+    const periodEnd = document.getElementById('period-end').value;
+    const issueDate = document.getElementById('issue-date').value;
+    const dueDate = document.getElementById('due-date').value;
+    const amount = parseFloat(document.getElementById('amount').value);
+    const currency = document.getElementById('currency').value;
+    const description = document.getElementById('description').value.trim();
+    const notes = document.getElementById('notes').value.trim();
+
+    if (!toName || !amount || !periodStart || !periodEnd) {
+      alert('Please fill in at least: company name, amount, period start and end.');
+      return;
+    }
+
+    const invoiceId = generateInvoiceId(toName, periodStart, periodEnd);
+
+    const html = `
+      <div class="invoice-header">
+        <div class="invoice-title">INVOICE</div>
+        <div class="invoice-meta">
+          <strong>${invoiceId}</strong>
+          Issued: ${formatDate(issueDate)}<br>
+          Due: ${formatDate(dueDate)}
+        </div>
+      </div>
+      <div class="invoice-parties">
+        <div>
+          <h3>From</h3>
+          <p><strong>${esc(fromName)}</strong><br>${esc(fromDetails)}</p>
+        </div>
+        <div>
+          <h3>Bill To</h3>
+          <p><strong>${esc(toName)}</strong><br>${esc(toDetails)}</p>
+        </div>
+      </div>
+      <table class="invoice-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              ${esc(description) || 'Services rendered'}
+              <div class="desc-cell">${formatDate(periodStart)} &mdash; ${formatDate(periodEnd)}</div>
+            </td>
+            <td>${formatMoney(amount, currency)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="invoice-total">
+        <span class="label">Total Due</span><br>
+        <span class="amount">${formatMoney(amount, currency)}</span>
+      </div>
+      ${notes ? `<div class="invoice-footer">${esc(notes)}</div>` : ''}
+    `;
+
+    document.getElementById('invoice-preview').innerHTML = html;
+    document.getElementById('preview-section').style.display = '';
+
+    // Auto-save profile
+    saveProfile();
+  }
+
+  function esc(s) {
+    const el = document.createElement('span');
+    el.textContent = s;
+    return el.innerHTML;
+  }
+
+  // --- PDF download via print ---
+  function downloadPDF() {
+    window.print();
+  }
+
+  init();
+</script>
+</body>
+</html>
