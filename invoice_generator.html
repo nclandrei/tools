@@ -204,8 +204,6 @@
     color: #999;
   }
 
-  #preview-section { display: none; }
-
   @media (max-width: 600px) {
     .form-grid { grid-template-columns: 1fr; }
     .invoice-preview { padding: 1.5rem; }
@@ -352,12 +350,18 @@
   }
 
   // --- Profiles ---
+  function storageAvailable() {
+    try { localStorage.setItem('__test', '1'); localStorage.removeItem('__test'); return true; }
+    catch { return false; }
+  }
+
   function getProfiles() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
     catch { return {}; }
   }
 
   function refreshProfiles() {
+    if (!storageAvailable()) { document.getElementById('profiles-section').style.display = 'none'; return; }
     const profiles = getProfiles();
     const keys = Object.keys(profiles);
     const section = document.getElementById('profiles-section');
@@ -379,6 +383,7 @@
   }
 
   function saveProfile() {
+    if (!storageAvailable()) return;
     const toName = document.getElementById('to-name').value.trim();
     if (!toName) { alert('Enter a company name first.'); return; }
 
@@ -417,6 +422,7 @@
   }
 
   function deleteProfile() {
+    if (!storageAvailable()) return;
     const key = document.getElementById('profile-select').value;
     if (!key) return;
     if (!confirm('Delete profile "' + key + '"?')) return;
@@ -514,7 +520,7 @@
     `;
 
     document.getElementById('invoice-preview').innerHTML = html;
-    document.getElementById('preview-section').style.display = '';
+    document.getElementById('preview-section').style.display = 'block';
 
     // Auto-save profile
     saveProfile();
