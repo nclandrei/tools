@@ -105,7 +105,7 @@
       <h1>Face Shield</h1>
       <a href="/">&larr; All tools</a>
     </header>
-    <p class="desc">Hide faces in photos before sharing on social media. Detected faces can be covered with a paper bag, cat face, or blur. Everything runs in your browser — nothing is uploaded.</p>
+    <p class="desc">Hide faces in photos before sharing on social media. Detected faces can be covered with a paper bag, cat face, sunglasses, emoji, mosaic, or blur. Everything runs in your browser — nothing is uploaded.</p>
 
     <div id="dropZone" class="drop-zone">
       Drop a photo here, click to browse, or paste from clipboard
@@ -118,6 +118,9 @@
         <div class="style-options">
           <button class="style-btn active" data-style="paper-bag">Paper Bag</button>
           <button class="style-btn" data-style="cat">Cat Face</button>
+          <button class="style-btn" data-style="sunglasses">Sunglasses</button>
+          <button class="style-btn" data-style="emoji">Emoji</button>
+          <button class="style-btn" data-style="mosaic">Mosaic</button>
           <button class="style-btn" data-style="blur">Blur</button>
         </div>
         <span class="face-info" id="faceInfo"></span>
@@ -139,8 +142,10 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/dist/face-api.js"></script>
-  <script>
+  <script type="module">
+  import vision from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm';
+  const { FaceDetector, FilesetResolver } = vision;
+
   (function() {
     'use strict';
 
@@ -149,6 +154,7 @@
       image: null,
       faces: [],
       style: 'paper-bag',
+      detector: null,
       modelReady: false,
       blurCache: null,
     };
@@ -172,9 +178,17 @@
     /* ---- model loading ---- */
     async function loadModel() {
       try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri(
-          'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/model'
+        const wasmFileset = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'
         );
+        S.detector = await FaceDetector.createFromOptions(wasmFileset, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',
+            delegate: 'GPU',
+          },
+          runningMode: 'IMAGE',
+          minDetectionConfidence: 0.4,
+        });
         S.modelReady = true;
         modelStatus.textContent = 'Face detection model ready.';
         modelStatus.classList.add('ready');
@@ -211,7 +225,6 @@
     async function handleFile(file) {
       const img = new Image();
       img.onload = async () => {
-        /* limit canvas to reasonable size */
         const MAX = 3000;
         let w = img.naturalWidth, h = img.naturalHeight;
         if (w > MAX || h > MAX) {
@@ -233,7 +246,7 @@
       img.src = URL.createObjectURL(file);
     }
 
-    /* ---- face detection ---- */
+    /* ---- face detection via MediaPipe ---- */
     async function detectFaces() {
       if (!S.modelReady) {
         overlay.textContent = 'Loading model…';
@@ -246,19 +259,27 @@
       overlay.style.display = '';
 
       try {
-        const detections = await faceapi.detectAllFaces(
-          canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 })
-        );
-        S.faces = detections.map(d => ({
-          x: d.box.x * (canvas.width / canvas.width),  // already in canvas coords
-          y: d.box.y,
-          w: d.box.width,
-          h: d.box.height,
-          selected: true,  // auto-select all faces
-        }));
+        /* MediaPipe needs an HTMLImageElement drawn at its natural or canvas size */
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = canvas.width;
+        tmpCanvas.height = canvas.height;
+        const tmpCtx = tmpCanvas.getContext('2d');
+        tmpCtx.drawImage(S.image, 0, 0, canvas.width, canvas.height);
+
+        const result = S.detector.detect(tmpCanvas);
+        S.faces = result.detections.map(d => {
+          const box = d.boundingBox;
+          return {
+            x: box.originX,
+            y: box.originY,
+            w: box.width,
+            h: box.height,
+            selected: true,
+          };
+        });
         /* expand boxes a bit for better coverage */
         S.faces.forEach(f => {
-          const padX = f.w * 0.1, padY = f.h * 0.15;
+          const padX = f.w * 0.12, padY = f.h * 0.18;
           f.x = Math.max(0, f.x - padX);
           f.y = Math.max(0, f.y - padY);
           f.w = Math.min(canvas.width - f.x, f.w + padX * 2);
@@ -299,9 +320,11 @@
         if (face.selected) {
           if (S.style === 'paper-bag') drawPaperBag(ctx, face);
           else if (S.style === 'cat') drawCatFace(ctx, face);
+          else if (S.style === 'sunglasses') drawSunglasses(ctx, face);
+          else if (S.style === 'emoji') drawEmoji(ctx, face);
+          else if (S.style === 'mosaic') drawMosaic(ctx, face);
           else if (S.style === 'blur') drawBlur(ctx, face);
         } else if (!forExport) {
-          /* dashed outline for unselected detected faces */
           ctx.save();
           ctx.setLineDash([6, 4]);
           ctx.strokeStyle = 'rgba(124,58,237,0.5)';
@@ -321,22 +344,18 @@
       const bh = f.h + f.h * 0.35;
 
       ctx.save();
-      /* shadow */
       ctx.shadowColor = 'rgba(0,0,0,0.25)';
       ctx.shadowBlur = 12;
       ctx.shadowOffsetY = 4;
 
-      /* body */
       ctx.fillStyle = '#c8a878';
       roundRect(ctx, bx, by, bw, bh, 4);
       ctx.fill();
       ctx.shadowColor = 'transparent';
 
-      /* top fold */
       ctx.fillStyle = '#b89868';
       ctx.fillRect(bx, by, bw, bh * 0.09);
 
-      /* fold crease */
       ctx.strokeStyle = '#a08050';
       ctx.lineWidth = Math.max(1, bw * 0.005);
       ctx.beginPath();
@@ -344,7 +363,6 @@
       ctx.lineTo(bx + bw * 0.95, by + bh * 0.09);
       ctx.stroke();
 
-      /* vertical wrinkles */
       ctx.strokeStyle = 'rgba(140,110,70,0.25)';
       ctx.lineWidth = Math.max(1, bw * 0.004);
       for (let i = 0.18; i < 0.9; i += 0.14) {
@@ -354,7 +372,6 @@
         ctx.stroke();
       }
 
-      /* eye holes */
       const eyeY = by + bh * 0.42;
       const eyeRx = bw * 0.08;
       const eyeRy = bw * 0.055;
@@ -376,12 +393,9 @@
       const r = Math.max(f.w, f.h) * 0.6;
 
       ctx.save();
-
-      /* shadow */
       ctx.shadowColor = 'rgba(0,0,0,0.18)';
       ctx.shadowBlur = 10;
 
-      /* face circle */
       ctx.fillStyle = '#f5e6d0';
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -394,7 +408,6 @@
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.stroke();
 
-      /* ears */
       function ear(sign) {
         ctx.fillStyle = '#f5e6d0';
         ctx.beginPath();
@@ -404,7 +417,6 @@
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        /* inner pink */
         ctx.fillStyle = '#f0b0b0';
         ctx.beginPath();
         ctx.moveTo(cx + sign * r * 0.52, cy - r * 0.72);
@@ -415,34 +427,28 @@
       }
       ear(-1); ear(1);
 
-      /* eyes */
       const eyeY = cy - r * 0.08;
       const eyeR = r * 0.17;
       [-1, 1].forEach(sign => {
         const ex = cx + sign * r * 0.3;
-        /* white */
         ctx.fillStyle = '#fffef0';
         ctx.beginPath();
         ctx.ellipse(ex, eyeY, eyeR, eyeR * 0.85, 0, 0, Math.PI * 2);
         ctx.fill();
-        /* iris */
         ctx.fillStyle = '#6db86d';
         ctx.beginPath();
         ctx.ellipse(ex, eyeY, eyeR * 0.7, eyeR * 0.75, 0, 0, Math.PI * 2);
         ctx.fill();
-        /* pupil slit */
         ctx.fillStyle = '#111';
         ctx.beginPath();
         ctx.ellipse(ex, eyeY, eyeR * 0.15, eyeR * 0.65, 0, 0, Math.PI * 2);
         ctx.fill();
-        /* highlight */
         ctx.fillStyle = 'rgba(255,255,255,0.7)';
         ctx.beginPath();
         ctx.arc(ex + eyeR * 0.25, eyeY - eyeR * 0.25, eyeR * 0.15, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      /* nose */
       ctx.fillStyle = '#e88ca0';
       ctx.beginPath();
       ctx.moveTo(cx, cy + r * 0.12);
@@ -451,7 +457,6 @@
       ctx.closePath();
       ctx.fill();
 
-      /* mouth */
       ctx.strokeStyle = '#c07070';
       ctx.lineWidth = Math.max(1.5, r * 0.015);
       ctx.lineCap = 'round';
@@ -464,7 +469,6 @@
       ctx.quadraticCurveTo(cx + r * 0.08, cy + r * 0.32, cx + r * 0.14, cy + r * 0.28);
       ctx.stroke();
 
-      /* whiskers */
       ctx.strokeStyle = '#888';
       ctx.lineWidth = Math.max(1, r * 0.012);
       [-1, 1].forEach(sign => {
@@ -476,6 +480,191 @@
         }
       });
 
+      ctx.restore();
+    }
+
+    /* -- sunglasses -- */
+    function drawSunglasses(ctx, f) {
+      const cx = f.x + f.w / 2;
+      const cy = f.y + f.h * 0.38;
+      const lensW = f.w * 0.32;
+      const lensH = f.w * 0.22;
+      const gap = f.w * 0.04;
+      const armLen = f.w * 0.18;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.3)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 3;
+
+      /* lenses */
+      ctx.fillStyle = '#1a1a2e';
+      [-1, 1].forEach(sign => {
+        const lx = cx + sign * (gap + lensW / 2);
+        roundRect(ctx, lx - lensW / 2, cy - lensH / 2, lensW, lensH, lensH * 0.3);
+        ctx.fill();
+      });
+      ctx.shadowColor = 'transparent';
+
+      /* lens shine */
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      [-1, 1].forEach(sign => {
+        const lx = cx + sign * (gap + lensW / 2);
+        ctx.beginPath();
+        ctx.ellipse(lx - lensW * 0.1, cy - lensH * 0.12, lensW * 0.2, lensH * 0.15, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      /* frame */
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = Math.max(2, f.w * 0.02);
+      ctx.lineCap = 'round';
+
+      [-1, 1].forEach(sign => {
+        const lx = cx + sign * (gap + lensW / 2);
+        roundRect(ctx, lx - lensW / 2, cy - lensH / 2, lensW, lensH, lensH * 0.3);
+        ctx.stroke();
+      });
+
+      /* bridge */
+      ctx.beginPath();
+      ctx.moveTo(cx - gap, cy);
+      ctx.quadraticCurveTo(cx, cy - lensH * 0.25, cx + gap, cy);
+      ctx.stroke();
+
+      /* arms */
+      [-1, 1].forEach(sign => {
+        const startX = cx + sign * (gap + lensW);
+        ctx.beginPath();
+        ctx.moveTo(startX, cy);
+        ctx.lineTo(startX + sign * armLen, cy + armLen * 0.3);
+        ctx.stroke();
+      });
+
+      ctx.restore();
+    }
+
+    /* -- emoji (smiley) -- */
+    function drawEmoji(ctx, f) {
+      const cx = f.x + f.w / 2;
+      const cy = f.y + f.h / 2;
+      const r = Math.max(f.w, f.h) * 0.55;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.2)';
+      ctx.shadowBlur = 10;
+
+      /* yellow circle */
+      ctx.fillStyle = '#ffdd57';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
+      /* subtle gradient overlay */
+      const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+      grad.addColorStop(0, 'rgba(255,255,255,0.2)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.05)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      /* outline */
+      ctx.strokeStyle = '#e6c74a';
+      ctx.lineWidth = Math.max(2, r * 0.025);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      /* eyes */
+      ctx.fillStyle = '#333';
+      [-1, 1].forEach(sign => {
+        const ex = cx + sign * r * 0.3;
+        const ey = cy - r * 0.15;
+        ctx.beginPath();
+        ctx.ellipse(ex, ey, r * 0.08, r * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        /* eye highlight */
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.beginPath();
+        ctx.arc(ex + r * 0.025, ey - r * 0.05, r * 0.03, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#333';
+      });
+
+      /* smile */
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = Math.max(2, r * 0.035);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(cx, cy + r * 0.05, r * 0.45, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+
+      /* cheek blush */
+      ctx.fillStyle = 'rgba(255,150,120,0.25)';
+      [-1, 1].forEach(sign => {
+        ctx.beginPath();
+        ctx.ellipse(cx + sign * r * 0.5, cy + r * 0.2, r * 0.12, r * 0.08, 0, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.restore();
+    }
+
+    /* -- mosaic/pixelate -- */
+    function drawMosaic(ctx, f) {
+      const pad = Math.max(f.w, f.h) * 0.05;
+      const sx = Math.max(0, Math.floor(f.x - pad));
+      const sy = Math.max(0, Math.floor(f.y - pad));
+      const sw = Math.min(canvas.width - sx, Math.ceil(f.w + pad * 2));
+      const sh = Math.min(canvas.height - sy, Math.ceil(f.h + pad * 2));
+      const blockSize = Math.max(6, Math.round(Math.max(f.w, f.h) / 8));
+
+      const imageData = ctx.getImageData(sx, sy, sw, sh);
+      const data = imageData.data;
+
+      for (let by = 0; by < sh; by += blockSize) {
+        for (let bx = 0; bx < sw; bx += blockSize) {
+          let r = 0, g = 0, b = 0, count = 0;
+          const bw = Math.min(blockSize, sw - bx);
+          const bh = Math.min(blockSize, sh - by);
+          for (let py = by; py < by + bh; py++) {
+            for (let px = bx; px < bx + bw; px++) {
+              const i = (py * sw + px) * 4;
+              r += data[i];
+              g += data[i + 1];
+              b += data[i + 2];
+              count++;
+            }
+          }
+          r = Math.round(r / count);
+          g = Math.round(g / count);
+          b = Math.round(b / count);
+          for (let py = by; py < by + bh; py++) {
+            for (let px = bx; px < bx + bw; px++) {
+              const i = (py * sw + px) * 4;
+              data[i] = r;
+              data[i + 1] = g;
+              data[i + 2] = b;
+            }
+          }
+        }
+      }
+
+      /* apply within elliptical clip */
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = canvas.width;
+      tmpCanvas.height = canvas.height;
+      const tmpCtx = tmpCanvas.getContext('2d');
+      tmpCtx.putImageData(imageData, sx, sy);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(f.x + f.w / 2, f.y + f.h / 2,
+                  f.w / 2 + pad, f.h / 2 + pad, 0, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(tmpCanvas, 0, 0);
       ctx.restore();
     }
 
@@ -549,14 +738,14 @@
     });
 
     downloadBtn.addEventListener('click', () => {
-      drawCanvas(true); /* export mode — no selection indicators */
+      drawCanvas(true);
       canvas.toBlob(blob => {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = 'face-shield-' + Date.now() + '.jpg';
         a.click();
         URL.revokeObjectURL(a.href);
-        drawCanvas(); /* restore editing indicators */
+        drawCanvas();
       }, 'image/jpeg', 0.92);
     });
 
