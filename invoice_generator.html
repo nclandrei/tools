@@ -278,6 +278,10 @@
       <input type="number" id="amount" step="0.01" min="0" placeholder="5000.00">
     </div>
     <div class="form-group">
+      <label for="hours">Hours Worked (optional)</label>
+      <input type="number" id="hours" step="0.5" min="0" placeholder="160">
+    </div>
+    <div class="form-group">
       <label for="currency">Currency</label>
       <select id="currency">
         <option value="EUR">EUR</option>
@@ -332,12 +336,15 @@
       periodStart: fmt(start),
       periodEnd: fmt(end),
       issueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 1, 1)), // 1st of current month
-      dueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 1, 15))   // 15th of current month
+      dueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 2, 0))   // last day of current month
     };
   }
 
   function fmt(d) {
-    return d.toISOString().split('T')[0];
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   function init() {
@@ -395,6 +402,7 @@
       toName: toName,
       toDetails: document.getElementById('to-details').value,
       amount: document.getElementById('amount').value,
+      hours: document.getElementById('hours').value,
       currency: document.getElementById('currency').value,
       description: document.getElementById('description').value,
       notes: document.getElementById('notes').value
@@ -416,6 +424,7 @@
     document.getElementById('to-name').value = p.toName || '';
     document.getElementById('to-details').value = p.toDetails || '';
     document.getElementById('amount').value = p.amount || '';
+    document.getElementById('hours').value = p.hours || '';
     document.getElementById('currency').value = p.currency || 'EUR';
     document.getElementById('description').value = p.description || '';
     document.getElementById('notes').value = p.notes || '';
@@ -465,6 +474,7 @@
     const issueDate = document.getElementById('issue-date').value;
     const dueDate = document.getElementById('due-date').value;
     const amount = parseFloat(document.getElementById('amount').value);
+    const hours = document.getElementById('hours').value ? parseFloat(document.getElementById('hours').value) : null;
     const currency = document.getElementById('currency').value;
     const description = document.getElementById('description').value.trim();
     const notes = document.getElementById('notes').value.trim();
@@ -506,7 +516,7 @@
           <tr>
             <td>
               ${esc(description) || 'Services rendered'}
-              <div class="desc-cell">${formatDate(periodStart)} &mdash; ${formatDate(periodEnd)}</div>
+              <div class="desc-cell">${formatDate(periodStart)} &mdash; ${formatDate(periodEnd)}${hours ? ' &middot; ' + hours + ' hours' : ''}</div>
             </td>
             <td>${formatMoney(amount, currency)}</td>
           </tr>
