@@ -233,19 +233,24 @@
     /* ---- model loading ---- */
     async function loadModel() {
       try {
-        const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm');
+        const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/+esm');
         const { FaceDetector, FilesetResolver } = vision;
         const wasmFileset = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm'
         );
-        S.detector = await FaceDetector.createFromOptions(wasmFileset, {
+        const createDetector = (delegate) => FaceDetector.createFromOptions(wasmFileset, {
           baseOptions: {
             modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',
-            delegate: 'GPU',
+            delegate,
           },
           runningMode: 'IMAGE',
           minDetectionConfidence: 0.4,
         });
+        try {
+          S.detector = await createDetector('GPU');
+        } catch (_) {
+          S.detector = await createDetector('CPU');
+        }
         S.modelReady = true;
         modelStatus.textContent = 'Face detection model ready.';
         modelStatus.classList.add('ready');
