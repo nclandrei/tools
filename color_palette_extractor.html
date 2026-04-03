@@ -49,18 +49,15 @@
     position: relative;
     border: 1px solid var(--border);
     border-radius: 8px;
-    overflow: hidden;
     background: var(--surface-alt);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    text-align: center;
     cursor: none;
   }
   .image-wrap img {
     display: block;
     max-width: 100%;
     max-height: 500px;
-    object-fit: contain;
+    margin: 0 auto;
   }
   .image-wrap canvas.hidden-canvas {
     display: none;
@@ -97,7 +94,7 @@
 
   /* Loupe */
   .loupe {
-    position: absolute;
+    position: fixed;
     width: 140px;
     height: 140px;
     border-radius: 50%;
@@ -396,11 +393,11 @@
     <div class="image-wrap" id="imageWrap">
       <img id="preview" alt="Loaded image">
       <canvas id="hiddenCanvas" class="hidden-canvas"></canvas>
-      <div class="loupe" id="loupe">
-        <canvas id="loupeCanvas" width="140" height="140"></canvas>
-        <div class="loupe-crosshair"></div>
-        <div class="loupe-info" id="loupeInfo">#000000</div>
-      </div>
+    </div>
+    <div class="loupe" id="loupe">
+      <canvas id="loupeCanvas" width="140" height="140"></canvas>
+      <div class="loupe-crosshair"></div>
+      <div class="loupe-info" id="loupeInfo">#000000</div>
     </div>
     <div class="image-info">
       <span class="file-name" id="fileName"></span>
@@ -725,32 +722,13 @@ imageWrap.addEventListener('mouseleave', onImageMouseLeave);
 imageWrap.addEventListener('click', onImageClick);
 
 function getImagePixelCoords(e) {
-  const img = preview;
-  const rect = img.getBoundingClientRect();
-  // Calculate the actual displayed image area (accounting for object-fit: contain)
-  const imgAspect = loadedImage.naturalWidth / loadedImage.naturalHeight;
-  const boxAspect = rect.width / rect.height;
-  let displayW, displayH, offsetX, offsetY;
-  if (imgAspect > boxAspect) {
-    displayW = rect.width;
-    displayH = rect.width / imgAspect;
-    offsetX = 0;
-    offsetY = (rect.height - displayH) / 2;
-  } else {
-    displayH = rect.height;
-    displayW = rect.height * imgAspect;
-    offsetX = (rect.width - displayW) / 2;
-    offsetY = 0;
-  }
-
-  const localX = e.clientX - rect.left - offsetX;
-  const localY = e.clientY - rect.top - offsetY;
-
-  if (localX < 0 || localY < 0 || localX > displayW || localY > displayH) return null;
-
-  const px = Math.floor((localX / displayW) * loadedImage.naturalWidth);
-  const py = Math.floor((localY / displayH) * loadedImage.naturalHeight);
-  return { px, py, displayW, displayH, offsetX, offsetY, rect };
+  const rect = preview.getBoundingClientRect();
+  const localX = e.clientX - rect.left;
+  const localY = e.clientY - rect.top;
+  if (localX < 0 || localY < 0 || localX > rect.width || localY > rect.height) return null;
+  const px = Math.floor((localX / rect.width) * loadedImage.naturalWidth);
+  const py = Math.floor((localY / rect.height) * loadedImage.naturalHeight);
+  return { px, py };
 }
 
 function onImageMouseMove(e) {
@@ -759,15 +737,13 @@ function onImageMouseMove(e) {
   const coords = getImagePixelCoords(e);
   if (!coords) { loupe.style.display = 'none'; return; }
 
-  const { px, py, rect } = coords;
-  const wrapRect = imageWrap.getBoundingClientRect();
+  const { px, py } = coords;
 
-  // Position loupe - offset so it doesn't overlap cursor
-  let loupeX = e.clientX - wrapRect.left + 20;
-  let loupeY = e.clientY - wrapRect.top - LOUPE_SIZE - 20;
-  // Keep loupe within bounds
-  if (loupeX + LOUPE_SIZE > wrapRect.width) loupeX = e.clientX - wrapRect.left - LOUPE_SIZE - 20;
-  if (loupeY < 0) loupeY = e.clientY - wrapRect.top + 20;
+  // Position loupe (fixed positioning — no clipping by overflow)
+  let loupeX = e.clientX + 20;
+  let loupeY = e.clientY - LOUPE_SIZE - 20;
+  if (loupeX + LOUPE_SIZE > window.innerWidth) loupeX = e.clientX - LOUPE_SIZE - 20;
+  if (loupeY < 0) loupeY = e.clientY + 20;
 
   loupe.style.display = 'block';
   loupe.style.left = loupeX + 'px';
