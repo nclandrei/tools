@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Background: large rounded square with subtle stroke for definition at small sizes -->
+  <rect x="64" y="64" width="896" height="896" rx="160" ry="160" fill="#fafaf8" stroke="#e8e5e0" stroke-width="4"/>
+
+  <!-- 3x3 grid of rounded squares -->
+  <!-- Each square: 210x210, gap: 28, total grid: 210*3 + 28*2 = 686 -->
+  <!-- Offset to center: (1024 - 686) / 2 = 169 -->
+
+  <!-- Row 1: lightest row -->
+  <rect x="169" y="169" width="210" height="210" rx="42" ry="42" fill="#a78bfa"/>
+  <rect x="407" y="169" width="210" height="210" rx="42" ry="42" fill="#c4b5fd"/>
+  <rect x="645" y="169" width="210" height="210" rx="42" ry="42" fill="#c4b5fd"/>
+
+  <!-- Row 2: mid tones, center square is the accent -->
+  <rect x="169" y="407" width="210" height="210" rx="42" ry="42" fill="#8b5cf6"/>
+  <rect x="407" y="407" width="210" height="210" rx="42" ry="42" fill="#5b21b6"/>
+  <rect x="645" y="407" width="210" height="210" rx="42" ry="42" fill="#a78bfa"/>
+
+  <!-- Row 3: deepest row -->
+  <rect x="169" y="645" width="210" height="210" rx="42" ry="42" fill="#6d28d9"/>
+  <rect x="407" y="645" width="210" height="210" rx="42" ry="42" fill="#7c3aed"/>
+  <rect x="645" y="645" width="210" height="210" rx="42" ry="42" fill="#8b5cf6"/>
+</svg>
