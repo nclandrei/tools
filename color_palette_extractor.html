@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Color Palette Extractor</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 900px; }
+
+  /* Mode tabs */
+  .mode-tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--surface-alt);
+    border-radius: 8px;
+    padding: 0.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .mode-tab {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .mode-tab:hover { color: var(--text); }
+  .mode-tab.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  /* Image display */
+  .image-area {
+    position: relative;
+    margin-bottom: 1.5rem;
+  }
+  .image-wrap {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface-alt);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: none;
+  }
+  .image-wrap img {
+    display: block;
+    max-width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+  }
+  .image-wrap canvas.hidden-canvas {
+    display: none;
+  }
+
+  .image-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .image-info .file-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 60%;
+  }
+
+  .clear-btn {
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-family: inherit;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .clear-btn:hover { color: var(--red); }
+
+  /* Loupe */
+  .loupe {
+    position: absolute;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,0,0,0.15);
+    pointer-events: none;
+    z-index: 50;
+    display: none;
+    overflow: hidden;
+    image-rendering: pixelated;
+  }
+  .loupe canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    image-rendering: pixelated;
+  }
+  .loupe-info {
+    position: absolute;
+    bottom: -32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.75);
+    color: #fff;
+    font-size: 0.68rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .loupe-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    transform: translate(-50%, -50%);
+    border: 1.5px solid rgba(255,255,255,0.8);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.3);
+    pointer-events: none;
+  }
+
+  /* Section labels */
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  /* Palette swatches */
+  .palette-section {
+    margin-bottom: 1.5rem;
+  }
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem;
+  }
+  .swatch-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  }
+  .swatch-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .swatch-color {
+    height: 64px;
+    position: relative;
+  }
+  .swatch-color .percent-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 0.62rem;
+    font-weight: 600;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+  }
+  .swatch-details {
+    padding: 0.5rem 0.65rem;
+  }
+  .swatch-name {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 0.2rem;
+  }
+  .swatch-values {
+    font-size: 0.68rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .swatch-values span {
+    display: block;
+  }
+  .copied-indicator {
+    font-size: 0.65rem;
+    color: var(--accent);
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .copied-indicator.show { opacity: 1; }
+
+  /* Eyedropper section */
+  .eyedropper-section {
+    margin-bottom: 1.5rem;
+  }
+  .eyedropper-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .picked-current {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    flex: 1;
+    min-width: 200px;
+  }
+  .picked-swatch {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .picked-values {
+    font-size: 0.78rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .picked-values span { display: block; color: var(--text-muted); font-size: 0.7rem; }
+
+  .api-notice {
+    font-size: 0.78rem;
+    color: var(--amber);
+    background: var(--amber-dim);
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+  }
+
+  /* Picked history */
+  .history-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .history-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem 0.3rem 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .history-chip:hover { border-color: var(--accent); }
+  .history-chip .chip-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.1);
+    flex-shrink: 0;
+  }
+
+  /* Export section */
+  .export-section {
+    margin-bottom: 1.5rem;
+  }
+  .export-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .export-tab {
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .export-tab:hover { border-color: var(--border-hover); color: var(--text); }
+  .export-tab.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .export-output {
+    position: relative;
+  }
+  .export-output textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    border-radius: 8px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+  .export-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  /* Toast */
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .hidden { display: none !important; }
+
+  @media (max-width: 600px) {
+    .palette-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .eyedropper-row { flex-direction: column; align-items: stretch; }
+    .picked-current { min-width: 0; }
+    .loupe { width: 110px; height: 110px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Color Palette Extractor</h1>
+    <a href="/">&#8592; All tools</a>
+  </header>
+
+  <p class="desc">Extract dominant colors from images and pick colors with a magnifying loupe. Export as CSS variables, Tailwind config, or PNG.</p>
+
+  <!-- Mode tabs -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="extract" id="tabExtract">Palette Extraction</button>
+    <button class="mode-tab" data-mode="picker" id="tabPicker">Eyedropper / Picker</button>
+  </div>
+
+  <!-- Drop zone -->
+  <div class="drop-zone" id="dropZone">
+    <span class="icon">&#127912;</span>
+    <p>Drop an image here or click to select</p>
+    <input type="file" accept="image/*" id="fileInput" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+  </div>
+
+  <!-- Image display (shared) -->
+  <div class="image-area hidden" id="imageArea">
+    <div class="image-wrap" id="imageWrap">
+      <img id="preview" alt="Loaded image">
+      <canvas id="hiddenCanvas" class="hidden-canvas"></canvas>
+      <div class="loupe" id="loupe">
+        <canvas id="loupeCanvas" width="140" height="140"></canvas>
+        <div class="loupe-crosshair"></div>
+        <div class="loupe-info" id="loupeInfo">#000000</div>
+      </div>
+    </div>
+    <div class="image-info">
+      <span class="file-name" id="fileName"></span>
+      <span id="imageDims"></span>
+      <button class="clear-btn" id="clearBtn">Clear image</button>
+    </div>
+  </div>
+
+  <!-- ====== EXTRACT MODE ====== -->
+  <div id="extractPanel">
+    <div class="palette-section hidden" id="paletteSection">
+      <div class="section-label">Extracted Palette</div>
+      <div class="palette-grid" id="paletteGrid"></div>
+    </div>
+  </div>
+
+  <!-- ====== PICKER MODE ====== -->
+  <div id="pickerPanel" class="hidden">
+    <div class="eyedropper-section">
+      <div class="section-label">Color Picker</div>
+      <div id="apiNotice" class="api-notice hidden">
+        Your browser does not support the EyeDropper API. You can still pick colors from the loaded image using the magnifying loupe.
+      </div>
+      <div class="eyedropper-row">
+        <button class="btn btn-primary" id="eyedropperBtn">Pick from screen</button>
+        <div class="picked-current" id="pickedCurrent">
+          <div class="picked-swatch" id="pickedSwatch" style="background: var(--surface-alt);"></div>
+          <div class="picked-values" id="pickedValues">
+            <div style="color:var(--text-muted); font-size: 0.78rem;">Hover over image or pick from screen</div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:1rem;">Hover over the loaded image to see a magnified loupe. Click to pick a color.</p>
+    </div>
+
+    <div class="palette-section hidden" id="historySection">
+      <div class="section-label">Picked Colors</div>
+      <div class="palette-grid" id="historyGrid"></div>
+    </div>
+  </div>
+
+  <!-- ====== EXPORT (shared) ====== -->
+  <div class="export-section hidden" id="exportSection">
+    <div class="section-label">Export Palette</div>
+    <div class="export-tabs">
+      <button class="export-tab active" data-format="css">CSS Variables</button>
+      <button class="export-tab" data-format="tailwind">Tailwind Config</button>
+      <button class="export-tab" data-format="text">Plain Text</button>
+    </div>
+    <div class="export-output">
+      <textarea id="exportOutput" readonly></textarea>
+    </div>
+    <div class="export-actions">
+      <button class="btn btn-secondary" id="copyExportBtn">Copy to clipboard</button>
+      <button class="btn btn-secondary" id="downloadPngBtn">Download PNG swatch</button>
+    </div>
+  </div>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script>
+// ── CSS Named Colors (148 colors) ──
+const CSS_COLORS = {"aliceblue":[240,248,255],"antiquewhite":[250,235,215],"aqua":[0,255,255],"aquamarine":[127,255,212],"azure":[240,255,255],"beige":[245,245,220],"bisque":[255,228,196],"black":[0,0,0],"blanchedalmond":[255,235,205],"blue":[0,0,255],"blueviolet":[138,43,226],"brown":[165,42,42],"burlywood":[222,184,135],"cadetblue":[95,158,160],"chartreuse":[127,255,0],"chocolate":[210,105,30],"coral":[255,127,80],"cornflowerblue":[100,149,237],"cornsilk":[255,248,220],"crimson":[220,20,60],"cyan":[0,255,255],"darkblue":[0,0,139],"darkcyan":[0,139,139],"darkgoldenrod":[184,134,11],"darkgray":[169,169,169],"darkgreen":[0,100,0],"darkkhaki":[189,183,107],"darkmagenta":[139,0,139],"darkolivegreen":[85,107,47],"darkorange":[255,140,0],"darkorchid":[153,50,204],"darkred":[139,0,0],"darksalmon":[233,150,122],"darkseagreen":[143,188,143],"darkslateblue":[72,61,139],"darkslategray":[47,79,79],"darkturquoise":[0,206,209],"darkviolet":[148,0,211],"deeppink":[255,20,147],"deepskyblue":[0,191,255],"dimgray":[105,105,105],"dodgerblue":[30,144,255],"firebrick":[178,34,34],"floralwhite":[255,250,240],"forestgreen":[34,139,34],"fuchsia":[255,0,255],"gainsboro":[220,220,220],"ghostwhite":[248,248,255],"gold":[255,215,0],"goldenrod":[218,165,32],"gray":[128,128,128],"green":[0,128,0],"greenyellow":[173,255,47],"honeydew":[240,255,240],"hotpink":[255,105,180],"indianred":[205,92,92],"indigo":[75,0,130],"ivory":[255,255,240],"khaki":[240,230,140],"lavender":[230,230,250],"lavenderblush":[255,240,245],"lawngreen":[124,252,0],"lemonchiffon":[255,250,205],"lightblue":[173,216,230],"lightcoral":[240,128,128],"lightcyan":[224,255,255],"lightgoldenrodyellow":[250,250,210],"lightgray":[211,211,211],"lightgreen":[144,238,144],"lightpink":[255,182,193],"lightsalmon":[255,160,122],"lightseagreen":[32,178,170],"lightskyblue":[135,206,250],"lightslategray":[119,136,153],"lightsteelblue":[176,196,222],"lightyellow":[255,255,224],"lime":[0,255,0],"limegreen":[50,205,50],"linen":[250,240,230],"magenta":[255,0,255],"maroon":[128,0,0],"mediumaquamarine":[102,205,170],"mediumblue":[0,0,205],"mediumorchid":[186,85,211],"mediumpurple":[147,111,219],"mediumseagreen":[60,179,113],"mediumslateblue":[123,104,238],"mediumspringgreen":[0,250,154],"mediumturquoise":[72,209,204],"mediumvioletred":[199,21,133],"midnightblue":[25,25,112],"mintcream":[245,255,250],"mistyrose":[255,228,225],"moccasin":[255,228,181],"navajowhite":[255,222,173],"navy":[0,0,128],"oldlace":[253,245,230],"olive":[128,128,0],"olivedrab":[107,142,35],"orange":[255,165,0],"orangered":[255,69,0],"orchid":[218,112,214],"palegoldenrod":[238,232,170],"palegreen":[152,251,152],"paleturquoise":[175,238,238],"palevioletred":[219,112,147],"papayawhip":[255,239,213],"peachpuff":[255,218,185],"peru":[205,133,63],"pink":[255,192,203],"plum":[221,160,221],"powderblue":[176,224,230],"purple":[128,0,128],"rebeccapurple":[102,51,153],"red":[255,0,0],"rosybrown":[188,143,143],"royalblue":[65,105,225],"saddlebrown":[139,69,19],"salmon":[250,128,114],"sandybrown":[244,164,96],"seagreen":[46,139,87],"seashell":[255,245,238],"sienna":[160,82,45],"silver":[192,192,192],"skyblue":[135,206,235],"slateblue":[106,90,205],"slategray":[112,128,144],"snow":[255,250,250],"springgreen":[0,255,127],"steelblue":[70,130,180],"tan":[210,180,140],"teal":[0,128,128],"thistle":[216,191,216],"tomato":[255,99,71],"turquoise":[64,224,208],"violet":[238,130,238],"wheat":[245,222,179],"white":[255,255,255],"whitesmoke":[245,245,245],"yellow":[255,255,0],"yellowgreen":[154,205,50]};
+
+function closestColorName(r, g, b) {
+  let best = '', bestDist = Infinity;
+  for (const [name, [cr, cg, cb]] of Object.entries(CSS_COLORS)) {
+    const d = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
+    if (d < bestDist) { bestDist = d; best = name; }
+  }
+  return best;
+}
+
+// ── Color conversion ──
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(c => Math.round(Math.max(0, Math.min(255, c))).toString(16).padStart(2, '0')).join('');
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) {
+    h = s = 0;
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+// ── Median Cut Color Quantization ──
+function extractPalette(imageData, colorCount) {
+  const data = imageData.data;
+  const pixels = [];
+  // Sample pixels (skip every 4th for performance on large images)
+  const step = data.length > 1000000 ? 16 : 4;
+  for (let i = 0; i < data.length; i += step) {
+    const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+    if (a < 128) continue; // skip transparent
+    pixels.push([r, g, b]);
+  }
+  if (pixels.length === 0) return [];
+
+  function getRange(bucket, channel) {
+    let min = 255, max = 0;
+    for (const px of bucket) {
+      if (px[channel] < min) min = px[channel];
+      if (px[channel] > max) max = px[channel];
+    }
+    return max - min;
+  }
+
+  function medianCut(bucket, depth) {
+    if (depth === 0 || bucket.length === 0) {
+      // Average the bucket
+      let rSum = 0, gSum = 0, bSum = 0;
+      for (const px of bucket) { rSum += px[0]; gSum += px[1]; bSum += px[2]; }
+      const n = bucket.length;
+      return [{ r: Math.round(rSum / n), g: Math.round(gSum / n), b: Math.round(bSum / n), count: n }];
+    }
+
+    // Find the channel with the greatest range
+    const rRange = getRange(bucket, 0);
+    const gRange = getRange(bucket, 1);
+    const bRange = getRange(bucket, 2);
+    let ch = 0;
+    if (gRange >= rRange && gRange >= bRange) ch = 1;
+    else if (bRange >= rRange && bRange >= gRange) ch = 2;
+
+    // Sort by that channel
+    bucket.sort((a, b) => a[ch] - b[ch]);
+    const mid = Math.floor(bucket.length / 2);
+
+    return [
+      ...medianCut(bucket.slice(0, mid), depth - 1),
+      ...medianCut(bucket.slice(mid), depth - 1)
+    ];
+  }
+
+  const depth = Math.ceil(Math.log2(colorCount));
+  let palette = medianCut(pixels, depth);
+
+  // Sort by count descending
+  palette.sort((a, b) => b.count - a.count);
+
+  // Take top N and calculate percentages
+  const totalPixels = pixels.length;
+  palette = palette.slice(0, colorCount);
+  const paletteTotal = palette.reduce((s, c) => s + c.count, 0);
+  return palette.map(c => ({
+    r: c.r, g: c.g, b: c.b,
+    percent: Math.round((c.count / paletteTotal) * 100)
+  }));
+}
+
+// ── State ──
+let currentMode = 'extract';
+let loadedImage = null;
+let imageCanvas = null;
+let imageCtx = null;
+let currentPalette = [];     // from extraction
+let pickedHistory = [];       // from eyedropper
+let currentExportFormat = 'css';
+let hasEyeDropper = typeof window.EyeDropper !== 'undefined';
+
+// ── DOM refs ──
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const imageArea = document.getElementById('imageArea');
+const imageWrap = document.getElementById('imageWrap');
+const preview = document.getElementById('preview');
+const hiddenCanvas = document.getElementById('hiddenCanvas');
+const fileName = document.getElementById('fileName');
+const imageDims = document.getElementById('imageDims');
+const clearBtn = document.getElementById('clearBtn');
+const paletteSection = document.getElementById('paletteSection');
+const paletteGrid = document.getElementById('paletteGrid');
+const extractPanel = document.getElementById('extractPanel');
+const pickerPanel = document.getElementById('pickerPanel');
+const historySection = document.getElementById('historySection');
+const historyGrid = document.getElementById('historyGrid');
+const exportSection = document.getElementById('exportSection');
+const exportOutput = document.getElementById('exportOutput');
+const loupe = document.getElementById('loupe');
+const loupeCanvas = document.getElementById('loupeCanvas');
+const loupeInfo = document.getElementById('loupeInfo');
+const eyedropperBtn = document.getElementById('eyedropperBtn');
+const pickedSwatch = document.getElementById('pickedSwatch');
+const pickedValues = document.getElementById('pickedValues');
+const apiNotice = document.getElementById('apiNotice');
+const toast = document.getElementById('toast');
+
+const loupeCtx = loupeCanvas.getContext('2d');
+
+// ── Mode switching ──
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentMode = tab.dataset.mode;
+    updatePanels();
+  });
+});
+
+function updatePanels() {
+  extractPanel.classList.toggle('hidden', currentMode !== 'extract');
+  pickerPanel.classList.toggle('hidden', currentMode !== 'picker');
+  updateExportVisibility();
+}
+
+function updateExportVisibility() {
+  const palette = getActivePalette();
+  exportSection.classList.toggle('hidden', palette.length === 0);
+  if (palette.length > 0) updateExportOutput();
+}
+
+function getActivePalette() {
+  return currentMode === 'extract' ? currentPalette : pickedHistory;
+}
+
+// ── File handling ──
+dropZone.addEventListener('click', () => fileInput.click());
+['dragenter', 'dragover'].forEach(e => dropZone.addEventListener(e, ev => {
+  ev.preventDefault(); ev.stopPropagation(); dropZone.classList.add('dragover');
+}));
+['dragleave', 'drop'].forEach(e => dropZone.addEventListener(e, ev => {
+  ev.stopPropagation(); dropZone.classList.remove('dragover');
+}));
+dropZone.addEventListener('drop', ev => {
+  ev.preventDefault();
+  const file = ev.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadFile(file);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) { loadFile(fileInput.files[0]); fileInput.value = ''; }
+});
+
+clearBtn.addEventListener('click', () => {
+  loadedImage = null;
+  imageCanvas = null;
+  imageCtx = null;
+  currentPalette = [];
+  imageArea.classList.add('hidden');
+  dropZone.classList.remove('hidden');
+  paletteSection.classList.add('hidden');
+  exportSection.classList.add('hidden');
+});
+
+function loadFile(file) {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    loadedImage = img;
+    preview.src = img.src;
+    fileName.textContent = file.name;
+    imageDims.textContent = img.naturalWidth + ' x ' + img.naturalHeight;
+
+    // Draw to hidden canvas for pixel access
+    hiddenCanvas.width = img.naturalWidth;
+    hiddenCanvas.height = img.naturalHeight;
+    imageCtx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
+    imageCtx.drawImage(img, 0, 0);
+
+    dropZone.classList.add('hidden');
+    imageArea.classList.remove('hidden');
+
+    if (currentMode === 'extract') runExtraction();
+  };
+  img.src = url;
+}
+
+// ── Palette extraction ──
+function runExtraction() {
+  if (!imageCtx) return;
+  const imgData = imageCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height);
+  currentPalette = extractPalette(imgData, 8);
+  renderPaletteSwatches();
+  paletteSection.classList.remove('hidden');
+  updateExportVisibility();
+}
+
+function renderPaletteSwatches() {
+  paletteGrid.innerHTML = '';
+  currentPalette.forEach(color => {
+    const hex = rgbToHex(color.r, color.g, color.b);
+    const hsl = rgbToHsl(color.r, color.g, color.b);
+    const name = closestColorName(color.r, color.g, color.b);
+
+    const card = document.createElement('div');
+    card.className = 'swatch-card';
+    card.onclick = () => copyToClipboard(hex);
+    card.innerHTML =
+      '<div class="swatch-color" style="background:' + hex + '">' +
+        '<span class="percent-badge">' + color.percent + '%</span>' +
+      '</div>' +
+      '<div class="swatch-details">' +
+        '<div class="swatch-name">' + name + '</div>' +
+        '<div class="swatch-values">' +
+          '<span>' + hex + '</span>' +
+          '<span>rgb(' + color.r + ', ' + color.g + ', ' + color.b + ')</span>' +
+          '<span>hsl(' + hsl.h + ', ' + hsl.s + '%, ' + hsl.l + '%)</span>' +
+        '</div>' +
+      '</div>';
+    paletteGrid.appendChild(card);
+  });
+}
+
+// ── Loupe (magnifier on image hover) ──
+const LOUPE_SIZE = 140;
+const LOUPE_ZOOM = 8;
+const LOUPE_RADIUS = LOUPE_SIZE / 2;
+
+imageWrap.addEventListener('mousemove', onImageMouseMove);
+imageWrap.addEventListener('mouseleave', onImageMouseLeave);
+imageWrap.addEventListener('click', onImageClick);
+
+function getImagePixelCoords(e) {
+  const img = preview;
+  const rect = img.getBoundingClientRect();
+  // Calculate the actual displayed image area (accounting for object-fit: contain)
+  const imgAspect = loadedImage.naturalWidth / loadedImage.naturalHeight;
+  const boxAspect = rect.width / rect.height;
+  let displayW, displayH, offsetX, offsetY;
+  if (imgAspect > boxAspect) {
+    displayW = rect.width;
+    displayH = rect.width / imgAspect;
+    offsetX = 0;
+    offsetY = (rect.height - displayH) / 2;
+  } else {
+    displayH = rect.height;
+    displayW = rect.height * imgAspect;
+    offsetX = (rect.width - displayW) / 2;
+    offsetY = 0;
+  }
+
+  const localX = e.clientX - rect.left - offsetX;
+  const localY = e.clientY - rect.top - offsetY;
+
+  if (localX < 0 || localY < 0 || localX > displayW || localY > displayH) return null;
+
+  const px = Math.floor((localX / displayW) * loadedImage.naturalWidth);
+  const py = Math.floor((localY / displayH) * loadedImage.naturalHeight);
+  return { px, py, displayW, displayH, offsetX, offsetY, rect };
+}
+
+function onImageMouseMove(e) {
+  if (!loadedImage || !imageCtx) return;
+  // Always show loupe when hovering over the image in both modes, but clicking to pick only in picker mode
+  const coords = getImagePixelCoords(e);
+  if (!coords) { loupe.style.display = 'none'; return; }
+
+  const { px, py, rect } = coords;
+  const wrapRect = imageWrap.getBoundingClientRect();
+
+  // Position loupe - offset so it doesn't overlap cursor
+  let loupeX = e.clientX - wrapRect.left + 20;
+  let loupeY = e.clientY - wrapRect.top - LOUPE_SIZE - 20;
+  // Keep loupe within bounds
+  if (loupeX + LOUPE_SIZE > wrapRect.width) loupeX = e.clientX - wrapRect.left - LOUPE_SIZE - 20;
+  if (loupeY < 0) loupeY = e.clientY - wrapRect.top + 20;
+
+  loupe.style.display = 'block';
+  loupe.style.left = loupeX + 'px';
+  loupe.style.top = loupeY + 'px';
+
+  // Draw zoomed region
+  const srcSize = Math.floor(LOUPE_SIZE / LOUPE_ZOOM);
+  const sx = Math.max(0, Math.min(px - Math.floor(srcSize / 2), loadedImage.naturalWidth - srcSize));
+  const sy = Math.max(0, Math.min(py - Math.floor(srcSize / 2), loadedImage.naturalHeight - srcSize));
+
+  loupeCtx.clearRect(0, 0, LOUPE_SIZE, LOUPE_SIZE);
+  loupeCtx.imageSmoothingEnabled = false;
+  loupeCtx.drawImage(
+    hiddenCanvas,
+    sx, sy, srcSize, srcSize,
+    0, 0, LOUPE_SIZE, LOUPE_SIZE
+  );
+
+  // Get pixel color
+  const pixelData = imageCtx.getImageData(
+    Math.min(px, loadedImage.naturalWidth - 1),
+    Math.min(py, loadedImage.naturalHeight - 1),
+    1, 1
+  ).data;
+  const hex = rgbToHex(pixelData[0], pixelData[1], pixelData[2]);
+  loupeInfo.textContent = hex;
+
+  // Update picker current display if in picker mode
+  if (currentMode === 'picker') {
+    pickedSwatch.style.background = hex;
+    const hsl = rgbToHsl(pixelData[0], pixelData[1], pixelData[2]);
+    pickedValues.innerHTML =
+      '<div>' + hex + '</div>' +
+      '<span>rgb(' + pixelData[0] + ', ' + pixelData[1] + ', ' + pixelData[2] + ')</span>' +
+      '<span>hsl(' + hsl.h + ', ' + hsl.s + '%, ' + hsl.l + '%)</span>';
+  }
+}
+
+function onImageMouseLeave() {
+  loupe.style.display = 'none';
+}
+
+function onImageClick(e) {
+  if (!loadedImage || !imageCtx) return;
+  // Only pick colors in picker mode
+  if (currentMode !== 'picker') return;
+
+  const coords = getImagePixelCoords(e);
+  if (!coords) return;
+
+  const pixelData = imageCtx.getImageData(
+    Math.min(coords.px, loadedImage.naturalWidth - 1),
+    Math.min(coords.py, loadedImage.naturalHeight - 1),
+    1, 1
+  ).data;
+
+  addPickedColor(pixelData[0], pixelData[1], pixelData[2]);
+}
+
+// ── EyeDropper API ──
+if (!hasEyeDropper) {
+  apiNotice.classList.remove('hidden');
+  eyedropperBtn.disabled = true;
+  eyedropperBtn.title = 'EyeDropper API not supported in this browser';
+}
+
+eyedropperBtn.addEventListener('click', async () => {
+  if (!hasEyeDropper) return;
+  try {
+    const dropper = new EyeDropper();
+    const result = await dropper.open();
+    const hex = result.sRGBHex;
+    // Parse hex to rgb
+    const n = parseInt(hex.replace('#', ''), 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    addPickedColor(r, g, b);
+    pickedSwatch.style.background = hex;
+    const hsl = rgbToHsl(r, g, b);
+    pickedValues.innerHTML =
+      '<div>' + hex + '</div>' +
+      '<span>rgb(' + r + ', ' + g + ', ' + b + ')</span>' +
+      '<span>hsl(' + hsl.h + ', ' + hsl.s + '%, ' + hsl.l + '%)</span>';
+  } catch (e) {
+    // User cancelled
+  }
+});
+
+function addPickedColor(r, g, b) {
+  const hex = rgbToHex(r, g, b);
+  // Avoid consecutive duplicates
+  if (pickedHistory.length > 0) {
+    const last = pickedHistory[pickedHistory.length - 1];
+    if (last.r === r && last.g === g && last.b === b) return;
+  }
+  pickedHistory.push({ r, g, b, percent: 0 });
+  renderHistoryGrid();
+  updateExportVisibility();
+}
+
+function renderHistoryGrid() {
+  historyGrid.innerHTML = '';
+  if (pickedHistory.length === 0) { historySection.classList.add('hidden'); return; }
+  historySection.classList.remove('hidden');
+
+  pickedHistory.forEach((color, idx) => {
+    const hex = rgbToHex(color.r, color.g, color.b);
+    const hsl = rgbToHsl(color.r, color.g, color.b);
+    const name = closestColorName(color.r, color.g, color.b);
+
+    const card = document.createElement('div');
+    card.className = 'swatch-card';
+    card.onclick = () => copyToClipboard(hex);
+    card.innerHTML =
+      '<div class="swatch-color" style="background:' + hex + '">' +
+        '<button class="remove-pick" data-idx="' + idx + '" style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,0.45);color:#fff;font-size:0.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">&times;</button>' +
+      '</div>' +
+      '<div class="swatch-details">' +
+        '<div class="swatch-name">' + name + '</div>' +
+        '<div class="swatch-values">' +
+          '<span>' + hex + '</span>' +
+          '<span>rgb(' + color.r + ', ' + color.g + ', ' + color.b + ')</span>' +
+          '<span>hsl(' + hsl.h + ', ' + hsl.s + '%, ' + hsl.l + '%)</span>' +
+        '</div>' +
+      '</div>';
+    paletteGrid.appendChild(card);
+    historyGrid.appendChild(card);
+  });
+
+  // Wire up remove buttons
+  historyGrid.querySelectorAll('.remove-pick').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      pickedHistory.splice(parseInt(btn.dataset.idx), 1);
+      renderHistoryGrid();
+      updateExportVisibility();
+    });
+  });
+}
+
+// ── Export ──
+document.querySelectorAll('.export-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.export-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentExportFormat = tab.dataset.format;
+    updateExportOutput();
+  });
+});
+
+function updateExportOutput() {
+  const palette = getActivePalette();
+  if (palette.length === 0) { exportOutput.value = ''; return; }
+
+  if (currentExportFormat === 'css') {
+    const lines = palette.map((c, i) => {
+      const hex = rgbToHex(c.r, c.g, c.b);
+      const name = closestColorName(c.r, c.g, c.b).replace(/\s+/g, '-');
+      return '  --color-' + (i + 1) + '-' + name + ': ' + hex + ';';
+    });
+    exportOutput.value = ':root {\n' + lines.join('\n') + '\n}';
+  } else if (currentExportFormat === 'tailwind') {
+    const entries = palette.map((c, i) => {
+      const hex = rgbToHex(c.r, c.g, c.b);
+      const name = closestColorName(c.r, c.g, c.b).replace(/\s+/g, '-');
+      return "      '" + name + '-' + (i + 1) + "': '" + hex + "',";
+    });
+    exportOutput.value = "module.exports = {\n  theme: {\n    extend: {\n      colors: {\n" + entries.join('\n') + "\n      },\n    },\n  },\n};";
+  } else {
+    const lines = palette.map(c => {
+      const hex = rgbToHex(c.r, c.g, c.b);
+      const hsl = rgbToHsl(c.r, c.g, c.b);
+      const name = closestColorName(c.r, c.g, c.b);
+      return hex + '  rgb(' + c.r + ', ' + c.g + ', ' + c.b + ')  hsl(' + hsl.h + ', ' + hsl.s + '%, ' + hsl.l + '%)  ' + name;
+    });
+    exportOutput.value = lines.join('\n');
+  }
+}
+
+document.getElementById('copyExportBtn').addEventListener('click', () => {
+  copyToClipboard(exportOutput.value);
+});
+
+// ── Download PNG swatch ──
+document.getElementById('downloadPngBtn').addEventListener('click', () => {
+  const palette = getActivePalette();
+  if (palette.length === 0) return;
+
+  const swatchW = 120;
+  const swatchH = 120;
+  const labelH = 28;
+  const cols = Math.min(palette.length, 8);
+  const rows = Math.ceil(palette.length / cols);
+  const canvasW = cols * swatchW;
+  const canvasH = rows * (swatchH + labelH);
+
+  const c = document.createElement('canvas');
+  c.width = canvasW;
+  c.height = canvasH;
+  const ctx = c.getContext('2d');
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  palette.forEach((color, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = col * swatchW;
+    const y = row * (swatchH + labelH);
+    const hex = rgbToHex(color.r, color.g, color.b);
+
+    ctx.fillStyle = hex;
+    ctx.fillRect(x, y, swatchW, swatchH);
+
+    ctx.fillStyle = '#333333';
+    ctx.font = '500 12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(hex, x + swatchW / 2, y + swatchH + 18);
+  });
+
+  const a = document.createElement('a');
+  a.href = c.toDataURL('image/png');
+  a.download = 'palette.png';
+  a.click();
+});
+
+// ── Copy to clipboard ──
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    toast.textContent = 'Copied: ' + text.substring(0, 40) + (text.length > 40 ? '...' : '');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+
+// ── Trigger extraction when switching to extract mode with image loaded ──
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    if (currentMode === 'extract' && loadedImage && currentPalette.length === 0) {
+      runExtraction();
+    }
+  });
+});
+
+// ── Init ──
+updatePanels();
+</script>
+</body>
+</html>
