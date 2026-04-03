@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UUID / ULID Generator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 680px; }
+
+  /* Format tabs */
+  .format-tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    margin-bottom: 1.25rem;
+  }
+
+  .format-tab {
+    flex: 1;
+    padding: 7px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .format-tab.active { background: var(--accent); color: #fff; }
+  .format-tab:not(.active):hover { color: var(--text); }
+
+  /* Controls row */
+  .controls {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .control-group label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .control-group select,
+  .control-group input[type="number"],
+  .control-group input[type="text"] {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+    border-radius: 6px;
+  }
+
+  .control-group input[type="number"] { width: 60px; }
+  .control-group input[type="text"] { width: 160px; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+
+  .controls .btn { flex-shrink: 0; }
+
+  /* Nano ID specific */
+  .nano-options {
+    display: none;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .nano-options.visible { display: flex; }
+
+  /* Toggle switch */
+  .toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .toggle {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background: var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: none;
+    padding: 0;
+  }
+
+  .toggle.on { background: var(--accent); }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.15s;
+  }
+
+  .toggle.on::after { transform: translateX(16px); }
+
+  /* Results */
+  .results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .id-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .id-item:hover { border-color: var(--accent); }
+
+  .id-value {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.82rem;
+    word-break: break-all;
+    line-height: 1.5;
+    color: var(--text);
+  }
+
+  .id-copy {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .id-copy:hover { color: var(--accent); background: var(--accent-dim); }
+
+  /* Details panel */
+  .details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 0.85rem;
+    margin-bottom: 1.5rem;
+    display: none;
+  }
+
+  .details.visible { display: block; }
+
+  .details-title {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.25rem 0;
+    font-size: 0.82rem;
+  }
+
+  .detail-label { color: var(--text-muted); }
+
+  .detail-value {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.78rem;
+    color: var(--text);
+    text-align: right;
+  }
+
+  /* History */
+  .history-section {
+    margin-top: 2rem;
+  }
+
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .history-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .history-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .history-clear:hover { color: var(--red); }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 0.78rem;
+  }
+
+  .history-item:hover { background: var(--surface-alt); }
+
+  .history-type {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    min-width: 48px;
+  }
+
+  .history-value {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .history-empty {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 1rem;
+  }
+
+  /* Copy all button */
+  .copy-all-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Toast */
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>UUID / ULID Generator</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Generate UUID v4, UUID v7, ULID, and Nano ID. Click any ID to copy. All randomness uses crypto.getRandomValues().</p>
+
+  <div class="format-tabs">
+    <button class="format-tab active" data-format="uuidv4" onclick="setFormat('uuidv4')">UUID v4</button>
+    <button class="format-tab" data-format="uuidv7" onclick="setFormat('uuidv7')">UUID v7</button>
+    <button class="format-tab" data-format="ulid" onclick="setFormat('ulid')">ULID</button>
+    <button class="format-tab" data-format="nanoid" onclick="setFormat('nanoid')">Nano ID</button>
+  </div>
+
+  <div class="controls">
+    <div class="control-group">
+      <label for="count">Count</label>
+      <input type="number" id="count" min="1" max="100" value="1">
+    </div>
+    <div class="control-group toggle-wrap" id="case-toggle-wrap">
+      <label>Uppercase</label>
+      <button class="toggle" id="case-toggle" onclick="toggleCase()" aria-label="Toggle uppercase"></button>
+    </div>
+    <button class="btn btn-primary" onclick="generate()">Generate</button>
+  </div>
+
+  <div class="nano-options" id="nano-options">
+    <div class="control-group">
+      <label for="nano-length">Length</label>
+      <input type="number" id="nano-length" min="1" max="256" value="21">
+    </div>
+    <div class="control-group">
+      <label for="nano-alphabet">Alphabet</label>
+      <select id="nano-alphabet" onchange="updateCustomAlphabet()">
+        <option value="default">Default (A-Za-z0-9_-)</option>
+        <option value="alphanumeric">Alphanumeric (A-Za-z0-9)</option>
+        <option value="hex">Hexadecimal (0-9a-f)</option>
+        <option value="numbers">Numbers (0-9)</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div class="control-group" id="custom-alphabet-wrap" style="display:none">
+      <label for="custom-alphabet">Chars</label>
+      <input type="text" id="custom-alphabet" value="abcdef0123456789" placeholder="Custom characters">
+    </div>
+  </div>
+
+  <div class="copy-all-row" id="copy-all-row" style="display:none">
+    <button class="btn btn-secondary" onclick="copyAll()" style="font-size:0.78rem; padding:0.35rem 0.75rem;">Copy all</button>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <div class="details" id="details"></div>
+
+  <div class="history-section">
+    <div class="history-header">
+      <span class="history-title">History (this session)</span>
+      <button class="history-clear" onclick="clearHistory()">Clear</button>
+    </div>
+    <div class="history-list" id="history-list">
+      <div class="history-empty">No IDs generated yet.</div>
+    </div>
+  </div>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script src="/theme.js"></script>
+<script>
+// ── State ──
+let currentFormat = 'uuidv4';
+let uppercase = false;
+let generatedIds = [];
+let history = [];
+
+// ── ULID encoding table (Crockford's Base32) ──
+const ULID_CHARS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+// ── Nano ID alphabets ──
+const NANO_ALPHABETS = {
+  default: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-',
+  alphanumeric: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+  hex: '0123456789abcdef',
+  numbers: '0123456789'
+};
+
+// ── Crypto random helpers ──
+function getRandomBytes(n) {
+  const buf = new Uint8Array(n);
+  crypto.getRandomValues(buf);
+  return buf;
+}
+
+function getRandomBigInt(bits) {
+  const bytes = getRandomBytes(Math.ceil(bits / 8));
+  let val = 0n;
+  for (const b of bytes) val = (val << 8n) | BigInt(b);
+  // Mask to exact bit count
+  if (bits % 8 !== 0) {
+    val = val >> BigInt(8 - (bits % 8));
+  }
+  return val;
+}
+
+// ── UUID v4 ──
+function generateUUIDv4() {
+  const bytes = getRandomBytes(16);
+  // Set version 4 (0100 in bits 48-51)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  // Set variant 10xx (bits 64-65)
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  return formatUUID(bytes);
+}
+
+function formatUUID(bytes) {
+  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20, 32);
+}
+
+// ── UUID v7 ──
+function generateUUIDv7() {
+  const now = Date.now();
+  const bytes = getRandomBytes(16);
+
+  // Timestamp: 48-bit ms since Unix epoch in bytes 0-5
+  const ts = BigInt(now);
+  bytes[0] = Number((ts >> 40n) & 0xffn);
+  bytes[1] = Number((ts >> 32n) & 0xffn);
+  bytes[2] = Number((ts >> 24n) & 0xffn);
+  bytes[3] = Number((ts >> 16n) & 0xffn);
+  bytes[4] = Number((ts >> 8n) & 0xffn);
+  bytes[5] = Number(ts & 0xffn);
+
+  // Set version 7 (0111 in bits 48-51)
+  bytes[6] = (bytes[6] & 0x0f) | 0x70;
+  // Set variant 10xx (bits 64-65)
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  return formatUUID(bytes);
+}
+
+function extractUUIDv7Timestamp(uuid) {
+  const hex = uuid.replace(/-/g, '');
+  const tsHex = hex.slice(0, 12);
+  return Number(BigInt('0x' + tsHex));
+}
+
+// ── ULID ──
+function generateULID() {
+  const now = Date.now();
+  const randBytes = getRandomBytes(10);
+
+  // Encode timestamp (48 bits) in 10 chars of Crockford's Base32
+  let ts = now;
+  const timeChars = new Array(10);
+  for (let i = 9; i >= 0; i--) {
+    timeChars[i] = ULID_CHARS[ts & 0x1f];
+    ts = Math.floor(ts / 32);
+  }
+
+  // Encode 80 bits of randomness in 16 chars
+  const randChars = new Array(16);
+  // Convert 10 bytes to 80-bit number, then encode
+  let randVal = 0n;
+  for (const b of randBytes) randVal = (randVal << 8n) | BigInt(b);
+  for (let i = 15; i >= 0; i--) {
+    randChars[i] = ULID_CHARS[Number(randVal & 0x1fn)];
+    randVal = randVal >> 5n;
+  }
+
+  return timeChars.join('') + randChars.join('');
+}
+
+function extractULIDTimestamp(ulid) {
+  let ts = 0;
+  for (let i = 0; i < 10; i++) {
+    ts = ts * 32 + ULID_CHARS.indexOf(ulid[i]);
+  }
+  return ts;
+}
+
+// ── Nano ID ──
+function generateNanoID(length, alphabet) {
+  const mask = (1 << Math.ceil(Math.log2(alphabet.length))) - 1;
+  const step = Math.ceil(1.6 * mask * length / alphabet.length);
+  let id = '';
+  while (id.length < length) {
+    const bytes = getRandomBytes(step);
+    for (let i = 0; i < bytes.length && id.length < length; i++) {
+      const idx = bytes[i] & mask;
+      if (idx < alphabet.length) {
+        id += alphabet[idx];
+      }
+    }
+  }
+  return id;
+}
+
+function getNanoAlphabet() {
+  const sel = document.getElementById('nano-alphabet').value;
+  if (sel === 'custom') {
+    return document.getElementById('custom-alphabet').value || NANO_ALPHABETS.default;
+  }
+  return NANO_ALPHABETS[sel];
+}
+
+// ── Format switching ──
+function setFormat(format) {
+  currentFormat = format;
+  document.querySelectorAll('.format-tab').forEach(t => t.classList.toggle('active', t.dataset.format === format));
+
+  // Show/hide nano options
+  document.getElementById('nano-options').classList.toggle('visible', format === 'nanoid');
+
+  // Show/hide case toggle (not relevant for nano)
+  document.getElementById('case-toggle-wrap').style.display = format === 'nanoid' ? 'none' : '';
+
+  generate();
+}
+
+function toggleCase() {
+  uppercase = !uppercase;
+  document.getElementById('case-toggle').classList.toggle('on', uppercase);
+  renderResults();
+}
+
+function updateCustomAlphabet() {
+  document.getElementById('custom-alphabet-wrap').style.display =
+    document.getElementById('nano-alphabet').value === 'custom' ? '' : 'none';
+}
+
+// ── Generation ──
+function generate() {
+  const count = Math.max(1, Math.min(100, parseInt(document.getElementById('count').value) || 1));
+  generatedIds = [];
+
+  for (let i = 0; i < count; i++) {
+    let id;
+    switch (currentFormat) {
+      case 'uuidv4': id = generateUUIDv4(); break;
+      case 'uuidv7': id = generateUUIDv7(); break;
+      case 'ulid':   id = generateULID();   break;
+      case 'nanoid':
+        const len = Math.max(1, Math.min(256, parseInt(document.getElementById('nano-length').value) || 21));
+        id = generateNanoID(len, getNanoAlphabet());
+        break;
+    }
+    generatedIds.push(id);
+  }
+
+  // Add to history
+  generatedIds.forEach(id => {
+    history.unshift({ type: currentFormat, value: id, time: Date.now() });
+  });
+  if (history.length > 200) history.length = 200;
+
+  renderResults();
+  renderDetails();
+  renderHistory();
+}
+
+// ── Rendering ──
+function applyCase(str) {
+  if (currentFormat === 'nanoid') return str;
+  if (currentFormat === 'ulid') return uppercase ? str.toUpperCase() : str.toLowerCase();
+  return uppercase ? str.toUpperCase() : str.toLowerCase();
+}
+
+function renderResults() {
+  const el = document.getElementById('results');
+  const copyAllRow = document.getElementById('copy-all-row');
+
+  if (generatedIds.length === 0) {
+    el.innerHTML = '';
+    copyAllRow.style.display = 'none';
+    return;
+  }
+
+  copyAllRow.style.display = generatedIds.length > 1 ? 'flex' : 'none';
+
+  el.innerHTML = generatedIds.map((id, i) => {
+    const display = applyCase(id);
+    return '<div class="id-item" onclick="copyText(\'' + escAttr(display) + '\')">' +
+      '<span class="id-value">' + esc(display) + '</span>' +
+      '<button class="id-copy" onclick="event.stopPropagation(); copyText(\'' + escAttr(display) + '\')">Copy</button>' +
+    '</div>';
+  }).join('');
+}
+
+function renderDetails() {
+  const el = document.getElementById('details');
+  if (generatedIds.length === 0) { el.classList.remove('visible'); return; }
+
+  // Show details for first generated ID
+  const id = generatedIds[0];
+  let rows = '';
+
+  switch (currentFormat) {
+    case 'uuidv4':
+      rows += detailRow('Format', 'UUID v4 (RFC 9562)');
+      rows += detailRow('Version', '4 (random)');
+      rows += detailRow('Variant', 'RFC 4122 / RFC 9562');
+      rows += detailRow('Random bits', '122');
+      rows += detailRow('Total bits', '128');
+      rows += detailRow('Collision space', '2<sup>122</sup> (~5.3 &times; 10<sup>36</sup>)');
+      break;
+
+    case 'uuidv7': {
+      const ts = extractUUIDv7Timestamp(id);
+      const date = new Date(ts);
+      rows += detailRow('Format', 'UUID v7 (RFC 9562)');
+      rows += detailRow('Version', '7 (time-ordered)');
+      rows += detailRow('Variant', 'RFC 4122 / RFC 9562');
+      rows += detailRow('Timestamp', date.toISOString());
+      rows += detailRow('Unix ms', ts.toString());
+      rows += detailRow('Random bits', '62');
+      rows += detailRow('Total bits', '128');
+      break;
+    }
+
+    case 'ulid': {
+      const ts = extractULIDTimestamp(id);
+      const date = new Date(ts);
+      rows += detailRow('Format', 'ULID (Crockford Base32)');
+      rows += detailRow('Encoding', 'Crockford\'s Base32');
+      rows += detailRow('Timestamp', date.toISOString());
+      rows += detailRow('Unix ms', ts.toString());
+      rows += detailRow('Random bits', '80');
+      rows += detailRow('Total bits', '128');
+      rows += detailRow('Sortable', 'Yes (lexicographic)');
+      break;
+    }
+
+    case 'nanoid': {
+      const alphabet = getNanoAlphabet();
+      const len = parseInt(document.getElementById('nano-length').value) || 21;
+      const bitsPerChar = Math.log2(alphabet.length);
+      const totalBits = (bitsPerChar * len).toFixed(1);
+      rows += detailRow('Format', 'Nano ID');
+      rows += detailRow('Length', len.toString() + ' chars');
+      rows += detailRow('Alphabet size', alphabet.length.toString() + ' chars');
+      rows += detailRow('Bits per char', bitsPerChar.toFixed(2));
+      rows += detailRow('Entropy', totalBits + ' bits');
+      rows += detailRow('Collision space', alphabet.length + '<sup>' + len + '</sup>');
+      break;
+    }
+  }
+
+  el.innerHTML = '<div class="details-title">Format Details</div>' + rows;
+  el.classList.add('visible');
+}
+
+function detailRow(label, value) {
+  return '<div class="detail-row"><span class="detail-label">' + label + '</span><span class="detail-value">' + value + '</span></div>';
+}
+
+function renderHistory() {
+  const el = document.getElementById('history-list');
+  if (history.length === 0) {
+    el.innerHTML = '<div class="history-empty">No IDs generated yet.</div>';
+    return;
+  }
+
+  el.innerHTML = history.slice(0, 50).map(h => {
+    const display = h.type === 'nanoid' ? h.value : (uppercase ? h.value.toUpperCase() : h.value.toLowerCase());
+    const label = h.type === 'uuidv4' ? 'v4' : h.type === 'uuidv7' ? 'v7' : h.type === 'ulid' ? 'ULID' : 'Nano';
+    return '<div class="history-item" onclick="copyText(\'' + escAttr(display) + '\')">' +
+      '<span class="history-type">' + label + '</span>' +
+      '<span class="history-value">' + esc(display) + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function clearHistory() {
+  history = [];
+  renderHistory();
+}
+
+// ── Clipboard ──
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('toast');
+    toast.textContent = 'Copied';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+
+function copyAll() {
+  const all = generatedIds.map(id => applyCase(id)).join('\n');
+  copyText(all);
+}
+
+// ── Escape helpers ──
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function escAttr(s) {
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+// ── Keyboard shortcut ──
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    generate();
+  }
+});
+
+// ── Auto-generate on load ──
+generate();
+</script>
+</body>
+</html>
