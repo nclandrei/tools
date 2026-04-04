@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>macOS Icon Tool</title>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+  <style>
+    .container { max-width: 860px; }
+    header { margin-bottom: 2.5rem; animation: fadeUp .4s ease; }
+    h1 { font-size: 1.75rem; }
+
+    .drop-zone {
+      position: relative;
+      animation: fadeUp .4s ease .05s both;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .drop-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--text-muted); line-height: 1; }
+
+    /* Source preview */
+    .source-preview {
+      display: flex; align-items: center; gap: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;
+      animation: fadeUp .3s ease;
+    }
+    .source-preview img {
+      width: 72px; height: 72px; object-fit: contain;
+      border-radius: 6px; background: var(--surface-alt);
+    }
+    .source-info { flex: 1; }
+    .source-info .name { font-weight: 500; margin-bottom: .2rem; word-break: break-all; }
+    .source-info .dims { color: var(--text-muted); font-family: monospace; font-size: .85rem; }
+    .change-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      padding: .4rem .75rem; border-radius: 6px; cursor: pointer;
+      font-family: inherit; font-size: .85rem; transition: all .15s ease;
+      white-space: nowrap;
+    }
+    .change-btn:hover { border-color: var(--border-hover); color: var(--text); }
+
+    /* Detection badge */
+    .detection-badge {
+      display: inline-flex; align-items: center; gap: .35rem;
+      padding: .25rem .6rem; border-radius: 5px; font-size: .8rem;
+      margin-top: .35rem; font-weight: 500;
+    }
+    .detection-badge.rounded { background: var(--green-dim); color: var(--green); }
+    .detection-badge.not-rounded { background: var(--amber-dim); color: var(--amber); }
+
+    /* Controls */
+    .controls {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;
+      animation: fadeUp .3s ease .05s both;
+    }
+    .controls h3 { font-size: .95rem; margin-bottom: .75rem; }
+    .control-row {
+      display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+      margin-bottom: .75rem;
+    }
+    .control-row:last-child { margin-bottom: 0; }
+    .control-group { display: flex; align-items: center; gap: .5rem; }
+    .control-group > label { font-size: .85rem; color: var(--text-muted); white-space: nowrap; }
+    select, input[type="range"] {
+      padding: .4rem .6rem; font-size: .85rem; cursor: pointer;
+    }
+    input[type="range"] { width: 120px; accent-color: var(--accent); }
+    .range-val { font-family: monospace; font-size: .85rem; color: var(--text-muted); min-width: 2.5ch; }
+    .cb-label {
+      display: flex; align-items: center; gap: 4px; font-size: .85rem;
+      color: var(--text-muted); cursor: pointer; user-select: none;
+    }
+    .cb-label input { accent-color: var(--accent); cursor: pointer; }
+
+    .hint {
+      font-size: .8rem; color: var(--text-muted); line-height: 1.4;
+      margin-top: .5rem;
+    }
+
+    /* Preview */
+    .preview-section {
+      margin-bottom: 1.5rem; animation: fadeUp .3s ease .1s both;
+    }
+    .preview-section h3 { font-size: .95rem; margin-bottom: .75rem; }
+    .preview-row {
+      display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: end;
+    }
+    .preview-item { text-align: center; }
+    .preview-item canvas {
+      border-radius: 4px;
+      background: repeating-conic-gradient(var(--surface-alt) 0% 25%, transparent 0% 50%) 50% / 12px 12px;
+    }
+    .preview-label {
+      font-size: .75rem; color: var(--text-muted); margin-top: .35rem;
+      font-family: monospace;
+    }
+
+    /* Actions */
+    .actions {
+      display: flex; gap: .75rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+      animation: fadeUp .3s ease .15s both;
+    }
+
+    /* Results */
+    .results-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: .75rem;
+    }
+    .result-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden; animation: fadeUp .25s ease;
+    }
+    .result-preview {
+      aspect-ratio: 1; display: flex; align-items: center;
+      justify-content: center; padding: .5rem;
+      background: repeating-conic-gradient(var(--surface-alt) 0% 25%, transparent 0% 50%) 50% / 12px 12px;
+    }
+    .result-preview img { max-width: 100%; max-height: 100%; object-fit: contain; image-rendering: auto; }
+    .result-info { padding: .5rem .65rem; }
+    .result-label { font-size: .78rem; font-weight: 500; margin-bottom: .1rem; }
+    .result-meta {
+      font-family: monospace; font-size: .72rem; color: var(--text-muted);
+      margin-bottom: .35rem;
+    }
+    .dl-btn {
+      width: 100%; padding: .3rem; background: transparent;
+      border: 1px solid var(--border); color: var(--text-muted);
+      border-radius: 6px; cursor: pointer; font-family: inherit;
+      font-size: .76rem; transition: all .15s ease;
+    }
+    .dl-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Progress */
+    .progress-bar {
+      width: 100%; height: 4px; background: var(--surface);
+      border-radius: 2px; margin: .75rem 0; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; background: var(--accent); border-radius: 2px;
+      transition: width .15s ease; width: 0%;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 1.35rem; }
+      .control-row { flex-direction: column; align-items: stretch; }
+      .results-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+      .source-preview { flex-wrap: wrap; }
+    }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>macOS Icon Tool</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+
+  <main>
+    <p class="desc">Properly round and resize icons for macOS apps. Detects existing rounding, applies Apple's squircle mask, and sizes the icon with correct padding so it matches standard macOS apps.</p>
+
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">&#8595;</div>
+      <p>Drop an icon image here or click to browse</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div id="sourcePreview" class="source-preview" hidden>
+      <img id="sourceImg" alt="Source">
+      <div class="source-info">
+        <div class="name" id="sourceName"></div>
+        <div class="dims" id="sourceDims"></div>
+        <div id="roundedBadge"></div>
+      </div>
+      <button class="change-btn" id="changeBtn">Change</button>
+    </div>
+
+    <div id="controlsSection" hidden>
+      <div class="controls">
+        <h3>Icon Settings</h3>
+        <div class="control-row">
+          <div class="control-group">
+            <label for="applyRounding">Rounding</label>
+            <select id="applyRounding">
+              <option value="auto">Auto-detect</option>
+              <option value="always">Always round</option>
+              <option value="never">Never round</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="iconInset">Icon inset</label>
+            <input type="range" id="iconInset" min="5" max="20" value="10" step="1">
+            <span class="range-val" id="insetVal">10%</span>
+          </div>
+        </div>
+        <div class="control-row">
+          <label class="cb-label">
+            <input type="checkbox" id="addShadow"> Subtle drop shadow
+          </label>
+        </div>
+        <p class="hint">Apple's macOS icons sit inset within the canvas (~10% padding). The squircle corner radius is ~22.37% of the shape size. "Auto-detect" checks if corners are already transparent.</p>
+      </div>
+
+      <div class="preview-section" id="previewSection" hidden>
+        <h3>Preview</h3>
+        <div class="preview-row" id="previewRow"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="generateBtn">Generate .iconset</button>
+        <button class="btn btn-secondary" id="downloadZipBtn" disabled>Download .iconset ZIP</button>
+      </div>
+
+      <div class="progress-bar" id="progressBar" hidden>
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <div id="resultsSection" hidden>
+        <h3 style="margin-bottom:.75rem">Generated Icons</h3>
+        <div class="results-grid" id="resultsGrid"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// macOS .iconset filenames and pixel sizes
+const ICONSET_SIZES = [
+  { name: 'icon_16x16.png',      w: 16 },
+  { name: 'icon_16x16@2x.png',   w: 32 },
+  { name: 'icon_32x32.png',      w: 32 },
+  { name: 'icon_32x32@2x.png',   w: 64 },
+  { name: 'icon_128x128.png',    w: 128 },
+  { name: 'icon_128x128@2x.png', w: 256 },
+  { name: 'icon_256x256.png',    w: 256 },
+  { name: 'icon_256x256@2x.png', w: 512 },
+  { name: 'icon_512x512.png',    w: 512 },
+  { name: 'icon_512x512@2x.png', w: 1024 },
+];
+
+let sourceImage = null;
+let generated = [];
+
+const $ = id => document.getElementById(id);
+
+// --- Squircle path ---
+// Apple uses a continuous-curvature rounded rectangle (superellipse/squircle).
+// We approximate it with cubic Bezier curves.
+// For a shape from (x, y) with size s, corner radius r:
+function squirclePath(ctx, x, y, s, r) {
+  // k controls how "smooth" the curve is — Apple uses ~0.55-0.6 for the squircle feel
+  const k = 0.5922;  // ratio for continuous corner
+  ctx.beginPath();
+  // Start at top-left after the corner
+  ctx.moveTo(x + r, y);
+  // Top edge
+  ctx.lineTo(x + s - r, y);
+  // Top-right corner
+  ctx.bezierCurveTo(x + s - r * (1 - k), y, x + s, y + r * (1 - k), x + s, y + r);
+  // Right edge
+  ctx.lineTo(x + s, y + s - r);
+  // Bottom-right corner
+  ctx.bezierCurveTo(x + s, y + s - r * (1 - k), x + s - r * (1 - k), y + s, x + s - r, y + s);
+  // Bottom edge
+  ctx.lineTo(x + r, y + s);
+  // Bottom-left corner
+  ctx.bezierCurveTo(x + r * (1 - k), y + s, x, y + s - r * (1 - k), x, y + s - r);
+  // Left edge
+  ctx.lineTo(x, y + r);
+  // Top-left corner
+  ctx.bezierCurveTo(x, y + r * (1 - k), x + r * (1 - k), y, x + r, y);
+  ctx.closePath();
+}
+
+// --- Detect if image corners are already transparent ---
+function detectRounded(img) {
+  const size = 256; // sample at this size
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, size, size);
+  const data = ctx.getImageData(0, 0, size, size).data;
+
+  // Sample corner regions (top-left, top-right, bottom-left, bottom-right)
+  // Check a triangle of pixels in each corner
+  const sampleSize = Math.floor(size * 0.08); // ~8% of each corner
+  let transparentCount = 0;
+  let totalCount = 0;
+
+  const corners = [
+    [0, 0],                          // top-left
+    [size - sampleSize, 0],          // top-right
+    [0, size - sampleSize],          // bottom-left
+    [size - sampleSize, size - sampleSize], // bottom-right
+  ];
+
+  for (const [cx, cy] of corners) {
+    for (let dy = 0; dy < sampleSize; dy++) {
+      for (let dx = 0; dx < sampleSize; dx++) {
+        // Only check pixels within the triangle (corner area)
+        const distFromCornerX = (cx === 0) ? (sampleSize - dx) : (dx + 1);
+        const distFromCornerY = (cy === 0) ? (sampleSize - dy) : (dy + 1);
+        if (distFromCornerX + distFromCornerY > sampleSize) continue;
+
+        const px = cx + dx;
+        const py = cy + dy;
+        const idx = (py * size + px) * 4;
+        totalCount++;
+        if (data[idx + 3] < 30) transparentCount++; // alpha < 30 = transparent
+      }
+    }
+  }
+
+  // If >70% of corner pixels are transparent, the image is already rounded
+  return totalCount > 0 && (transparentCount / totalCount) > 0.7;
+}
+
+// --- Render a single icon at target size ---
+function renderIcon(img, targetSize, shouldRound, insetPercent, addShadow) {
+  const canvas = document.createElement('canvas');
+  canvas.width = targetSize;
+  canvas.height = targetSize;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const inset = targetSize * (insetPercent / 100);
+  const shapeSize = targetSize - inset * 2;
+  const shapeX = inset;
+  const shapeY = inset;
+  const cornerRadius = shapeSize * 0.2237; // Apple's squircle radius ratio
+
+  if (shouldRound) {
+    // Draw drop shadow if enabled
+    if (addShadow && targetSize >= 64) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.25)';
+      ctx.shadowBlur = targetSize * 0.03;
+      ctx.shadowOffsetY = targetSize * 0.01;
+      squirclePath(ctx, shapeX, shapeY, shapeSize, cornerRadius);
+      ctx.fillStyle = 'rgba(0,0,0,1)';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Clip to squircle and draw
+    ctx.save();
+    squirclePath(ctx, shapeX, shapeY, shapeSize, cornerRadius);
+    ctx.clip();
+    ctx.drawImage(img, shapeX, shapeY, shapeSize, shapeSize);
+    ctx.restore();
+  } else {
+    // Already rounded — just draw inset (the transparency is preserved)
+    if (addShadow && targetSize >= 64) {
+      // For pre-rounded images we approximate shadow with a squircle behind
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.25)';
+      ctx.shadowBlur = targetSize * 0.03;
+      ctx.shadowOffsetY = targetSize * 0.01;
+      squirclePath(ctx, shapeX, shapeY, shapeSize, cornerRadius);
+      ctx.fillStyle = 'rgba(0,0,0,1)';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.drawImage(img, shapeX, shapeY, shapeSize, shapeSize);
+  }
+
+  return canvas;
+}
+
+// --- UI wiring ---
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+const applyRounding = $('applyRounding');
+const iconInset = $('iconInset');
+const insetVal = $('insetVal');
+const addShadow = $('addShadow');
+
+let isRounded = false;
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    sourceImage = img;
+    $('sourceImg').src = url;
+    $('sourceName').textContent = file.name;
+    $('sourceDims').textContent = `${img.naturalWidth} \u00D7 ${img.naturalHeight}`;
+
+    isRounded = detectRounded(img);
+    const badge = $('roundedBadge');
+    if (isRounded) {
+      badge.innerHTML = '<span class="detection-badge rounded">Corners already rounded</span>';
+    } else {
+      badge.innerHTML = '<span class="detection-badge not-rounded">Corners not rounded &mdash; will apply squircle</span>';
+    }
+
+    dropZone.hidden = true;
+    $('sourcePreview').hidden = false;
+    $('controlsSection').hidden = false;
+    $('resultsSection').hidden = true;
+    $('downloadZipBtn').disabled = true;
+    generated = [];
+    updatePreview();
+  };
+  img.onerror = () => alert('Could not load image.');
+  img.src = url;
+}
+
+function shouldRound() {
+  const mode = applyRounding.value;
+  if (mode === 'always') return true;
+  if (mode === 'never') return false;
+  return !isRounded; // auto: round only if not already rounded
+}
+
+function updatePreview() {
+  if (!sourceImage) return;
+  $('previewSection').hidden = false;
+  const row = $('previewRow');
+  row.innerHTML = '';
+
+  const sizes = [512, 256, 128, 64, 32];
+  const round = shouldRound();
+  const inset = parseInt(iconInset.value);
+  const shadow = addShadow.checked;
+
+  for (const s of sizes) {
+    const canvas = renderIcon(sourceImage, s, round, inset, shadow);
+    // Display at capped visual size
+    const displaySize = Math.min(s, 128);
+    canvas.style.width = displaySize + 'px';
+    canvas.style.height = displaySize + 'px';
+
+    const item = document.createElement('div');
+    item.className = 'preview-item';
+    item.appendChild(canvas);
+    const label = document.createElement('div');
+    label.className = 'preview-label';
+    label.textContent = `${s}\u00D7${s}`;
+    item.appendChild(label);
+    row.appendChild(item);
+  }
+}
+
+iconInset.addEventListener('input', () => {
+  insetVal.textContent = iconInset.value + '%';
+  updatePreview();
+});
+applyRounding.addEventListener('change', updatePreview);
+addShadow.addEventListener('change', updatePreview);
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+$('changeBtn').addEventListener('click', () => {
+  dropZone.hidden = false;
+  $('sourcePreview').hidden = true;
+  $('controlsSection').hidden = true;
+  $('resultsSection').hidden = true;
+  sourceImage = null;
+  generated = [];
+  fileInput.value = '';
+});
+
+function canvasToBlob(canvas) {
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+async function generate() {
+  if (!sourceImage) return;
+  const round = shouldRound();
+  const inset = parseInt(iconInset.value);
+  const shadow = addShadow.checked;
+
+  $('generateBtn').disabled = true;
+  $('generateBtn').textContent = 'Generating\u2026';
+  $('progressBar').hidden = false;
+  $('progressFill').style.width = '0%';
+  generated = [];
+
+  for (let i = 0; i < ICONSET_SIZES.length; i++) {
+    const entry = ICONSET_SIZES[i];
+    await new Promise(r => setTimeout(r, 0)); // yield
+
+    const canvas = renderIcon(sourceImage, entry.w, round, inset, shadow);
+    const dataUrl = canvas.toDataURL('image/png');
+
+    generated.push({ ...entry, canvas, dataUrl });
+    $('progressFill').style.width = `${((i + 1) / ICONSET_SIZES.length) * 100}%`;
+  }
+
+  renderResults();
+  $('progressBar').hidden = true;
+  $('generateBtn').disabled = false;
+  $('generateBtn').textContent = 'Generate .iconset';
+  $('downloadZipBtn').disabled = false;
+}
+
+function renderResults() {
+  const grid = $('resultsGrid');
+  grid.innerHTML = generated.map((item, i) => `
+    <div class="result-card">
+      <div class="result-preview">
+        <img src="${item.dataUrl}" alt="${item.name}">
+      </div>
+      <div class="result-info">
+        <div class="result-label">${item.name}</div>
+        <div class="result-meta">${item.w} \u00D7 ${item.w} px</div>
+        <button class="dl-btn" data-idx="${i}">Download</button>
+      </div>
+    </div>
+  `).join('');
+  $('resultsSection').hidden = false;
+}
+
+$('resultsGrid').addEventListener('click', e => {
+  const btn = e.target.closest('.dl-btn');
+  if (!btn) return;
+  const item = generated[parseInt(btn.dataset.idx)];
+  const a = document.createElement('a');
+  a.href = item.dataUrl;
+  a.download = item.name;
+  a.click();
+});
+
+async function downloadZip() {
+  if (generated.length === 0) return;
+  $('downloadZipBtn').disabled = true;
+  $('downloadZipBtn').textContent = 'Zipping\u2026';
+
+  const zip = new JSZip();
+  const folder = zip.folder('AppIcon.iconset');
+  for (const item of generated) {
+    const blob = await canvasToBlob(item.canvas);
+    folder.file(item.name, blob);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(zipBlob);
+  a.download = 'AppIcon.iconset.zip';
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  $('downloadZipBtn').disabled = false;
+  $('downloadZipBtn').textContent = 'Download .iconset ZIP';
+}
+
+$('generateBtn').addEventListener('click', generate);
+$('downloadZipBtn').addEventListener('click', downloadZip);
+</script>
+</body>
+</html>
