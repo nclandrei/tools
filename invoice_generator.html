@@ -8,13 +8,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
 <style>
-  .container { max-width: 860px; }
+  .container { max-width: 900px; }
+
+  .form-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-section-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
 
   .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    margin-bottom: 1.5rem;
   }
 
   .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
@@ -38,7 +52,7 @@
 
   .form-group textarea {
     resize: vertical;
-    min-height: 80px;
+    min-height: 60px;
     line-height: 1.5;
   }
 
@@ -79,6 +93,72 @@
   .profile-row button {
     flex-shrink: 0;
   }
+
+  /* Line items */
+  .line-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0.75rem;
+  }
+
+  .line-items-table th {
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .line-items-table td {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .line-items-table input {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.88rem;
+    border-radius: 5px;
+    box-sizing: border-box;
+  }
+
+  .line-items-table .col-desc { width: 45%; }
+  .line-items-table .col-qty { width: 12%; }
+  .line-items-table .col-rate { width: 18%; }
+  .line-items-table .col-amount { width: 18%; }
+  .line-items-table .col-actions { width: 7%; text-align: center; }
+
+  .line-items-table .row-amount {
+    font-weight: 500;
+    font-size: 0.88rem;
+    color: var(--text);
+    padding: 0.45rem 0.6rem;
+  }
+
+  .btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+  }
+  .btn-icon:hover { color: var(--red); background: var(--surface-alt); }
+
+  .add-line-btn {
+    font-size: 0.82rem;
+    cursor: pointer;
+    color: var(--accent);
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.8rem;
+    width: 100%;
+  }
+  .add-line-btn:hover { border-color: var(--accent); background: var(--surface-alt); }
 
   /* Invoice preview */
   .invoice-preview {
@@ -138,12 +218,13 @@
   .invoice-parties p {
     font-size: 0.9rem;
     color: #333;
+    white-space: pre-line;
   }
 
   .invoice-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
   .invoice-table th {
@@ -156,19 +237,16 @@
     border-bottom: 1px solid #e5e5e0;
   }
 
-  .invoice-table th:last-child {
-    text-align: right;
-  }
+  .invoice-table th.num { text-align: right; }
 
   .invoice-table td {
-    padding: 0.8rem 0;
+    padding: 0.7rem 0;
     border-bottom: 1px solid #f0f0ee;
     vertical-align: top;
   }
 
-  .invoice-table td:last-child {
+  .invoice-table td.num {
     text-align: right;
-    font-weight: 500;
     white-space: nowrap;
   }
 
@@ -178,27 +256,50 @@
     padding-top: 0.2rem;
   }
 
-  .invoice-total {
-    text-align: right;
-    padding-top: 1rem;
-    border-top: 2px solid #1a1a1a;
-    margin-top: -1px;
+  .invoice-totals {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+    padding-top: 0.5rem;
   }
 
-  .invoice-total .label {
-    font-size: 0.85rem;
+  .invoice-totals .total-row {
+    display: flex;
+    justify-content: space-between;
+    width: 220px;
+    font-size: 0.9rem;
     color: #666;
   }
 
-  .invoice-total .amount {
-    font-size: 1.4rem;
+  .invoice-totals .total-row.grand {
+    border-top: 2px solid #1a1a1a;
+    padding-top: 0.5rem;
+    margin-top: 0.3rem;
+    font-size: 1.15rem;
     font-weight: 600;
     color: #1a1a1a;
   }
 
+  .invoice-bank {
+    margin-top: 2rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid #e5e5e0;
+    font-size: 0.82rem;
+    color: #555;
+  }
+
+  .invoice-bank h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #999;
+    margin-bottom: 0.4rem;
+  }
+
   .invoice-footer {
-    margin-top: 2.5rem;
-    padding-top: 1.5rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
     border-top: 1px solid #e5e5e0;
     font-size: 0.82rem;
     color: #999;
@@ -210,12 +311,13 @@
     .invoice-header { flex-direction: column; gap: 1rem; }
     .invoice-meta { text-align: left; }
     .invoice-parties { grid-template-columns: 1fr; }
+    .line-items-table .col-desc { width: 35%; }
   }
 
   @media print {
     body { background: #fff; }
     .container { padding: 0; max-width: none; }
-    header, .desc, .form-grid, .actions, .saved-profiles, #preview-section .actions { display: none !important; }
+    header, .desc, .form-section, .actions, .saved-profiles, #preview-section .actions { display: none !important; }
     .invoice-preview { border: none; border-radius: 0; padding: 2rem 0; }
     #preview-section { display: block !important; }
   }
@@ -240,67 +342,134 @@
     </div>
   </div>
 
-  <div class="form-grid">
-    <div class="form-group">
-      <label for="from-name">Your Name / Company</label>
-      <input type="text" id="from-name" placeholder="Acme Ltd">
+  <!-- From / Invoicer -->
+  <div class="form-section">
+    <div class="form-section-title">From (Your Company)</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="from-name">Company Name</label>
+        <input type="text" id="from-name" placeholder="Acme Ltd">
+      </div>
+      <div class="form-group">
+        <label for="from-vat">VAT / Tax Number</label>
+        <input type="text" id="from-vat" placeholder="GB123456789">
+      </div>
+      <div class="form-group full-width">
+        <label for="from-address">Address</label>
+        <textarea id="from-address" rows="2" placeholder="123 Main St&#10;London, UK W1A 1AA"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="bank-name">Bank Name</label>
+        <input type="text" id="bank-name" placeholder="Barclays">
+      </div>
+      <div class="form-group">
+        <label for="bank-account">Account Holder</label>
+        <input type="text" id="bank-account" placeholder="Acme Ltd">
+      </div>
+      <div class="form-group">
+        <label for="bank-iban">IBAN</label>
+        <input type="text" id="bank-iban" placeholder="GB29 NWBK 6016 1331 9268 19">
+      </div>
+      <div class="form-group">
+        <label for="bank-swift">BIC / SWIFT</label>
+        <input type="text" id="bank-swift" placeholder="NWBKGB2L">
+      </div>
     </div>
-    <div class="form-group">
-      <label for="from-details">Your Details (address, VAT, etc.)</label>
-      <input type="text" id="from-details" placeholder="123 Main St, London, UK">
+  </div>
+
+  <!-- Bill To / Client -->
+  <div class="form-section">
+    <div class="form-section-title">Bill To (Client)</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="to-name">Company Name</label>
+        <input type="text" id="to-name" placeholder="Client Corp">
+      </div>
+      <div class="form-group">
+        <label for="to-vat">VAT / Tax Number</label>
+        <input type="text" id="to-vat" placeholder="DE123456789">
+      </div>
+      <div class="form-group full-width">
+        <label for="to-address">Address</label>
+        <textarea id="to-address" rows="2" placeholder="456 Oak Ave&#10;Berlin, DE 10115"></textarea>
+      </div>
     </div>
-    <div class="form-group">
-      <label for="to-name">Bill To (Company Name)</label>
-      <input type="text" id="to-name" placeholder="Client Corp">
+  </div>
+
+  <!-- Invoice Details -->
+  <div class="form-section">
+    <div class="form-section-title">Invoice Details</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="invoice-number">Invoice Number</label>
+        <input type="text" id="invoice-number" placeholder="Auto-generated if empty">
+      </div>
+      <div class="form-group">
+        <label for="currency">Currency</label>
+        <select id="currency">
+          <option value="EUR">EUR</option>
+          <option value="USD">USD</option>
+          <option value="GBP">GBP</option>
+          <option value="RON">RON</option>
+          <option value="CHF">CHF</option>
+          <option value="JPY">JPY</option>
+          <option value="CAD">CAD</option>
+          <option value="AUD">AUD</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="period-start">Period Start</label>
+        <input type="date" id="period-start">
+      </div>
+      <div class="form-group">
+        <label for="period-end">Period End</label>
+        <input type="date" id="period-end">
+      </div>
+      <div class="form-group">
+        <label for="issue-date">Issue Date</label>
+        <input type="date" id="issue-date">
+      </div>
+      <div class="form-group">
+        <label for="due-date">Due Date</label>
+        <input type="date" id="due-date">
+      </div>
+      <div class="form-group">
+        <label for="payment-terms">Payment Terms</label>
+        <input type="text" id="payment-terms" placeholder="Net 30">
+      </div>
+      <div class="form-group">
+        <label for="tax-rate">Tax / VAT Rate (%)</label>
+        <input type="number" id="tax-rate" step="0.01" min="0" max="100" placeholder="0">
+      </div>
     </div>
-    <div class="form-group">
-      <label for="to-details">Client Details (address, etc.)</label>
-      <input type="text" id="to-details" placeholder="456 Oak Ave, Berlin, DE">
-    </div>
-    <div class="form-group">
-      <label for="period-start">Period Start</label>
-      <input type="date" id="period-start">
-    </div>
-    <div class="form-group">
-      <label for="period-end">Period End</label>
-      <input type="date" id="period-end">
-    </div>
-    <div class="form-group">
-      <label for="issue-date">Issue Date</label>
-      <input type="date" id="issue-date">
-    </div>
-    <div class="form-group">
-      <label for="due-date">Due Date</label>
-      <input type="date" id="due-date">
-    </div>
-    <div class="form-group">
-      <label for="amount">Amount</label>
-      <input type="number" id="amount" step="0.01" min="0" placeholder="5000.00">
-    </div>
-    <div class="form-group">
-      <label for="hours">Hours Worked (optional)</label>
-      <input type="number" id="hours" step="0.5" min="0" placeholder="160">
-    </div>
-    <div class="form-group">
-      <label for="currency">Currency</label>
-      <select id="currency">
-        <option value="EUR">EUR</option>
-        <option value="USD">USD</option>
-        <option value="GBP">GBP</option>
-        <option value="RON">RON</option>
-        <option value="CHF">CHF</option>
-        <option value="JPY">JPY</option>
-        <option value="CAD">CAD</option>
-        <option value="AUD">AUD</option>
-      </select>
-    </div>
-    <div class="form-group full-width">
-      <label for="description">Description of Services</label>
-      <textarea id="description" placeholder="Software development services for the month of March 2026."></textarea>
-    </div>
-    <div class="form-group full-width">
-      <label for="notes">Footer Notes (optional)</label>
-      <input type="text" id="notes" placeholder="Payment via bank transfer. Thank you for your business.">
+  </div>
+
+  <!-- Line Items -->
+  <div class="form-section">
+    <div class="form-section-title">Services Provided</div>
+    <table class="line-items-table" id="line-items">
+      <thead>
+        <tr>
+          <th class="col-desc">Description</th>
+          <th class="col-qty">Qty / Hours</th>
+          <th class="col-rate">Rate</th>
+          <th class="col-amount">Amount</th>
+          <th class="col-actions"></th>
+        </tr>
+      </thead>
+      <tbody id="line-items-body">
+      </tbody>
+    </table>
+    <button class="add-line-btn" onclick="addLineItem()">+ Add Line Item</button>
+  </div>
+
+  <!-- Notes -->
+  <div class="form-section">
+    <div class="form-grid">
+      <div class="form-group full-width">
+        <label for="notes">Footer Notes</label>
+        <input type="text" id="notes" placeholder="Payment via bank transfer. Thank you for your business.">
+      </div>
     </div>
   </div>
 
@@ -309,7 +478,7 @@
     <button class="btn btn-secondary" onclick="saveProfile()">Save as Profile</button>
   </div>
 
-  <div id="preview-section">
+  <div id="preview-section" style="display:none">
     <div class="invoice-preview" id="invoice-preview"></div>
     <div class="actions">
       <button class="btn btn-primary" onclick="downloadPDF()">Download PDF</button>
@@ -324,10 +493,9 @@
   // --- Default dates: previous full month ---
   function getDefaultDates() {
     const now = new Date();
-    // Go to first day of current month, then back one month
     const firstOfCurrent = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonth = new Date(firstOfCurrent);
-    lastMonth.setDate(lastMonth.getDate() - 1); // last day of previous month
+    lastMonth.setDate(lastMonth.getDate() - 1);
 
     const start = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
     const end = lastMonth;
@@ -335,8 +503,8 @@
     return {
       periodStart: fmt(start),
       periodEnd: fmt(end),
-      issueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 1, 1)), // 1st of current month
-      dueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 2, 0))   // last day of current month
+      issueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 1, 1)),
+      dueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 2, 0))
     };
   }
 
@@ -347,12 +515,75 @@
     return `${y}-${m}-${day}`;
   }
 
+  // --- Line items ---
+  let lineItemCounter = 0;
+
+  function addLineItem(desc = '', qty = '', rate = '') {
+    const id = lineItemCounter++;
+    const tbody = document.getElementById('line-items-body');
+    const tr = document.createElement('tr');
+    tr.dataset.lineId = id;
+    tr.innerHTML = `
+      <td><input type="text" data-field="desc" value="${esc(desc)}" placeholder="Software development services"></td>
+      <td><input type="number" data-field="qty" value="${esc(String(qty))}" step="0.5" min="0" placeholder="160" oninput="calcLineAmount(this)"></td>
+      <td><input type="number" data-field="rate" value="${esc(String(rate))}" step="0.01" min="0" placeholder="50.00" oninput="calcLineAmount(this)"></td>
+      <td class="row-amount" data-field="amount">${calcAmount(qty, rate)}</td>
+      <td><button class="btn-icon" onclick="removeLineItem(this)" title="Remove">&times;</button></td>
+    `;
+    tbody.appendChild(tr);
+    return tr;
+  }
+
+  function calcAmount(qty, rate) {
+    const q = parseFloat(qty);
+    const r = parseFloat(rate);
+    if (!isNaN(q) && !isNaN(r)) return formatInputMoney(q * r);
+    if (!isNaN(r) && isNaN(q)) return formatInputMoney(r);
+    return '—';
+  }
+
+  function formatInputMoney(n) {
+    return n.toFixed(2);
+  }
+
+  function calcLineAmount(input) {
+    const tr = input.closest('tr');
+    const qty = tr.querySelector('[data-field="qty"]').value;
+    const rate = tr.querySelector('[data-field="rate"]').value;
+    tr.querySelector('[data-field="amount"]').textContent = calcAmount(qty, rate);
+  }
+
+  function removeLineItem(btn) {
+    const tr = btn.closest('tr');
+    const tbody = document.getElementById('line-items-body');
+    if (tbody.children.length <= 1) return; // keep at least one row
+    tr.remove();
+  }
+
+  function getLineItems() {
+    const rows = document.querySelectorAll('#line-items-body tr');
+    return Array.from(rows).map(tr => {
+      const desc = tr.querySelector('[data-field="desc"]').value.trim();
+      const qty = tr.querySelector('[data-field="qty"]').value;
+      const rate = tr.querySelector('[data-field="rate"]').value;
+      return { desc, qty: qty ? parseFloat(qty) : null, rate: rate ? parseFloat(rate) : null };
+    });
+  }
+
+  function getLineTotal(item) {
+    if (item.qty != null && item.rate != null) return item.qty * item.rate;
+    if (item.rate != null) return item.rate;
+    return 0;
+  }
+
+  // --- Init ---
   function init() {
     const defaults = getDefaultDates();
     document.getElementById('period-start').value = defaults.periodStart;
     document.getElementById('period-end').value = defaults.periodEnd;
     document.getElementById('issue-date').value = defaults.issueDate;
     document.getElementById('due-date').value = defaults.dueDate;
+    addLineItem();
     refreshProfiles();
   }
 
@@ -392,24 +623,29 @@
   function saveProfile() {
     if (!storageAvailable()) return;
     const toName = document.getElementById('to-name').value.trim();
-    if (!toName) { alert('Enter a company name first.'); return; }
+    if (!toName) { alert('Enter a client company name first.'); return; }
 
     const profiles = getProfiles();
-    const key = toName;
-    profiles[key] = {
+    profiles[toName] = {
       fromName: document.getElementById('from-name').value,
-      fromDetails: document.getElementById('from-details').value,
+      fromVat: document.getElementById('from-vat').value,
+      fromAddress: document.getElementById('from-address').value,
+      bankName: document.getElementById('bank-name').value,
+      bankAccount: document.getElementById('bank-account').value,
+      bankIban: document.getElementById('bank-iban').value,
+      bankSwift: document.getElementById('bank-swift').value,
       toName: toName,
-      toDetails: document.getElementById('to-details').value,
-      amount: document.getElementById('amount').value,
-      hours: document.getElementById('hours').value,
+      toVat: document.getElementById('to-vat').value,
+      toAddress: document.getElementById('to-address').value,
       currency: document.getElementById('currency').value,
-      description: document.getElementById('description').value,
-      notes: document.getElementById('notes').value
+      paymentTerms: document.getElementById('payment-terms').value,
+      taxRate: document.getElementById('tax-rate').value,
+      notes: document.getElementById('notes').value,
+      lineItems: getLineItems()
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
     refreshProfiles();
-    document.getElementById('profile-select').value = key;
+    document.getElementById('profile-select').value = toName;
   }
 
   function loadProfile() {
@@ -420,14 +656,29 @@
     if (!p) return;
 
     document.getElementById('from-name').value = p.fromName || '';
-    document.getElementById('from-details').value = p.fromDetails || '';
+    document.getElementById('from-vat').value = p.fromVat || '';
+    document.getElementById('from-address').value = p.fromAddress || '';
+    document.getElementById('bank-name').value = p.bankName || '';
+    document.getElementById('bank-account').value = p.bankAccount || '';
+    document.getElementById('bank-iban').value = p.bankIban || '';
+    document.getElementById('bank-swift').value = p.bankSwift || '';
     document.getElementById('to-name').value = p.toName || '';
-    document.getElementById('to-details').value = p.toDetails || '';
-    document.getElementById('amount').value = p.amount || '';
-    document.getElementById('hours').value = p.hours || '';
+    document.getElementById('to-vat').value = p.toVat || '';
+    document.getElementById('to-address').value = p.toAddress || '';
     document.getElementById('currency').value = p.currency || 'EUR';
-    document.getElementById('description').value = p.description || '';
+    document.getElementById('payment-terms').value = p.paymentTerms || '';
+    document.getElementById('tax-rate').value = p.taxRate || '';
     document.getElementById('notes').value = p.notes || '';
+
+    // Restore line items
+    const tbody = document.getElementById('line-items-body');
+    tbody.innerHTML = '';
+    lineItemCounter = 0;
+    if (p.lineItems && p.lineItems.length > 0) {
+      p.lineItems.forEach(li => addLineItem(li.desc || '', li.qty || '', li.rate || ''));
+    } else {
+      addLineItem();
+    }
   }
 
   function deleteProfile() {
@@ -466,66 +717,133 @@
   // --- Generate ---
   function generateInvoice() {
     const fromName = document.getElementById('from-name').value.trim();
-    const fromDetails = document.getElementById('from-details').value.trim();
+    const fromVat = document.getElementById('from-vat').value.trim();
+    const fromAddress = document.getElementById('from-address').value.trim();
+    const bankName = document.getElementById('bank-name').value.trim();
+    const bankAccount = document.getElementById('bank-account').value.trim();
+    const bankIban = document.getElementById('bank-iban').value.trim();
+    const bankSwift = document.getElementById('bank-swift').value.trim();
     const toName = document.getElementById('to-name').value.trim();
-    const toDetails = document.getElementById('to-details').value.trim();
+    const toVat = document.getElementById('to-vat').value.trim();
+    const toAddress = document.getElementById('to-address').value.trim();
     const periodStart = document.getElementById('period-start').value;
     const periodEnd = document.getElementById('period-end').value;
     const issueDate = document.getElementById('issue-date').value;
     const dueDate = document.getElementById('due-date').value;
-    const amount = parseFloat(document.getElementById('amount').value);
-    const hours = document.getElementById('hours').value ? parseFloat(document.getElementById('hours').value) : null;
     const currency = document.getElementById('currency').value;
-    const description = document.getElementById('description').value.trim();
+    const paymentTerms = document.getElementById('payment-terms').value.trim();
+    const taxRate = parseFloat(document.getElementById('tax-rate').value) || 0;
     const notes = document.getElementById('notes').value.trim();
+    const customInvoiceNumber = document.getElementById('invoice-number').value.trim();
 
-    if (!toName || !amount || !periodStart || !periodEnd) {
-      alert('Please fill in at least: company name, amount, period start and end.');
+    const items = getLineItems();
+
+    if (!toName || !periodStart || !periodEnd) {
+      alert('Please fill in at least: client company name, period start and end.');
       return;
     }
 
-    const invoiceId = generateInvoiceId(toName, periodStart, periodEnd);
+    if (items.every(i => getLineTotal(i) === 0)) {
+      alert('Please add at least one line item with an amount.');
+      return;
+    }
+
+    const invoiceId = customInvoiceNumber || generateInvoiceId(toName, periodStart, periodEnd);
+
+    const subtotal = items.reduce((sum, i) => sum + getLineTotal(i), 0);
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount;
+
+    // Build line items HTML
+    const itemsHtml = items.map(item => {
+      const lineTotal = getLineTotal(item);
+      if (lineTotal === 0 && !item.desc) return '';
+      const qtyStr = item.qty != null ? item.qty : '';
+      const rateStr = item.rate != null ? formatMoney(item.rate, currency) : '';
+      return `
+        <tr>
+          <td>${esc(item.desc) || 'Services rendered'}</td>
+          <td class="num">${qtyStr}</td>
+          <td class="num">${rateStr}</td>
+          <td class="num">${formatMoney(lineTotal, currency)}</td>
+        </tr>`;
+    }).filter(Boolean).join('');
+
+    // Build from details
+    let fromBlock = `<strong>${esc(fromName)}</strong>`;
+    if (fromAddress) fromBlock += `<br>${esc(fromAddress)}`;
+    if (fromVat) fromBlock += `<br>VAT: ${esc(fromVat)}`;
+
+    // Build to details
+    let toBlock = `<strong>${esc(toName)}</strong>`;
+    if (toAddress) toBlock += `<br>${esc(toAddress)}`;
+    if (toVat) toBlock += `<br>VAT: ${esc(toVat)}`;
+
+    // Bank details section
+    let bankHtml = '';
+    if (bankIban || bankSwift || bankName) {
+      bankHtml = `<div class="invoice-bank"><h3>Bank Details</h3>`;
+      if (bankName) bankHtml += `Bank: ${esc(bankName)}<br>`;
+      if (bankAccount) bankHtml += `Account holder: ${esc(bankAccount)}<br>`;
+      if (bankIban) bankHtml += `IBAN: ${esc(bankIban)}<br>`;
+      if (bankSwift) bankHtml += `BIC/SWIFT: ${esc(bankSwift)}`;
+      bankHtml += `</div>`;
+    }
+
+    // Totals
+    let totalsHtml = '';
+    if (taxRate > 0) {
+      totalsHtml = `
+        <div class="invoice-totals">
+          <div class="total-row"><span>Subtotal</span><span>${formatMoney(subtotal, currency)}</span></div>
+          <div class="total-row"><span>Tax (${taxRate}%)</span><span>${formatMoney(taxAmount, currency)}</span></div>
+          <div class="total-row grand"><span>Total Due</span><span>${formatMoney(total, currency)}</span></div>
+        </div>`;
+    } else {
+      totalsHtml = `
+        <div class="invoice-totals">
+          <div class="total-row grand"><span>Total Due</span><span>${formatMoney(total, currency)}</span></div>
+        </div>`;
+    }
 
     const html = `
       <div class="invoice-header">
         <div class="invoice-title">INVOICE</div>
         <div class="invoice-meta">
-          <strong>${invoiceId}</strong>
+          <strong>${esc(invoiceId)}</strong>
           Issued: ${formatDate(issueDate)}<br>
           Due: ${formatDate(dueDate)}
+          ${paymentTerms ? '<br>Terms: ' + esc(paymentTerms) : ''}
         </div>
       </div>
       <div class="invoice-parties">
         <div>
           <h3>From</h3>
-          <p><strong>${esc(fromName)}</strong><br>${esc(fromDetails)}</p>
+          <p>${fromBlock}</p>
         </div>
         <div>
           <h3>Bill To</h3>
-          <p><strong>${esc(toName)}</strong><br>${esc(toDetails)}</p>
+          <p>${toBlock}</p>
         </div>
+      </div>
+      <div style="font-size:0.82rem;color:#666;margin-bottom:1rem;">
+        Period: ${formatDate(periodStart)} &mdash; ${formatDate(periodEnd)}
       </div>
       <table class="invoice-table">
         <thead>
           <tr>
             <th>Description</th>
-            <th>Amount</th>
+            <th class="num">Qty / Hours</th>
+            <th class="num">Rate</th>
+            <th class="num">Amount</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>
-              ${esc(description) || 'Services rendered'}
-              <div class="desc-cell">${formatDate(periodStart)} &mdash; ${formatDate(periodEnd)}${hours ? ' &middot; ' + hours + ' hours' : ''}</div>
-            </td>
-            <td>${formatMoney(amount, currency)}</td>
-          </tr>
+          ${itemsHtml}
         </tbody>
       </table>
-      <div class="invoice-total">
-        <span class="label">Total Due</span><br>
-        <span class="amount">${formatMoney(amount, currency)}</span>
-      </div>
+      ${totalsHtml}
+      ${bankHtml}
       ${notes ? `<div class="invoice-footer">${esc(notes)}</div>` : ''}
     `;
 
