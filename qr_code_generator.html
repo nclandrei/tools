@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Code Generator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  textarea {
+    width: 100%;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    resize: vertical;
+    outline: none;
+    line-height: 1.5;
+    min-height: 80px;
+  }
+
+  textarea:focus {
+    border-color: var(--accent);
+  }
+
+  textarea::placeholder {
+    color: var(--text-muted);
+  }
+
+  .options-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .option-group {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  select, input[type="number"], input[type="color"] {
+    width: 100%;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.55rem 0.75rem;
+    outline: none;
+  }
+
+  select:focus, input[type="number"]:focus {
+    border-color: var(--accent);
+  }
+
+  .color-group {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .color-field {
+    flex: 1;
+    min-width: 100px;
+  }
+
+  input[type="color"] {
+    height: 38px;
+    padding: 4px;
+    cursor: pointer;
+  }
+
+  .output-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-height: 200px;
+    justify-content: center;
+  }
+
+  .output-area.empty {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+
+  #qr-canvas {
+    image-rendering: pixelated;
+  }
+
+  .char-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: right;
+    margin-top: 0.25rem;
+  }
+
+  .char-count.warn {
+    color: var(--amber);
+  }
+
+  .char-count.error {
+    color: var(--red);
+  }
+
+  .download-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="/">&larr; All tools</a>
+    <h1>QR Code Generator</h1>
+    <p class="desc">Generate QR codes from text, URLs, or any data. Customise colours and size, then download as PNG or SVG.</p>
+  </header>
+
+  <div class="controls">
+    <div>
+      <label for="input-text">Content</label>
+      <textarea id="input-text" placeholder="Enter text, URL, email, phone number, or any data…" autofocus></textarea>
+      <div class="char-count" id="char-count"></div>
+    </div>
+
+    <div class="options-row">
+      <div class="option-group">
+        <label for="ec-level">Error Correction</label>
+        <select id="ec-level">
+          <option value="L">Low (7%)</option>
+          <option value="M" selected>Medium (15%)</option>
+          <option value="Q">Quartile (25%)</option>
+          <option value="H">High (30%)</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label for="qr-size">Module Size (px)</label>
+        <input type="number" id="qr-size" value="10" min="1" max="50">
+      </div>
+      <div class="option-group">
+        <label for="qr-margin">Margin (modules)</label>
+        <input type="number" id="qr-margin" value="4" min="0" max="20">
+      </div>
+    </div>
+
+    <div class="color-group">
+      <div class="color-field">
+        <label for="fg-color">Foreground</label>
+        <input type="color" id="fg-color" value="#000000">
+      </div>
+      <div class="color-field">
+        <label for="bg-color">Background</label>
+        <input type="color" id="bg-color" value="#ffffff">
+      </div>
+    </div>
+  </div>
+
+  <div class="output-area empty" id="output-area">
+    <span>Enter content above to generate a QR code</span>
+  </div>
+
+  <div style="display:flex; justify-content:center; margin-top:1rem; gap:0.5rem; flex-wrap:wrap;" id="action-buttons" hidden>
+    <button class="btn btn-primary" id="download-png">Download PNG</button>
+    <button class="btn btn-secondary" id="download-svg">Download SVG</button>
+    <button class="btn btn-secondary" id="copy-png">Copy to Clipboard</button>
+  </div>
+</div>
+
+<canvas id="qr-canvas" hidden></canvas>
+
+<script>
+const input = document.getElementById('input-text');
+const ecLevel = document.getElementById('ec-level');
+const qrSize = document.getElementById('qr-size');
+const qrMargin = document.getElementById('qr-margin');
+const fgColor = document.getElementById('fg-color');
+const bgColor = document.getElementById('bg-color');
+const outputArea = document.getElementById('output-area');
+const canvas = document.getElementById('qr-canvas');
+const actionButtons = document.getElementById('action-buttons');
+const charCount = document.getElementById('char-count');
+
+let currentQR = null;
+let debounceTimer = null;
+
+function getMaxChars(ecl) {
+  // Approximate max for alphanumeric at version 40
+  const limits = { L: 4296, M: 3391, Q: 2420, H: 1852 };
+  return limits[ecl] || 3391;
+}
+
+function updateCharCount() {
+  const len = input.value.length;
+  const max = getMaxChars(ecLevel.value);
+  charCount.textContent = `${len} / ~${max} characters`;
+  charCount.className = 'char-count';
+  if (len > max) charCount.classList.add('error');
+  else if (len > max * 0.8) charCount.classList.add('warn');
+}
+
+function generate() {
+  const text = input.value.trim();
+  updateCharCount();
+
+  if (!text) {
+    outputArea.innerHTML = '<span>Enter content above to generate a QR code</span>';
+    outputArea.classList.add('empty');
+    actionButtons.hidden = true;
+    currentQR = null;
+    return;
+  }
+
+  try {
+    const typeNumber = 0; // auto-detect
+    const errorCorrection = ecLevel.value;
+    const qr = qrcode(typeNumber, errorCorrection);
+    qr.addData(text);
+    qr.make();
+    currentQR = qr;
+
+    const moduleCount = qr.getModuleCount();
+    const cellSize = parseInt(qrSize.value) || 10;
+    const margin = parseInt(qrMargin.value) || 0;
+    const size = moduleCount * cellSize + margin * 2 * cellSize;
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = size;
+    canvas.height = size;
+
+    const fg = fgColor.value;
+    const bg = bgColor.value;
+
+    // Background
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, size, size);
+
+    // Modules
+    ctx.fillStyle = fg;
+    for (let row = 0; row < moduleCount; row++) {
+      for (let col = 0; col < moduleCount; col++) {
+        if (qr.isDark(row, col)) {
+          ctx.fillRect(
+            (col + margin) * cellSize,
+            (row + margin) * cellSize,
+            cellSize,
+            cellSize
+          );
+        }
+      }
+    }
+
+    // Display
+    const img = new Image();
+    img.src = canvas.toDataURL('image/png');
+    img.style.maxWidth = '100%';
+    img.style.imageRendering = 'pixelated';
+    img.style.borderRadius = '4px';
+    outputArea.innerHTML = '';
+    outputArea.classList.remove('empty');
+    outputArea.appendChild(img);
+    actionButtons.hidden = false;
+
+  } catch (e) {
+    outputArea.innerHTML = `<span style="color:var(--red)">Error: ${e.message || 'Content too long for selected error correction level.'}</span>`;
+    outputArea.classList.add('empty');
+    actionButtons.hidden = true;
+    currentQR = null;
+  }
+}
+
+function buildSVG() {
+  if (!currentQR) return '';
+  const moduleCount = currentQR.getModuleCount();
+  const cellSize = parseInt(qrSize.value) || 10;
+  const margin = parseInt(qrMargin.value) || 0;
+  const size = moduleCount * cellSize + margin * 2 * cellSize;
+  const fg = fgColor.value;
+  const bg = bgColor.value;
+
+  let rects = '';
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (currentQR.isDark(row, col)) {
+        rects += `<rect x="${(col + margin) * cellSize}" y="${(row + margin) * cellSize}" width="${cellSize}" height="${cellSize}" fill="${fg}"/>`;
+      }
+    }
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" shape-rendering="crispEdges">
+<rect width="${size}" height="${size}" fill="${bg}"/>
+${rects}
+</svg>`;
+}
+
+document.getElementById('download-png').addEventListener('click', () => {
+  if (!currentQR) return;
+  const a = document.createElement('a');
+  a.download = 'qrcode.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+});
+
+document.getElementById('download-svg').addEventListener('click', () => {
+  const svg = buildSVG();
+  if (!svg) return;
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.download = 'qrcode.svg';
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById('copy-png').addEventListener('click', async () => {
+  if (!currentQR) return;
+  const btn = document.getElementById('copy-png');
+  try {
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy to Clipboard', 1500);
+  } catch {
+    btn.textContent = 'Copy failed';
+    setTimeout(() => btn.textContent = 'Copy to Clipboard', 1500);
+  }
+});
+
+function debouncedGenerate() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(generate, 150);
+}
+
+input.addEventListener('input', debouncedGenerate);
+ecLevel.addEventListener('change', generate);
+qrSize.addEventListener('input', generate);
+qrMargin.addEventListener('input', generate);
+fgColor.addEventListener('input', generate);
+bgColor.addEventListener('input', generate);
+</script>
+</body>
+</html>
