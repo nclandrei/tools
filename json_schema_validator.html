@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON Schema Validator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 1060px; }
+
+  label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .controls select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 0.45rem 0.6rem;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .controls select:focus {
+    border-color: var(--accent);
+  }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 700px) {
+    .panels { grid-template-columns: 1fr; }
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+  }
+
+  .panel-header label { margin-bottom: 0; }
+
+  .panel-actions {
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .panel-actions button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .panel-actions button:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .json-editor {
+    width: 100%;
+    min-height: 320px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    padding: 0.75rem;
+    resize: vertical;
+    outline: none;
+    tab-size: 2;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+  }
+
+  .json-editor:focus {
+    border-color: var(--accent);
+  }
+
+  .json-editor.error-border {
+    border-color: var(--red);
+  }
+
+  .result-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+  }
+
+  .result-bar.valid {
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid var(--green);
+  }
+
+  .result-bar.invalid {
+    background: var(--red-dim);
+    color: var(--red);
+    border: 1px solid var(--red);
+  }
+
+  .result-bar.idle {
+    background: var(--surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+
+  .result-bar.loading {
+    background: var(--surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+
+  .result-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .errors-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .errors-list li {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  .error-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .error-message {
+    color: var(--text);
+    margin-top: 0.15rem;
+  }
+
+  .error-keyword {
+    display: inline-block;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    padding: 0.05rem 0.35rem;
+    color: var(--text-muted);
+    margin-left: 0.4rem;
+  }
+
+  .example-btn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .example-btn:hover {
+    color: var(--accent-hover);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="/">&larr; All tools</a>
+    <h1>JSON Schema Validator</h1>
+    <p class="desc">Paste a JSON Schema and a JSON document to validate. Supports Draft-04, Draft-06, Draft-07, and 2020-12.</p>
+  </header>
+
+  <div class="controls">
+    <label style="margin-bottom:0;display:inline-flex;align-items:center;gap:0.4rem;">
+      Draft
+      <select id="draft-select">
+        <option value="2020-12" selected>2020-12</option>
+        <option value="draft-07">Draft-07</option>
+        <option value="draft-06">Draft-06</option>
+        <option value="draft-04">Draft-04</option>
+      </select>
+    </label>
+    <button class="example-btn" id="load-example">Load example</button>
+  </div>
+
+  <div class="panels">
+    <div>
+      <div class="panel-header">
+        <label>Schema</label>
+        <div class="panel-actions">
+          <button id="fmt-schema">Format</button>
+          <button id="clr-schema">Clear</button>
+        </div>
+      </div>
+      <textarea id="schema-editor" class="json-editor" spellcheck="false" placeholder='{"type": "object", "properties": { ... }}'></textarea>
+    </div>
+    <div>
+      <div class="panel-header">
+        <label>Document</label>
+        <div class="panel-actions">
+          <button id="fmt-doc">Format</button>
+          <button id="clr-doc">Clear</button>
+        </div>
+      </div>
+      <textarea id="doc-editor" class="json-editor" spellcheck="false" placeholder='{"name": "example", ...}'></textarea>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="validate-btn" style="width:100%;margin-bottom:1rem;">Validate</button>
+
+  <div id="result-bar" class="result-bar loading">
+    <span class="result-icon">⏳</span>
+    <span id="result-text">Loading validator engine…</span>
+  </div>
+
+  <ul id="errors-list" class="errors-list"></ul>
+</div>
+
+<script type="module">
+import Ajv from 'https://esm.sh/ajv@8.17.1?bundle-deps';
+import Ajv04 from 'https://esm.sh/ajv-draft-04@1.0.0?bundle-deps';
+import addFormats from 'https://esm.sh/ajv-formats@3.0.1?bundle-deps';
+
+const schemaEditor = document.getElementById('schema-editor');
+const docEditor = document.getElementById('doc-editor');
+const draftSelect = document.getElementById('draft-select');
+const validateBtn = document.getElementById('validate-btn');
+const resultBar = document.getElementById('result-bar');
+const resultText = document.getElementById('result-text');
+const resultIcon = resultBar.querySelector('.result-icon');
+const errorsList = document.getElementById('errors-list');
+
+// Mark as ready
+resultBar.className = 'result-bar idle';
+resultIcon.textContent = '○';
+resultText.textContent = 'Paste a schema and document, then click Validate.';
+
+const EXAMPLE_SCHEMA = {
+  type: "object",
+  properties: {
+    name: { type: "string", minLength: 1 },
+    age: { type: "integer", minimum: 0 },
+    email: { type: "string", format: "email" },
+    tags: {
+      type: "array",
+      items: { type: "string" },
+      minItems: 1
+    }
+  },
+  required: ["name", "age", "email"]
+};
+
+const EXAMPLE_DOC = {
+  name: "",
+  age: -5,
+  email: "not-an-email",
+  tags: []
+};
+
+document.getElementById('load-example').addEventListener('click', () => {
+  schemaEditor.value = JSON.stringify(EXAMPLE_SCHEMA, null, 2);
+  docEditor.value = JSON.stringify(EXAMPLE_DOC, null, 2);
+  validate();
+});
+
+function formatEditor(el) {
+  try {
+    el.value = JSON.stringify(JSON.parse(el.value), null, 2);
+    el.classList.remove('error-border');
+  } catch (e) {
+    el.classList.add('error-border');
+  }
+}
+
+function clearEditor(el) {
+  el.value = '';
+  el.classList.remove('error-border');
+  resetResult();
+}
+
+document.getElementById('fmt-schema').addEventListener('click', () => formatEditor(schemaEditor));
+document.getElementById('clr-schema').addEventListener('click', () => clearEditor(schemaEditor));
+document.getElementById('fmt-doc').addEventListener('click', () => formatEditor(docEditor));
+document.getElementById('clr-doc').addEventListener('click', () => clearEditor(docEditor));
+
+function resetResult() {
+  resultBar.className = 'result-bar idle';
+  resultIcon.textContent = '○';
+  resultText.textContent = 'Paste a schema and document, then click Validate.';
+  errorsList.innerHTML = '';
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function humanizeError(err) {
+  const path = err.instancePath || '/';
+  const kw = err.keyword;
+  const p = err.params || {};
+
+  const messages = {
+    type: () => `Expected type "${p.type}" but got "${typeof err.data !== 'undefined' ? typeof err.data : 'unknown'}"`,
+    required: () => `Missing required property "${p.missingProperty}"`,
+    minLength: () => `String is too short (minimum ${p.limit} character${p.limit === 1 ? '' : 's'})`,
+    maxLength: () => `String is too long (maximum ${p.limit} character${p.limit === 1 ? '' : 's'})`,
+    minimum: () => `Value ${err.data} is less than the minimum of ${p.limit}`,
+    maximum: () => `Value ${err.data} is greater than the maximum of ${p.limit}`,
+    exclusiveMinimum: () => `Value ${err.data} must be greater than ${p.limit}`,
+    exclusiveMaximum: () => `Value ${err.data} must be less than ${p.limit}`,
+    multipleOf: () => `Value ${err.data} is not a multiple of ${p.multipleOf}`,
+    minItems: () => `Array has too few items (minimum ${p.limit})`,
+    maxItems: () => `Array has too many items (maximum ${p.limit})`,
+    uniqueItems: () => `Array items are not unique (indices ${p.i} and ${p.j})`,
+    minProperties: () => `Object has too few properties (minimum ${p.limit})`,
+    maxProperties: () => `Object has too many properties (maximum ${p.limit})`,
+    pattern: () => `String does not match pattern "${p.pattern}"`,
+    format: () => `String is not a valid "${p.format}"`,
+    enum: () => `Value must be one of: ${JSON.stringify(p.allowedValues)}`,
+    const: () => `Value must be ${JSON.stringify(p.allowedValue)}`,
+    additionalProperties: () => `Unexpected additional property "${p.additionalProperty}"`,
+    propertyNames: () => `Property name "${p.propertyName}" is not valid`,
+    dependencies: () => `Property "${p.property}" requires "${p.deps}" to be present`,
+    'if': () => `Conditional "if" schema validation failed`,
+    oneOf: () => `Must match exactly one of the given schemas (matched ${p.passingSchemas === null ? 0 : p.passingSchemas.length || 0})`,
+    anyOf: () => `Must match at least one of the given schemas`,
+    not: () => `Must NOT be valid against the given schema`,
+  };
+
+  const msg = messages[kw] ? messages[kw]() : err.message;
+  return { path, message: msg, keyword: kw };
+}
+
+function createAjv(draft) {
+  const opts = { allErrors: true, verbose: true, strict: false };
+  let ajv;
+
+  if (draft === 'draft-04') {
+    ajv = new Ajv04(opts);
+  } else {
+    ajv = new Ajv(opts);
+  }
+
+  addFormats(ajv);
+  return ajv;
+}
+
+function validate() {
+  schemaEditor.classList.remove('error-border');
+  docEditor.classList.remove('error-border');
+  errorsList.innerHTML = '';
+
+  const schemaStr = schemaEditor.value.trim();
+  const docStr = docEditor.value.trim();
+
+  if (!schemaStr || !docStr) {
+    resetResult();
+    return;
+  }
+
+  let schema, doc;
+  try {
+    schema = JSON.parse(schemaStr);
+  } catch (e) {
+    schemaEditor.classList.add('error-border');
+    resultBar.className = 'result-bar invalid';
+    resultIcon.textContent = '✕';
+    resultText.textContent = 'Schema is not valid JSON: ' + e.message;
+    return;
+  }
+
+  try {
+    doc = JSON.parse(docStr);
+  } catch (e) {
+    docEditor.classList.add('error-border');
+    resultBar.className = 'result-bar invalid';
+    resultIcon.textContent = '✕';
+    resultText.textContent = 'Document is not valid JSON: ' + e.message;
+    return;
+  }
+
+  const draft = draftSelect.value;
+
+  try {
+    const ajv = createAjv(draft);
+    const valid = ajv.validate(schema, doc);
+
+    if (valid) {
+      resultBar.className = 'result-bar valid';
+      resultIcon.textContent = '✓';
+      resultText.textContent = 'Document is valid against the schema.';
+    } else {
+      const errors = ajv.errors || [];
+      resultBar.className = 'result-bar invalid';
+      resultIcon.textContent = '✕';
+      resultText.textContent = `Validation failed with ${errors.length} error${errors.length === 1 ? '' : 's'}.`;
+
+      errors.forEach(err => {
+        const h = humanizeError(err);
+        const li = document.createElement('li');
+        li.innerHTML = `<div class="error-path">${escapeHtml(h.path)}<span class="error-keyword">${escapeHtml(h.keyword)}</span></div>
+          <div class="error-message">${escapeHtml(h.message)}</div>`;
+        errorsList.appendChild(li);
+      });
+    }
+  } catch (e) {
+    resultBar.className = 'result-bar invalid';
+    resultIcon.textContent = '✕';
+    resultText.textContent = 'Schema error: ' + e.message;
+  }
+}
+
+validateBtn.addEventListener('click', validate);
+
+// Tab key support in editors
+[schemaEditor, docEditor].forEach(el => {
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      el.value = el.value.substring(0, start) + '  ' + el.value.substring(end);
+      el.selectionStart = el.selectionEnd = start + 2;
+    }
+  });
+});
+
+// Ctrl/Cmd+Enter to validate
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    validate();
+  }
+});
+</script>
+</body>
+</html>
