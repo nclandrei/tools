@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unicode Reference</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 960px; }
+
+  .controls {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.55rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.88rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  .block-select {
+    padding: 0.55rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    min-width: 180px;
+    cursor: pointer;
+  }
+  .block-select:focus { border-color: var(--accent); }
+
+  .stats {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  th {
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tr:hover td { background: var(--accent-dim); }
+
+  .char-cell {
+    font-size: 1.4rem;
+    text-align: center;
+    width: 3rem;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+  }
+
+  .char-cell:hover { color: var(--accent); }
+
+  .char-cell.copied::after {
+    content: 'Copied!';
+    position: absolute;
+    top: -1.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: var(--green);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    white-space: nowrap;
+    animation: fadeUp 0.3s ease;
+    pointer-events: none;
+  }
+
+  .code-point {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.82rem;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .dec-col, .hex-col {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .name-col {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    word-break: break-word;
+  }
+
+  .block-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: var(--surface-alt);
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .html-col {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .load-more {
+    text-align: center;
+    padding: 1rem;
+  }
+
+  .load-more button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.5rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .load-more button:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 600px) {
+    .controls { flex-direction: column; }
+    .block-select { min-width: 100%; }
+    .search-input { min-width: 100%; }
+    table { font-size: 0.78rem; }
+    .char-cell { font-size: 1.1rem; }
+    td, th { padding: 0.4rem 0.5rem; }
+    .hide-mobile { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="/">&larr; All tools</a>
+    <h1>Unicode Reference</h1>
+  </header>
+  <p class="desc">Searchable ASCII &amp; Unicode table with code points, HTML entities, and click-to-copy characters. Filter by block.</p>
+
+  <div class="controls">
+    <input type="text" class="search-input" id="search" placeholder="Search by character, name, code point, or hex..." autocomplete="off">
+    <select class="block-select" id="block-filter">
+      <option value="all">All blocks</option>
+    </select>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Char</th>
+          <th>Code</th>
+          <th>Hex</th>
+          <th>Dec</th>
+          <th class="hide-mobile">HTML</th>
+          <th>Name</th>
+          <th class="hide-mobile">Block</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="load-more" id="load-more" style="display:none;">
+    <button id="load-more-btn">Load more</button>
+  </div>
+
+  <div class="empty-state" id="empty" style="display:none;">No characters match your search.</div>
+</div>
+
+<script>
+(() => {
+  const BLOCKS = [
+    { name: 'Basic Latin (ASCII)', start: 0x0000, end: 0x007F },
+    { name: 'Latin-1 Supplement', start: 0x0080, end: 0x00FF },
+    { name: 'Latin Extended-A', start: 0x0100, end: 0x017F },
+    { name: 'Latin Extended-B', start: 0x0180, end: 0x024F },
+    { name: 'Greek and Coptic', start: 0x0370, end: 0x03FF },
+    { name: 'Cyrillic', start: 0x0400, end: 0x04FF },
+    { name: 'General Punctuation', start: 0x2000, end: 0x206F },
+    { name: 'Superscripts and Subscripts', start: 0x2070, end: 0x209F },
+    { name: 'Currency Symbols', start: 0x20A0, end: 0x20CF },
+    { name: 'Letterlike Symbols', start: 0x2100, end: 0x214F },
+    { name: 'Number Forms', start: 0x2150, end: 0x218F },
+    { name: 'Arrows', start: 0x2190, end: 0x21FF },
+    { name: 'Mathematical Operators', start: 0x2200, end: 0x22FF },
+    { name: 'Miscellaneous Technical', start: 0x2300, end: 0x23FF },
+    { name: 'Enclosed Alphanumerics', start: 0x2460, end: 0x24FF },
+    { name: 'Box Drawing', start: 0x2500, end: 0x257F },
+    { name: 'Block Elements', start: 0x2580, end: 0x259F },
+    { name: 'Geometric Shapes', start: 0x25A0, end: 0x25FF },
+    { name: 'Miscellaneous Symbols', start: 0x2600, end: 0x26FF },
+    { name: 'Dingbats', start: 0x2700, end: 0x27BF },
+    { name: 'Braille Patterns', start: 0x2800, end: 0x28FF },
+    { name: 'Supplemental Arrows-B', start: 0x2900, end: 0x297F },
+    { name: 'Miscellaneous Math Symbols-B', start: 0x2980, end: 0x29FF },
+    { name: 'CJK Symbols and Punctuation', start: 0x3000, end: 0x303F },
+    { name: 'Emoticons', start: 0x1F600, end: 0x1F64F },
+    { name: 'Miscellaneous Symbols & Pictographs', start: 0x1F300, end: 0x1F5FF },
+    { name: 'Transport & Map Symbols', start: 0x1F680, end: 0x1F6FF },
+  ];
+
+  // Well-known HTML entity names
+  const NAMED_ENTITIES = {
+    0x22: '&quot;', 0x26: '&amp;', 0x27: '&apos;', 0x3C: '&lt;', 0x3E: '&gt;',
+    0xA0: '&nbsp;', 0xA1: '&iexcl;', 0xA2: '&cent;', 0xA3: '&pound;', 0xA4: '&curren;',
+    0xA5: '&yen;', 0xA9: '&copy;', 0xAE: '&reg;', 0xB0: '&deg;', 0xB1: '&plusmn;',
+    0xB5: '&micro;', 0xB6: '&para;', 0xB7: '&middot;', 0xBC: '&frac14;', 0xBD: '&frac12;',
+    0xBE: '&frac34;', 0xBF: '&iquest;', 0xD7: '&times;', 0xF7: '&divide;',
+    0x2013: '&ndash;', 0x2014: '&mdash;', 0x2018: '&lsquo;', 0x2019: '&rsquo;',
+    0x201C: '&ldquo;', 0x201D: '&rdquo;', 0x2022: '&bull;', 0x2026: '&hellip;',
+    0x2032: '&prime;', 0x2033: '&Prime;', 0x20AC: '&euro;', 0x2122: '&trade;',
+    0x2190: '&larr;', 0x2191: '&uarr;', 0x2192: '&rarr;', 0x2193: '&darr;',
+    0x2194: '&harr;', 0x21B5: '&crarr;', 0x2200: '&forall;', 0x2202: '&part;',
+    0x2203: '&exist;', 0x2205: '&empty;', 0x2207: '&nabla;', 0x2208: '&isin;',
+    0x2209: '&notin;', 0x220B: '&ni;', 0x220F: '&prod;', 0x2211: '&sum;',
+    0x221A: '&radic;', 0x221E: '&infin;', 0x2227: '&and;', 0x2228: '&or;',
+    0x2229: '&cap;', 0x222A: '&cup;', 0x222B: '&int;', 0x2248: '&asymp;',
+    0x2260: '&ne;', 0x2261: '&equiv;', 0x2264: '&le;', 0x2265: '&ge;',
+    0x25CA: '&loz;', 0x2660: '&spades;', 0x2663: '&clubs;', 0x2665: '&hearts;',
+    0x2666: '&diams;',
+  };
+
+  // ASCII control character names
+  const CONTROL_NAMES = [
+    'NULL','START OF HEADING','START OF TEXT','END OF TEXT','END OF TRANSMISSION',
+    'ENQUIRY','ACKNOWLEDGE','BELL','BACKSPACE','HORIZONTAL TAB','LINE FEED',
+    'VERTICAL TAB','FORM FEED','CARRIAGE RETURN','SHIFT OUT','SHIFT IN',
+    'DATA LINK ESCAPE','DEVICE CONTROL 1','DEVICE CONTROL 2','DEVICE CONTROL 3',
+    'DEVICE CONTROL 4','NEGATIVE ACKNOWLEDGE','SYNCHRONOUS IDLE',
+    'END OF TRANSMISSION BLOCK','CANCEL','END OF MEDIUM','SUBSTITUTE',
+    'ESCAPE','FILE SEPARATOR','GROUP SEPARATOR','RECORD SEPARATOR','UNIT SEPARATOR'
+  ];
+
+  // Build character data
+  const allChars = [];
+
+  function getBlockName(cp) {
+    for (const b of BLOCKS) {
+      if (cp >= b.start && cp <= b.end) return b.name;
+    }
+    return 'Other';
+  }
+
+  function getCharName(cp) {
+    if (cp < 0x20) return CONTROL_NAMES[cp];
+    if (cp === 0x20) return 'SPACE';
+    if (cp === 0x7F) return 'DELETE';
+    if (cp >= 0x80 && cp <= 0x9F) return 'CONTROL CHARACTER';
+    // Use a curated set of known names for commonly referenced characters
+    const known = KNOWN_NAMES[cp];
+    if (known) return known;
+    // Fallback: derive from Unicode general description
+    return '';
+  }
+
+  // Commonly referenced character names
+  const KNOWN_NAMES = {};
+  // Populate ASCII printable
+  const ASCII_NAMES = {
+    0x21:'EXCLAMATION MARK',0x22:'QUOTATION MARK',0x23:'NUMBER SIGN',0x24:'DOLLAR SIGN',
+    0x25:'PERCENT SIGN',0x26:'AMPERSAND',0x27:'APOSTROPHE',0x28:'LEFT PARENTHESIS',
+    0x29:'RIGHT PARENTHESIS',0x2A:'ASTERISK',0x2B:'PLUS SIGN',0x2C:'COMMA',
+    0x2D:'HYPHEN-MINUS',0x2E:'FULL STOP',0x2F:'SOLIDUS',
+    0x30:'DIGIT ZERO',0x31:'DIGIT ONE',0x32:'DIGIT TWO',0x33:'DIGIT THREE',
+    0x34:'DIGIT FOUR',0x35:'DIGIT FIVE',0x36:'DIGIT SIX',0x37:'DIGIT SEVEN',
+    0x38:'DIGIT EIGHT',0x39:'DIGIT NINE',0x3A:'COLON',0x3B:'SEMICOLON',
+    0x3C:'LESS-THAN SIGN',0x3D:'EQUALS SIGN',0x3E:'GREATER-THAN SIGN',0x3F:'QUESTION MARK',
+    0x40:'COMMERCIAL AT',
+    0x5B:'LEFT SQUARE BRACKET',0x5C:'REVERSE SOLIDUS',0x5D:'RIGHT SQUARE BRACKET',
+    0x5E:'CIRCUMFLEX ACCENT',0x5F:'LOW LINE',0x60:'GRAVE ACCENT',
+    0x7B:'LEFT CURLY BRACKET',0x7C:'VERTICAL LINE',0x7D:'RIGHT CURLY BRACKET',0x7E:'TILDE',
+  };
+  // Letters
+  for (let i = 0x41; i <= 0x5A; i++) ASCII_NAMES[i] = 'LATIN CAPITAL LETTER ' + String.fromCodePoint(i);
+  for (let i = 0x61; i <= 0x7A; i++) ASCII_NAMES[i] = 'LATIN SMALL LETTER ' + String.fromCodePoint(i).toUpperCase();
+  Object.assign(KNOWN_NAMES, ASCII_NAMES);
+
+  // Build all characters from blocks
+  for (const block of BLOCKS) {
+    for (let cp = block.start; cp <= block.end; cp++) {
+      // Skip surrogates
+      if (cp >= 0xD800 && cp <= 0xDFFF) continue;
+      let name = getCharName(cp);
+      const htmlEntity = NAMED_ENTITIES[cp] || `&#${cp};`;
+      let displayChar = String.fromCodePoint(cp);
+      let isControl = cp < 0x20 || cp === 0x7F || (cp >= 0x80 && cp <= 0x9F);
+
+      allChars.push({
+        cp,
+        char: displayChar,
+        display: isControl ? '\u2400' : displayChar,  // Use control picture for controls
+        name: name,
+        block: block.name,
+        html: htmlEntity,
+        hex: cp.toString(16).toUpperCase().padStart(4, '0'),
+        isControl,
+      });
+    }
+  }
+
+  // Populate block filter
+  const blockFilter = document.getElementById('block-filter');
+  const blockNames = [...new Set(allChars.map(c => c.block))];
+  for (const name of blockNames) {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    blockFilter.appendChild(opt);
+  }
+
+  const PAGE_SIZE = 200;
+  let filtered = allChars;
+  let shown = 0;
+
+  const tbody = document.getElementById('tbody');
+  const statsEl = document.getElementById('stats');
+  const loadMoreEl = document.getElementById('load-more');
+  const emptyEl = document.getElementById('empty');
+  const searchInput = document.getElementById('search');
+
+  function renderRows(chars, start, count) {
+    const end = Math.min(start + count, chars.length);
+    const frag = document.createDocumentFragment();
+    for (let i = start; i < end; i++) {
+      const c = chars[i];
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td class="char-cell" data-char="${c.isControl ? '' : c.char.replace(/"/g, '&quot;')}" title="Click to copy">${c.display}</td>` +
+        `<td class="code-point">U+${c.hex}</td>` +
+        `<td class="hex-col">0x${c.hex}</td>` +
+        `<td class="dec-col">${c.cp}</td>` +
+        `<td class="html-col hide-mobile">${escapeHtml(c.html)}</td>` +
+        `<td class="name-col">${c.name || '—'}</td>` +
+        `<td class="hide-mobile"><span class="block-label">${c.block}</span></td>`;
+      frag.appendChild(tr);
+    }
+    tbody.appendChild(frag);
+    return end;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function update() {
+    const query = searchInput.value.trim().toLowerCase();
+    const block = blockFilter.value;
+
+    filtered = allChars.filter(c => {
+      if (block !== 'all' && c.block !== block) return false;
+      if (!query) return true;
+      // Search by character
+      if (c.char === query) return true;
+      // Search by name
+      if (c.name && c.name.toLowerCase().includes(query)) return true;
+      // Search by code point (U+XXXX or just hex)
+      const q = query.replace(/^u\+/, '').replace(/^0x/, '');
+      if (c.hex.toLowerCase().includes(q)) return true;
+      // Search by decimal
+      if (String(c.cp) === query) return true;
+      // Search by html entity
+      if (c.html.toLowerCase().includes(query)) return true;
+      return false;
+    });
+
+    tbody.innerHTML = '';
+    shown = 0;
+
+    if (filtered.length === 0) {
+      emptyEl.style.display = '';
+      loadMoreEl.style.display = 'none';
+      statsEl.textContent = '';
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+    shown = renderRows(filtered, 0, PAGE_SIZE);
+    loadMoreEl.style.display = shown < filtered.length ? '' : 'none';
+    statsEl.textContent = `Showing ${shown.toLocaleString()} of ${filtered.length.toLocaleString()} characters`;
+  }
+
+  function loadMore() {
+    const prev = shown;
+    shown = renderRows(filtered, shown, PAGE_SIZE);
+    loadMoreEl.style.display = shown < filtered.length ? '' : 'none';
+    statsEl.textContent = `Showing ${shown.toLocaleString()} of ${filtered.length.toLocaleString()} characters`;
+  }
+
+  // Events
+  let debounce;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(update, 150);
+  });
+  blockFilter.addEventListener('change', update);
+  document.getElementById('load-more-btn').addEventListener('click', loadMore);
+
+  // Copy on click
+  tbody.addEventListener('click', e => {
+    const cell = e.target.closest('.char-cell');
+    if (!cell) return;
+    const char = cell.dataset.char;
+    if (!char) return;
+    navigator.clipboard.writeText(char).then(() => {
+      cell.classList.add('copied');
+      setTimeout(() => cell.classList.remove('copied'), 1200);
+    });
+  });
+
+  // Keyboard shortcut: / to focus search
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement !== searchInput) {
+      e.preventDefault();
+      searchInput.focus();
+    }
+  });
+
+  // Initial render
+  update();
+})();
+</script>
+</body>
+</html>
