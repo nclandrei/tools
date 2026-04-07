@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Certificate Decoder</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  label { display:block; font-size:0.75rem; font-weight:500; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); margin-bottom:0.4rem; }
+  textarea { width:100%; font-family:'Courier New',monospace; font-size:0.82rem; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.75rem; resize:vertical; outline:none; line-height:1.5; }
+  textarea:focus { border-color:var(--accent); }
+  textarea::placeholder { color:var(--text-muted); }
+  .actions { display:flex; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+  .result { display:none; animation:fadeUp .2s ease; }
+  .result.visible { display:block; }
+  .section { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1rem 1.25rem; margin-bottom:1rem; }
+  .section-title { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--accent); margin-bottom:0.75rem; }
+  .field { display:flex; gap:0.5rem; margin-bottom:0.5rem; font-size:0.85rem; line-height:1.5; }
+  .field:last-child { margin-bottom:0; }
+  .field-label { color:var(--text-muted); min-width:140px; flex-shrink:0; font-weight:500; }
+  .field-value { color:var(--text); word-break:break-all; font-family:'Courier New',monospace; font-size:0.82rem; }
+  .badge { display:inline-block; font-size:0.72rem; font-weight:600; padding:0.15rem 0.5rem; border-radius:4px; text-transform:uppercase; letter-spacing:0.03em; }
+  .badge-green { background:var(--green-dim); color:var(--green); }
+  .badge-red { background:var(--red-dim); color:var(--red); }
+  .badge-amber { background:var(--amber-dim); color:var(--amber); }
+  .badge-blue { background:var(--blue-dim); color:var(--blue); }
+  .san-list { list-style:none; padding:0; margin:0; }
+  .san-list li { font-family:'Courier New',monospace; font-size:0.82rem; padding:0.2rem 0; }
+  .san-list li::before { content:"\2022"; color:var(--accent); margin-right:0.5rem; }
+  .error-box { background:var(--red-dim); color:var(--red); border:1px solid var(--red); border-radius:8px; padding:0.75rem 1rem; font-size:0.85rem; margin-bottom:1rem; display:none; }
+  .error-box.visible { display:block; }
+  .ku-list { display:flex; flex-wrap:wrap; gap:0.35rem; }
+  .ku-tag { font-size:0.72rem; padding:0.2rem 0.5rem; border-radius:4px; background:var(--accent-dim); color:var(--accent); font-weight:500; }
+  .chain-status { margin-top:0.75rem; padding:0.5rem 0.75rem; border-radius:6px; font-size:0.82rem; font-weight:500; }
+  .chain-valid { background:var(--green-dim); color:var(--green); }
+  .chain-invalid { background:var(--red-dim); color:var(--red); }
+  .chain-partial { background:var(--amber-dim); color:var(--amber); }
+  @media(max-width:600px) { .field { flex-direction:column; gap:0.15rem; } .field-label { min-width:0; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="/">&larr; All tools</a>
+    <h1>Certificate Decoder</h1>
+  </header>
+  <p class="desc">Paste a PEM-encoded certificate to decode subject, issuer, validity, SANs, key usage, and chain info. Runs entirely in the browser.</p>
+  <div style="margin-bottom:1rem;">
+    <label for="pem-input">PEM Certificate</label>
+    <textarea id="pem-input" rows="10" placeholder="-----BEGIN CERTIFICATE-----&#10;MIIBxTCCAWugAwIBAgIU...&#10;-----END CERTIFICATE-----&#10;&#10;Paste one or more PEM certificates here..."></textarea>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" id="decode-btn">Decode</button>
+    <button class="btn btn-secondary" id="clear-btn">Clear</button>
+    <button class="btn btn-secondary" id="sample-btn">Load Sample</button>
+  </div>
+  <div class="error-box" id="error-box"></div>
+  <div class="result" id="result"></div>
+</div>
+<script>
+(function(){
+  // ── Minimal DER/ASN.1 parser ──
+  function parseDER(buf, offset, end) {
+    if (offset === undefined) offset = 0;
+    if (end === undefined) end = buf.length;
+    var results = [];
+    while (offset < end) {
+      if (offset >= buf.length) break;
+      var tagByte = buf[offset++];
+      var cls = (tagByte >> 6) & 3; // 0=universal,1=app,2=context,3=private
+      var constructed = (tagByte >> 5) & 1;
+      var tagNum = tagByte & 0x1f;
+      if (tagNum === 0x1f) { // long tag
+        tagNum = 0;
+        var tb;
+        do { tb = buf[offset++]; tagNum = (tagNum << 7) | (tb & 0x7f); } while (tb & 0x80);
+      }
+      // Length
+      var lenByte = buf[offset++];
+      var len;
+      if (lenByte < 0x80) { len = lenByte; }
+      else {
+        var numBytes = lenByte & 0x7f;
+        len = 0;
+        for (var i = 0; i < numBytes; i++) len = (len << 8) | buf[offset++];
+      }
+      var valueStart = offset;
+      var valueEnd = offset + len;
+      var node = { tag: tagByte, cls: cls, constructed: constructed, tagNum: tagNum, raw: buf.slice(valueStart, valueEnd), offset: valueStart, length: len };
+      if (constructed) {
+        node.children = parseDER(buf, valueStart, valueEnd);
+      }
+      results.push(node);
+      offset = valueEnd;
+    }
+    return results;
+  }
+
+  function decodeOID(bytes) {
+    var parts = [];
+    parts.push(Math.floor(bytes[0] / 40));
+    parts.push(bytes[0] % 40);
+    var val = 0;
+    for (var i = 1; i < bytes.length; i++) {
+      val = (val << 7) | (bytes[i] & 0x7f);
+      if (!(bytes[i] & 0x80)) { parts.push(val); val = 0; }
+    }
+    return parts.join('.');
+  }
+
+  function decodeString(node) {
+    // UTF8, PrintableString, IA5String, etc.
+    var raw = node.raw;
+    var s = '';
+    for (var i = 0; i < raw.length; i++) s += String.fromCharCode(raw[i]);
+    if (node.tagNum === 0x0c) { // UTF8String
+      try { return new TextDecoder().decode(new Uint8Array(raw)); } catch(e) {}
+    }
+    return s;
+  }
+
+  function decodeUTCTime(raw) {
+    var s = '';
+    for (var i = 0; i < raw.length; i++) s += String.fromCharCode(raw[i]);
+    // YYMMDDHHMMSSZ
+    var y = parseInt(s.substr(0,2));
+    y = y >= 50 ? 1900 + y : 2000 + y;
+    return new Date(Date.UTC(y, parseInt(s.substr(2,2))-1, parseInt(s.substr(4,2)),
+      parseInt(s.substr(6,2)), parseInt(s.substr(8,2)), parseInt(s.substr(10,2))));
+  }
+
+  function decodeGeneralizedTime(raw) {
+    var s = '';
+    for (var i = 0; i < raw.length; i++) s += String.fromCharCode(raw[i]);
+    return new Date(Date.UTC(parseInt(s.substr(0,4)), parseInt(s.substr(4,2))-1, parseInt(s.substr(6,2)),
+      parseInt(s.substr(8,2)), parseInt(s.substr(10,2)), parseInt(s.substr(12,2))));
+  }
+
+  function decodeTime(node) {
+    if (node.tagNum === 0x17) return decodeUTCTime(node.raw);
+    if (node.tagNum === 0x18) return decodeGeneralizedTime(node.raw);
+    return null;
+  }
+
+  function decodeInteger(raw) {
+    return Array.from(raw).map(function(b) { return b.toString(16).padStart(2,'0').toUpperCase(); }).join(':');
+  }
+
+  var OID_NAMES = {
+    '2.5.4.3':'CN','2.5.4.6':'C','2.5.4.7':'L','2.5.4.8':'ST',
+    '2.5.4.10':'O','2.5.4.11':'OU','1.2.840.113549.1.9.1':'E',
+    '2.5.4.5':'serialNumber','2.5.4.12':'title','0.9.2342.19200300.100.1.25':'DC'
+  };
+
+  var SIG_ALGOS = {
+    '1.2.840.113549.1.1.5':'SHA-1 with RSA',
+    '1.2.840.113549.1.1.11':'SHA-256 with RSA',
+    '1.2.840.113549.1.1.12':'SHA-384 with RSA',
+    '1.2.840.113549.1.1.13':'SHA-512 with RSA',
+    '1.2.840.10045.4.3.2':'ECDSA with SHA-256',
+    '1.2.840.10045.4.3.3':'ECDSA with SHA-384',
+    '1.2.840.10045.4.3.4':'ECDSA with SHA-512',
+    '1.3.101.112':'Ed25519','1.3.101.113':'Ed448'
+  };
+
+  var EKU_OIDS = {
+    '1.3.6.1.5.5.7.3.1':'Server Authentication',
+    '1.3.6.1.5.5.7.3.2':'Client Authentication',
+    '1.3.6.1.5.5.7.3.3':'Code Signing',
+    '1.3.6.1.5.5.7.3.4':'Email Protection',
+    '1.3.6.1.5.5.7.3.8':'Time Stamping',
+    '1.3.6.1.5.5.7.3.9':'OCSP Signing'
+  };
+
+  var KU_BITS = ['Digital Signature','Non Repudiation','Key Encipherment','Data Encipherment','Key Agreement','Key Cert Sign','CRL Sign','Encipher Only','Decipher Only'];
+
+  function decodeRDN(seqNode) {
+    var parts = [];
+    if (!seqNode.children) return '';
+    for (var i = 0; i < seqNode.children.length; i++) {
+      var set = seqNode.children[i];
+      if (!set.children) continue;
+      for (var j = 0; j < set.children.length; j++) {
+        var atv = set.children[j];
+        if (!atv.children || atv.children.length < 2) continue;
+        var oid = decodeOID(atv.children[0].raw);
+        var name = OID_NAMES[oid] || oid;
+        var val = decodeString(atv.children[1]);
+        parts.push(name + '=' + val);
+      }
+    }
+    return parts.join(', ');
+  }
+
+  function getRDNField(seqNode, targetOid) {
+    if (!seqNode.children) return '';
+    for (var i = 0; i < seqNode.children.length; i++) {
+      var set = seqNode.children[i];
+      if (!set.children) continue;
+      for (var j = 0; j < set.children.length; j++) {
+        var atv = set.children[j];
+        if (!atv.children || atv.children.length < 2) continue;
+        var oid = decodeOID(atv.children[0].raw);
+        if (oid === targetOid) return decodeString(atv.children[1]);
+      }
+    }
+    return '';
+  }
+
+  function getAlgOID(algNode) {
+    if (algNode.children && algNode.children[0]) return decodeOID(algNode.children[0].raw);
+    return '';
+  }
+
+  function parseCert(der) {
+    var arr = new Uint8Array(der);
+    var tree = parseDER(arr);
+    if (!tree.length || !tree[0].children) throw new Error('Invalid certificate structure');
+    var cert = tree[0]; // Certificate SEQUENCE
+    var tbs = cert.children[0]; // TBSCertificate
+    if (!tbs.children) throw new Error('Invalid TBSCertificate');
+
+    var idx = 0;
+    // version [0] EXPLICIT
+    var version = 0;
+    if (tbs.children[idx] && tbs.children[idx].cls === 2 && tbs.children[idx].tagNum === 0) {
+      var vNode = parseDER(tbs.children[idx].raw);
+      if (vNode[0]) version = vNode[0].raw[0];
+      idx++;
+    }
+
+    var serialRaw = tbs.children[idx++].raw; // serialNumber INTEGER
+    var sigAlgNode = tbs.children[idx++]; // signature AlgorithmIdentifier
+    var issuerNode = tbs.children[idx++]; // issuer
+    var validityNode = tbs.children[idx++]; // validity
+    var subjectNode = tbs.children[idx++]; // subject
+    var spkiNode = tbs.children[idx++]; // subjectPublicKeyInfo
+
+    var sigAlgOid = getAlgOID(sigAlgNode);
+
+    // Validity
+    var notBefore = decodeTime(validityNode.children[0]);
+    var notAfter = decodeTime(validityNode.children[1]);
+
+    // Public key info
+    var pkAlgOid = getAlgOID(spkiNode.children[0]);
+    var pkInfo = '';
+    if (pkAlgOid === '1.2.840.113549.1.1.1') {
+      pkInfo = 'RSA';
+      // Key size from BIT STRING -> SEQUENCE -> first INTEGER (modulus)
+      if (spkiNode.children[1]) {
+        var bitStr = spkiNode.children[1].raw;
+        // Skip unused bits byte
+        var pkBytes = bitStr.slice(1);
+        try {
+          var pkTree = parseDER(pkBytes);
+          if (pkTree[0] && pkTree[0].children && pkTree[0].children[0]) {
+            var modLen = pkTree[0].children[0].raw.length;
+            // Leading zero byte doesn't count
+            if (pkTree[0].children[0].raw[0] === 0) modLen--;
+            pkInfo += ' (' + (modLen * 8) + ' bits)';
+          }
+        } catch(e) {}
+      }
+    } else if (pkAlgOid === '1.2.840.10045.2.1') {
+      pkInfo = 'EC';
+      if (spkiNode.children[0].children && spkiNode.children[0].children[1]) {
+        var curveOid = decodeOID(spkiNode.children[0].children[1].raw);
+        var curves = {'1.2.840.10045.3.1.7':'P-256','1.3.132.0.34':'P-384','1.3.132.0.35':'P-521'};
+        if (curves[curveOid]) pkInfo += ' (' + curves[curveOid] + ')';
+      }
+    } else if (pkAlgOid === '1.3.101.112') { pkInfo = 'Ed25519'; }
+    else if (pkAlgOid === '1.3.101.113') { pkInfo = 'Ed448'; }
+    else { pkInfo = pkAlgOid; }
+
+    // Extensions [3] EXPLICIT
+    var extensions = { keyUsage: [], extKeyUsage: [], sans: [], basicConstraints: null };
+    for (var ei = idx; ei < tbs.children.length; ei++) {
+      var extBlock = tbs.children[ei];
+      if (extBlock.cls === 2 && extBlock.tagNum === 3) {
+        // Parse the inner SEQUENCE of extensions
+        var extsSeq = parseDER(extBlock.raw);
+        if (extsSeq[0] && extsSeq[0].children) {
+          for (var xi = 0; xi < extsSeq[0].children.length; xi++) {
+            var ext = extsSeq[0].children[xi];
+            if (!ext.children || ext.children.length < 2) continue;
+            var extOid = decodeOID(ext.children[0].raw);
+            // The value is in OCTET STRING (last child), possibly with critical BOOLEAN before it
+            var extValueNode = ext.children[ext.children.length - 1];
+            var extValue = extValueNode.raw;
+
+            if (extOid === '2.5.29.15') { // Key Usage
+              var kuParsed = parseDER(extValue);
+              if (kuParsed[0] && kuParsed[0].raw.length >= 2) {
+                var unusedBits = kuParsed[0].raw[0];
+                var byte1 = kuParsed[0].raw[1];
+                var byte2 = kuParsed[0].raw.length > 2 ? kuParsed[0].raw[2] : 0;
+                for (var ki = 0; ki < KU_BITS.length; ki++) {
+                  var byteIdx = ki < 8 ? byte1 : byte2;
+                  var bitIdx = ki < 8 ? (7 - ki) : (15 - ki);
+                  if (byteIdx & (1 << bitIdx)) extensions.keyUsage.push(KU_BITS[ki]);
+                }
+              }
+            } else if (extOid === '2.5.29.37') { // Extended Key Usage
+              var ekuParsed = parseDER(extValue);
+              if (ekuParsed[0] && ekuParsed[0].children) {
+                for (var eki = 0; eki < ekuParsed[0].children.length; eki++) {
+                  var ekuOid = decodeOID(ekuParsed[0].children[eki].raw);
+                  extensions.extKeyUsage.push(EKU_OIDS[ekuOid] || ekuOid);
+                }
+              }
+            } else if (extOid === '2.5.29.17') { // SANs
+              var sanParsed = parseDER(extValue);
+              if (sanParsed[0] && sanParsed[0].children) {
+                for (var si = 0; si < sanParsed[0].children.length; si++) {
+                  var sanNode = sanParsed[0].children[si];
+                  var sanVal = '';
+                  for (var sv = 0; sv < sanNode.raw.length; sv++) sanVal += String.fromCharCode(sanNode.raw[sv]);
+                  if (sanNode.tagNum === 2) extensions.sans.push('DNS: ' + sanVal);
+                  else if (sanNode.tagNum === 1) extensions.sans.push('Email: ' + sanVal);
+                  else if (sanNode.tagNum === 6) extensions.sans.push('URI: ' + sanVal);
+                  else if (sanNode.tagNum === 7) {
+                    if (sanNode.raw.length === 4) extensions.sans.push('IP: ' + sanNode.raw.join('.'));
+                    else if (sanNode.raw.length === 16) {
+                      var ipv6 = [];
+                      for (var ip6 = 0; ip6 < 16; ip6 += 2) ipv6.push(((sanNode.raw[ip6] << 8) | sanNode.raw[ip6+1]).toString(16));
+                      extensions.sans.push('IP: ' + ipv6.join(':'));
+                    }
+                  }
+                }
+              }
+            } else if (extOid === '2.5.29.19') { // Basic Constraints
+              var bcParsed = parseDER(extValue);
+              if (bcParsed[0]) {
+                var isCA = false;
+                var pathLen = null;
+                if (bcParsed[0].children) {
+                  for (var bi = 0; bi < bcParsed[0].children.length; bi++) {
+                    if (bcParsed[0].children[bi].tagNum === 1) { // BOOLEAN
+                      isCA = bcParsed[0].children[bi].raw[0] !== 0;
+                    }
+                    if (bcParsed[0].children[bi].tagNum === 2) { // INTEGER
+                      pathLen = bcParsed[0].children[bi].raw[0];
+                    }
+                  }
+                }
+                extensions.basicConstraints = { isCA: isCA, pathLength: pathLen };
+              }
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    return {
+      version: version,
+      serial: decodeInteger(serialRaw),
+      sigAlg: SIG_ALGOS[sigAlgOid] || sigAlgOid,
+      issuer: decodeRDN(issuerNode),
+      issuerNode: issuerNode,
+      subject: decodeRDN(subjectNode),
+      subjectNode: subjectNode,
+      cn: getRDNField(subjectNode, '2.5.4.3'),
+      notBefore: notBefore,
+      notAfter: notAfter,
+      pkInfo: pkInfo,
+      extensions: extensions
+    };
+  }
+
+  // ── PEM parsing ──
+  function parsePEMBlocks(pem) {
+    var blocks = [];
+    var re = /-----BEGIN CERTIFICATE-----\s*([\s\S]*?)\s*-----END CERTIFICATE-----/g;
+    var m;
+    while ((m = re.exec(pem)) !== null) {
+      var b64 = m[1].replace(/\s/g, '');
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      blocks.push(bytes.buffer);
+    }
+    if (!blocks.length) throw new Error('No valid PEM certificate blocks found.');
+    return blocks;
+  }
+
+  // ── UI helpers ──
+  var pemInput = document.getElementById('pem-input');
+  var decodeBtn = document.getElementById('decode-btn');
+  var clearBtn = document.getElementById('clear-btn');
+  var sampleBtn = document.getElementById('sample-btn');
+  var errorBox = document.getElementById('error-box');
+  var resultEl = document.getElementById('result');
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  function validityBadge(nb, na) {
+    var now = new Date();
+    if (now < nb) return '<span class="badge badge-amber">Not Yet Valid</span>';
+    if (now > na) return '<span class="badge badge-red">Expired</span>';
+    var days = Math.ceil((na - now) / 86400000);
+    if (days <= 30) return '<span class="badge badge-amber">Expires in ' + days + ' days</span>';
+    return '<span class="badge badge-green">Valid</span>';
+  }
+
+  function showError(msg) { errorBox.textContent = msg; errorBox.classList.add('visible'); }
+
+  var SAMPLE_PEM = [
+    '-----BEGIN CERTIFICATE-----',
+    'MIIDazCCAlOgAwIBAgIUV/mnjFKPYhJecFGEznBTpRySi5cwDQYJKoZIhvcNAQEL',
+    'BQAwRTELMAkGA1UEBhMCVVMxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM',
+    'GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjA0MDcyMDU3MjlaFw0yNzA0',
+    'MDcyMDU3MjlaMEUxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApTb21lLVN0YXRlMSEw',
+    'HwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEB',
+    'AQUAA4IBDwAwggEKAoIBAQDOIRogP38MTC7dlKAzHjIk3MZIta77uLo6D9FTGsoe',
+    'f22QPt7jIW22PvwvSb6vzhUV5UZwPCJHJNlCmTs06lhS8TC4fvliL2M8GTIsKJqO',
+    'JIWH2x1EM2wPJxgczb3vpux3WxE3Oa23oP61bex5bj0FRJUtSW/wCwZNl9OTS8or',
+    '6uxZ+5mtIv8SMlf3XplkroKida0fsTAoQv2j+I1X7ob9bwvNyAN9VgKNLtFeBVkP',
+    'uAd8yfyXHlakIFLnFHku+2GLYX5oHMEytLs/tvOn1d+jQF9ZMFeEHtsCYJMGt8YC',
+    'Ijm5nlnYMXMFTAM7hlVO5AYls7FC7NKcdzPRiues9zeTAgMBAAGjUzBRMB0GA1Ud',
+    'DgQWBBSy7K0UbDfbQoAF8zCYFmmEL3c2HDAfBgNVHSMEGDAWgBSy7K0UbDfbQoAF',
+    '8zCYFmmEL3c2HDAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQDH',
+    'ur20CXYdel8Bivf7tWQEDtAw9bVLf2CSEPp+eLFbBeGpus2d0nGRD7gip+LsuKM0',
+    'UFyelC625JdaJ0WwIr0ZeUMgcu6Y3WYgclcw1+Nm1hNVMjFnwQHIiE1ubbAHaYwr',
+    'RjZExWT4ZuGwt3uGe2QNxgkFpc6dbvHeVnilmR4kfS3NfqECxcslteuV1s2f9O37',
+    'Avmn45suVgq0WFi6JVSxS3znQ77JvXtHS0l0EjHYBHe2oSqIuXKp9SqQE1fXepa5',
+    '5daT6Yc81hE7aH6BThquYU9AWFmKde+lNGI/SHn/GwRX3gKIxBjAV+ihRN6Rhmee',
+    'sdTwSjZcj/ZIUPuc5RJu',
+    '-----END CERTIFICATE-----'
+  ].join('\n');
+
+  async function decode() {
+    errorBox.classList.remove('visible');
+    resultEl.classList.remove('visible');
+    resultEl.innerHTML = '';
+
+    var pem = pemInput.value.trim();
+    if (!pem) { showError('Please paste a PEM certificate.'); return; }
+
+    try {
+      var blocks = parsePEMBlocks(pem);
+      var certs = [];
+      for (var i = 0; i < blocks.length; i++) {
+        var info = parseCert(blocks[i]);
+        var fp = await crypto.subtle.digest('SHA-256', blocks[i]);
+        info.fingerprint = Array.from(new Uint8Array(fp)).map(function(b){return b.toString(16).padStart(2,'0').toUpperCase();}).join(':');
+        certs.push(info);
+      }
+
+      var html = '';
+      for (var i = 0; i < certs.length; i++) {
+        var c = certs[i];
+        var isSelfSigned = c.subject === c.issuer;
+        var label = certs.length > 1 ? (i === 0 ? 'Leaf Certificate' : (i === certs.length - 1 && isSelfSigned ? 'Root Certificate' : 'Intermediate Certificate #' + i)) : 'Certificate';
+
+        if (certs.length > 1) html += '<div class="section-title" style="margin-bottom:0.5rem">' + label + '</div>';
+
+        // Subject & Issuer
+        html += '<div class="section"><div class="section-title">Subject &amp; Issuer</div>';
+        if (c.cn) html += '<div class="field"><span class="field-label">Common Name</span><span class="field-value">' + esc(c.cn) + '</span></div>';
+        html += '<div class="field"><span class="field-label">Subject</span><span class="field-value">' + esc(c.subject) + '</span></div>';
+        html += '<div class="field"><span class="field-label">Issuer</span><span class="field-value">' + esc(c.issuer) + '</span></div>';
+        if (isSelfSigned) html += '<div class="field"><span class="field-label">Type</span><span class="field-value"><span class="badge badge-blue">Self-Signed</span></span></div>';
+        html += '</div>';
+
+        // Validity
+        html += '<div class="section"><div class="section-title">Validity</div>';
+        html += '<div class="field"><span class="field-label">Status</span><span class="field-value">' + validityBadge(c.notBefore, c.notAfter) + '</span></div>';
+        html += '<div class="field"><span class="field-label">Not Before</span><span class="field-value">' + esc(c.notBefore.toUTCString()) + '</span></div>';
+        html += '<div class="field"><span class="field-label">Not After</span><span class="field-value">' + esc(c.notAfter.toUTCString()) + '</span></div>';
+        var dur = Math.ceil((c.notAfter - c.notBefore) / 86400000);
+        html += '<div class="field"><span class="field-label">Duration</span><span class="field-value">' + dur + ' days</span></div>';
+        html += '</div>';
+
+        // SANs
+        if (c.extensions.sans.length) {
+          html += '<div class="section"><div class="section-title">Subject Alternative Names (' + c.extensions.sans.length + ')</div><ul class="san-list">';
+          for (var si = 0; si < c.extensions.sans.length; si++) html += '<li>' + esc(c.extensions.sans[si]) + '</li>';
+          html += '</ul></div>';
+        }
+
+        // Key Usage
+        var ku = c.extensions.keyUsage;
+        var eku = c.extensions.extKeyUsage;
+        if (ku.length || eku.length) {
+          html += '<div class="section"><div class="section-title">Key Usage</div>';
+          if (ku.length) {
+            html += '<div class="field"><span class="field-label">Key Usage</span><span class="field-value"><span class="ku-list">';
+            for (var ki = 0; ki < ku.length; ki++) html += '<span class="ku-tag">' + esc(ku[ki]) + '</span>';
+            html += '</span></span></div>';
+          }
+          if (eku.length) {
+            html += '<div class="field"><span class="field-label">Extended</span><span class="field-value"><span class="ku-list">';
+            for (var eki = 0; eki < eku.length; eki++) html += '<span class="ku-tag">' + esc(eku[eki]) + '</span>';
+            html += '</span></span></div>';
+          }
+          html += '</div>';
+        }
+
+        // Technical
+        html += '<div class="section"><div class="section-title">Technical Details</div>';
+        html += '<div class="field"><span class="field-label">Serial Number</span><span class="field-value">' + esc(c.serial) + '</span></div>';
+        html += '<div class="field"><span class="field-label">Signature Algo</span><span class="field-value">' + esc(c.sigAlg) + '</span></div>';
+        html += '<div class="field"><span class="field-label">Public Key</span><span class="field-value">' + esc(c.pkInfo) + '</span></div>';
+        if (c.extensions.basicConstraints) {
+          var bc = c.extensions.basicConstraints;
+          var bcStr = 'CA: ' + (bc.isCA ? 'Yes' : 'No');
+          if (bc.pathLength !== null) bcStr += ', Path Length: ' + bc.pathLength;
+          html += '<div class="field"><span class="field-label">Basic Constraints</span><span class="field-value">' + esc(bcStr) + '</span></div>';
+        }
+        html += '<div class="field"><span class="field-label">Version</span><span class="field-value">v' + (c.version + 1) + '</span></div>';
+        html += '<div class="field"><span class="field-label">SHA-256 Fingerprint</span><span class="field-value" style="font-size:0.75rem">' + esc(c.fingerprint) + '</span></div>';
+        html += '</div>';
+
+        if (certs.length > 1 && i < certs.length - 1) html += '<hr style="border:none;border-top:1px solid var(--border);margin:1.5rem 0">';
+      }
+
+      // Chain validation
+      if (certs.length > 1) {
+        var issues = [];
+        for (var ci = 0; ci < certs.length - 1; ci++) {
+          if (certs[ci].issuer !== certs[ci+1].subject) {
+            issues.push('Certificate ' + (ci+1) + ' issuer does not match certificate ' + (ci+2) + ' subject');
+          }
+        }
+        var last = certs[certs.length-1];
+        var rootSelf = last.issuer === last.subject;
+        html += '<div class="section"><div class="section-title">Chain Validation</div>';
+        if (issues.length) {
+          html += '<div class="chain-status chain-invalid">\u2717 ' + esc(issues.join('; ')) + '</div>';
+        } else if (rootSelf) {
+          html += '<div class="chain-status chain-valid">\u2713 Chain is complete: leaf \u2192 intermediates \u2192 self-signed root (' + certs.length + ' certificates)</div>';
+        } else {
+          html += '<div class="chain-status chain-partial">\u26A0 Chain appears valid but root CA is not included (' + certs.length + ' certificates)</div>';
+        }
+        html += '</div>';
+      }
+
+      resultEl.innerHTML = html;
+      resultEl.classList.add('visible');
+    } catch(e) {
+      showError(e.message || 'Failed to decode certificate.');
+    }
+  }
+
+  decodeBtn.addEventListener('click', decode);
+  clearBtn.addEventListener('click', function() {
+    pemInput.value = '';
+    errorBox.classList.remove('visible');
+    resultEl.classList.remove('visible');
+    resultEl.innerHTML = '';
+  });
+  sampleBtn.addEventListener('click', function() { pemInput.value = SAMPLE_PEM; decode(); });
+  pemInput.addEventListener('paste', function() { setTimeout(decode, 50); });
+})();
+</script>
+</body>
+</html>
