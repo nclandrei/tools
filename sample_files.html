@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sample File Generator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@9.5.0/build/index.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  .container { max-width: 860px; }
+
+  .settings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-bottom: 2rem;
+    padding: 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .settings .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .settings .field label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .settings .field input {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.88rem;
+    width: 140px;
+  }
+
+  .settings .field input.narrow { width: 80px; }
+
+  .download-all-wrap {
+    margin-left: auto;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .format-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .format-card:hover {
+    border-color: var(--border-hover);
+  }
+
+  .format-card .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .format-card .format-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .format-card .format-desc {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .format-card .format-size {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: auto;
+  }
+
+  .format-card .btn {
+    margin-top: 0.5rem;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Badge colors per format */
+  .badge-jpg  { background: #e67e22; }
+  .badge-png  { background: #2ecc71; }
+  .badge-pdf  { background: #e74c3c; }
+  .badge-doc  { background: #3498db; }
+  .badge-docx { background: #2980b9; }
+  .badge-xlsx { background: #27ae60; }
+  .badge-ods  { background: #16a085; }
+  .badge-csv  { background: #8e44ad; }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 0.3rem;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Sample File Generator</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+  <p class="desc">Generate and download realistic sample files in various formats for testing. All files are created in-browser.</p>
+
+  <div class="settings">
+    <div class="field">
+      <label for="prefix">File name prefix</label>
+      <input type="text" id="prefix" value="sample" placeholder="sample">
+    </div>
+    <div class="field">
+      <label for="img-width">Image width</label>
+      <input type="number" id="img-width" value="1200" min="100" max="4000" class="narrow">
+    </div>
+    <div class="field">
+      <label for="img-height">Image height</label>
+      <input type="number" id="img-height" value="900" min="100" max="4000" class="narrow">
+    </div>
+    <div class="download-all-wrap">
+      <button class="btn btn-primary" id="download-all">Download All</button>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+/* ── Lorem ipsum content ── */
+const LOREM = [
+  "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+  "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+  "Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Vestibulum tortor quam, feugiat vitae, ultricies eget, tempor sit amet, ante.",
+  "Curabitur blandit tempus porttitor. Nullam quis risus eget urna mollis ornare vel eu leo. Donec sed odio dui. Maecenas faucibus mollis interdum. Praesent commodo cursus magna, vel scelerisque nisl consectetur et.",
+  "Nulla vitae elit libero, a pharetra augue. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus.",
+  "Integer posuere erat a ante venenatis dapibus posuere velit aliquet. Cras mattis consectetur purus sit amet fermentum. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor.",
+  "Aenean eu leo quam. Pellentesque ornare sem lacinia quam venenatis vestibulum. Etiam porta sem malesuada magna mollis euismod. Sed posuere consectetur est at lobortis.",
+  "Maecenas sed diam eget risus varius blandit sit amet non magna. Donec id elit non mi porta gravida at eget metus. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus."
+];
+
+const TITLE = "Quarterly Performance Analysis Report";
+const SUBTITLE = "Prepared by the Research & Analytics Division";
+
+function getPrefix() { return document.getElementById('prefix').value.trim() || 'sample'; }
+function getImgW() { return parseInt(document.getElementById('img-width').value) || 1200; }
+function getImgH() { return parseInt(document.getElementById('img-height').value) || 900; }
+
+/* ── Fake spreadsheet data ── */
+const FIRST_NAMES = ["Alice","Bob","Carol","David","Elena","Frank","Grace","Henry","Irene","James","Karen","Leo","Maria","Nathan","Olivia","Patrick","Quinn","Rachel","Samuel","Tina"];
+const LAST_NAMES = ["Anderson","Brown","Chen","Davis","Evans","Fischer","Garcia","Harris","Ibrahim","Johnson","Kim","Lopez","Martinez","Nelson","O'Brien","Patel","Quinn","Roberts","Smith","Taylor"];
+const STATUSES = ["Paid","Paid","Paid","Pending","Pending","Overdue","Paid","Paid","Pending","Paid"];
+
+function fakeRows(n) {
+  const rows = [];
+  for (let i = 0; i < n; i++) {
+    const fn = FIRST_NAMES[i % FIRST_NAMES.length];
+    const ln = LAST_NAMES[(i * 7 + 3) % LAST_NAMES.length];
+    const email = (fn + "." + ln).toLowerCase().replace(/'/g, '') + "@example.com";
+    const amount = (Math.round((50 + Math.random() * 9950) * 100) / 100).toFixed(2);
+    const d = new Date(2025, Math.floor(Math.random() * 12), 1 + Math.floor(Math.random() * 28));
+    const date = d.toISOString().split('T')[0];
+    const status = STATUSES[i % STATUSES.length];
+    rows.push([fn + " " + ln, email, "$" + amount, date, status]);
+  }
+  return rows;
+}
+
+const SHEET_HEADERS = ["Name", "Email", "Amount", "Date", "Status"];
+const SHEET_ROWS = fakeRows(20);
+
+/* ── Generators ── */
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function drawDocumentCanvas(format) {
+  const w = getImgW(), h = getImgH();
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#fafaf8';
+  ctx.fillRect(0, 0, w, h);
+
+  // Header bar
+  const barH = h * 0.12;
+  ctx.fillStyle = '#7c3aed';
+  ctx.fillRect(0, 0, w, barH);
+
+  // Decorative shapes
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath();
+  ctx.arc(w * 0.85, barH * 0.5, barH * 0.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Title
+  const titleSize = Math.max(16, Math.round(w * 0.028));
+  ctx.fillStyle = '#fff';
+  ctx.font = `600 ${titleSize}px Inter, sans-serif`;
+  ctx.fillText(TITLE, w * 0.05, barH * 0.55);
+
+  // Subtitle
+  const subSize = Math.max(12, Math.round(w * 0.016));
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.font = `400 ${subSize}px Inter, sans-serif`;
+  ctx.fillText(SUBTITLE, w * 0.05, barH * 0.8);
+
+  // Content area
+  const bodySize = Math.max(11, Math.round(w * 0.013));
+  ctx.font = `400 ${bodySize}px Inter, sans-serif`;
+  ctx.fillStyle = '#333';
+
+  const margin = w * 0.05;
+  const lineH = bodySize * 1.7;
+  const maxLineW = w - margin * 2;
+  let y = barH + lineH * 2;
+
+  // Side accent rectangles
+  ctx.fillStyle = '#e8e0f7';
+  ctx.fillRect(w * 0.72, barH + 30, w * 0.22, h * 0.18);
+  ctx.fillStyle = '#d4f5e0';
+  ctx.fillRect(w * 0.72, barH + 30 + h * 0.22, w * 0.22, h * 0.12);
+
+  // Section heading
+  const headSize = Math.max(14, Math.round(w * 0.02));
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = `600 ${headSize}px Inter, sans-serif`;
+  ctx.fillText("Executive Summary", margin, y);
+  y += lineH * 1.8;
+
+  // Paragraph text
+  ctx.font = `400 ${bodySize}px Inter, sans-serif`;
+  ctx.fillStyle = '#444';
+  const textW = w * 0.62;
+
+  for (let p = 0; p < 4 && y < h - lineH * 3; p++) {
+    const words = LOREM[p].split(' ');
+    let line = '';
+    for (const word of words) {
+      const test = line + word + ' ';
+      if (ctx.measureText(test).width > textW && line) {
+        ctx.fillText(line.trim(), margin, y);
+        y += lineH;
+        line = word + ' ';
+        if (y > h - lineH * 3) break;
+      } else {
+        line = test;
+      }
+    }
+    if (line.trim() && y < h - lineH * 3) {
+      ctx.fillText(line.trim(), margin, y);
+      y += lineH * 1.8;
+    }
+  }
+
+  // Footer line
+  ctx.fillStyle = '#e5e5e0';
+  ctx.fillRect(margin, h - 50, w - margin * 2, 1);
+  ctx.fillStyle = '#999';
+  ctx.font = `400 ${Math.max(10, Math.round(w * 0.01))}px Inter, sans-serif`;
+  ctx.fillText("Sample document generated for testing purposes", margin, h - 28);
+  ctx.fillText("Page 1 of 1", w - margin - ctx.measureText("Page 1 of 1").width, h - 28);
+
+  return c;
+}
+
+async function genJPG() {
+  const c = drawDocumentCanvas('jpg');
+  return new Promise(r => c.toBlob(b => r(b), 'image/jpeg', 0.92));
+}
+
+async function genPNG() {
+  const c = drawDocumentCanvas('png');
+  return new Promise(r => c.toBlob(b => r(b), 'image/png'));
+}
+
+async function genPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pw = 210, ph = 297;
+  const m = 20;
+  let y = m;
+
+  // Title
+  doc.setFontSize(20);
+  doc.setFont(undefined, 'bold');
+  doc.text(TITLE, m, y + 7);
+  y += 14;
+
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(100);
+  doc.text(SUBTITLE, m, y);
+  y += 6;
+
+  // Accent line
+  doc.setDrawColor(124, 58, 237);
+  doc.setLineWidth(0.8);
+  doc.line(m, y, pw - m, y);
+  y += 12;
+
+  doc.setTextColor(30);
+
+  for (let i = 0; i < LOREM.length; i++) {
+    // Section heading every 2 paragraphs
+    if (i % 2 === 0) {
+      const headings = ["1. Introduction", "2. Methodology", "3. Key Findings", "4. Conclusion"];
+      const hIdx = Math.floor(i / 2);
+      if (hIdx < headings.length) {
+        if (y > ph - 40) { doc.addPage(); y = m; }
+        doc.setFontSize(13);
+        doc.setFont(undefined, 'bold');
+        doc.text(headings[hIdx], m, y);
+        y += 8;
+      }
+    }
+
+    doc.setFontSize(10.5);
+    doc.setFont(undefined, 'normal');
+    const lines = doc.splitTextToSize(LOREM[i], pw - 2 * m);
+    for (const line of lines) {
+      if (y > ph - 20) { doc.addPage(); y = m; }
+      doc.text(line, m, y);
+      y += 5.2;
+    }
+    y += 4;
+  }
+
+  // Page numbers
+  const pages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(9);
+    doc.setTextColor(150);
+    doc.text(`Page ${p} of ${pages}`, pw - m, ph - 10, { align: 'right' });
+    doc.text("Sample document — generated for testing", m, ph - 10);
+  }
+
+  return doc.output('blob');
+}
+
+async function genDOC() {
+  let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>${TITLE}</title>
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #222; margin: 2.5cm; }
+h1 { font-size: 20pt; color: #7c3aed; margin-bottom: 4pt; }
+h2 { font-size: 14pt; color: #333; margin-top: 18pt; margin-bottom: 6pt; }
+p.subtitle { font-size: 11pt; color: #666; margin-bottom: 12pt; }
+p { margin-bottom: 8pt; line-height: 1.6; }
+hr { border: none; border-top: 2px solid #7c3aed; margin: 12pt 0; }
+.footer { font-size: 9pt; color: #999; margin-top: 24pt; border-top: 1px solid #ddd; padding-top: 8pt; }
+</style></head><body>
+<h1>${TITLE}</h1>
+<p class="subtitle">${SUBTITLE}</p>
+<hr>`;
+
+  const headings = ["Introduction", "Methodology", "Key Findings", "Conclusion"];
+  for (let i = 0; i < LOREM.length; i++) {
+    if (i % 2 === 0) {
+      const hIdx = Math.floor(i / 2);
+      if (hIdx < headings.length) html += `<h2>${hIdx + 1}. ${headings[hIdx]}</h2>`;
+    }
+    html += `<p>${LOREM[i]}</p>`;
+  }
+  html += `<p class="footer">Sample document generated for testing purposes.</p></body></html>`;
+
+  return new Blob([html], { type: 'application/msword' });
+}
+
+async function genDOCX() {
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle } = docx;
+  const headings = ["Introduction", "Methodology", "Key Findings", "Conclusion"];
+  const children = [];
+
+  children.push(new Paragraph({
+    children: [new TextRun({ text: TITLE, bold: true, size: 40, color: "7c3aed" })],
+    spacing: { after: 100 }
+  }));
+
+  children.push(new Paragraph({
+    children: [new TextRun({ text: SUBTITLE, size: 22, color: "666666", italics: true })],
+    spacing: { after: 200 }
+  }));
+
+  children.push(new Paragraph({
+    border: { bottom: { color: "7c3aed", space: 1, style: BorderStyle.SINGLE, size: 6 } },
+    spacing: { after: 300 }
+  }));
+
+  for (let i = 0; i < LOREM.length; i++) {
+    if (i % 2 === 0) {
+      const hIdx = Math.floor(i / 2);
+      if (hIdx < headings.length) {
+        children.push(new Paragraph({
+          text: `${hIdx + 1}. ${headings[hIdx]}`,
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 300, after: 120 }
+        }));
+      }
+    }
+    children.push(new Paragraph({
+      children: [new TextRun({ text: LOREM[i], size: 22 })],
+      spacing: { after: 160 },
+    }));
+  }
+
+  children.push(new Paragraph({
+    children: [new TextRun({ text: "Sample document generated for testing purposes.", size: 18, color: "999999", italics: true })],
+    spacing: { before: 400 }
+  }));
+
+  const doc = new Document({
+    sections: [{ children }]
+  });
+
+  return await Packer.toBlob(doc);
+}
+
+async function genXLSX() {
+  const wb = XLSX.utils.book_new();
+  const data = [SHEET_HEADERS, ...SHEET_ROWS];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 20 }, { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 10 }];
+  XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+async function genODS() {
+  const wb = XLSX.utils.book_new();
+  const data = [SHEET_HEADERS, ...SHEET_ROWS];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 20 }, { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 10 }];
+  XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+  const buf = XLSX.write(wb, { bookType: 'ods', type: 'array' });
+  return new Blob([buf], { type: 'application/vnd.oasis.opendocument.spreadsheet' });
+}
+
+async function genCSV() {
+  const rows = [SHEET_HEADERS, ...SHEET_ROWS];
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(',')).join('\r\n');
+  return new Blob([csv], { type: 'text/csv' });
+}
+
+/* ── Format definitions ── */
+const FORMATS = [
+  { id: 'jpg',  ext: 'jpg',  name: 'JPG Image',   desc: 'Colorful document-style image with headings and text.', size: '~120 KB', gen: genJPG,  badge: 'badge-jpg'  },
+  { id: 'png',  ext: 'png',  name: 'PNG Image',    desc: 'Same document layout as JPG, lossless PNG format.',     size: '~250 KB', gen: genPNG,  badge: 'badge-png'  },
+  { id: 'pdf',  ext: 'pdf',  name: 'PDF Document', desc: 'Multi-section document with headings and page numbers.', size: '~30 KB',  gen: genPDF,  badge: 'badge-pdf'  },
+  { id: 'doc',  ext: 'doc',  name: 'DOC Document', desc: 'HTML-based Word document with styled content.',         size: '~8 KB',   gen: genDOC,  badge: 'badge-doc'  },
+  { id: 'docx', ext: 'docx', name: 'DOCX Document',desc: 'Real Office Open XML document with formatting.',        size: '~15 KB',  gen: genDOCX, badge: 'badge-docx' },
+  { id: 'xlsx', ext: 'xlsx', name: 'XLSX Spreadsheet', desc: '20 rows of realistic transaction data with headers.',size: '~10 KB',  gen: genXLSX, badge: 'badge-xlsx' },
+  { id: 'ods',  ext: 'ods',  name: 'ODS Spreadsheet',  desc: 'Same data as XLSX in OpenDocument format.',         size: '~8 KB',   gen: genODS,  badge: 'badge-ods'  },
+  { id: 'csv',  ext: 'csv',  name: 'CSV File',     desc: 'Plain text comma-separated values with 20 data rows.',  size: '~2 KB',   gen: genCSV,  badge: 'badge-csv'  },
+];
+
+/* ── Build grid ── */
+const grid = document.getElementById('grid');
+FORMATS.forEach(f => {
+  const card = document.createElement('div');
+  card.className = 'format-card';
+  card.innerHTML = `
+    <div class="badge ${f.badge}">${f.ext.toUpperCase()}</div>
+    <div class="format-name">${f.name}</div>
+    <div class="format-desc">${f.desc}</div>
+    <div class="format-size">${f.size}</div>
+    <button class="btn btn-primary" data-format="${f.id}">Download</button>
+  `;
+  card.querySelector('button').addEventListener('click', () => downloadFormat(f));
+  grid.appendChild(card);
+});
+
+async function downloadFormat(f) {
+  const btn = grid.querySelector(`[data-format="${f.id}"]`);
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span>Generating...';
+  btn.disabled = true;
+  try {
+    const blob = await f.gen();
+    downloadBlob(blob, `${getPrefix()}.${f.ext}`);
+  } catch (e) {
+    console.error(`Error generating ${f.id}:`, e);
+    alert(`Failed to generate ${f.name}. Check console for details.`);
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
+}
+
+/* ── Download All ── */
+document.getElementById('download-all').addEventListener('click', async () => {
+  const btn = document.getElementById('download-all');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span>Generating all...';
+  btn.disabled = true;
+  try {
+    for (const f of FORMATS) {
+      const blob = await f.gen();
+      downloadBlob(blob, `${getPrefix()}.${f.ext}`);
+      // Small delay so browser doesn't block multiple downloads
+      await new Promise(r => setTimeout(r, 300));
+    }
+  } catch (e) {
+    console.error('Error in download all:', e);
+    alert('Some files may have failed. Check console for details.');
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
