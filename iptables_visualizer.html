@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iptables Visualizer</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 960px; }
+
+  /* Input area */
+  .input-section { margin-bottom: 1.5rem; }
+
+  .format-tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    margin-bottom: 0.75rem;
+  }
+
+  .format-tab {
+    flex: 1;
+    padding: 7px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .format-tab.active { background: var(--accent); color: #fff; }
+  .format-tab:not(.active):hover { color: var(--text); }
+
+  .rules-input {
+    width: 100%;
+    min-height: 160px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.8rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    border-radius: 6px;
+    resize: vertical;
+    line-height: 1.5;
+    tab-size: 4;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .actions .btn { font-size: 0.82rem; }
+
+  .sample-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-left: auto;
+  }
+
+  .sample-label select {
+    font-size: 0.78rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.35rem;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .stat-badge .stat-num {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-badge.accept { color: var(--green); background: var(--green-dim); border-color: transparent; }
+  .stat-badge.drop { color: var(--red); background: var(--red-dim); border-color: transparent; }
+  .stat-badge.reject { color: var(--amber); background: var(--amber-dim); border-color: transparent; }
+  .stat-badge.other { color: var(--blue); background: var(--blue-dim); border-color: transparent; }
+
+  /* Flow diagram */
+  .flow-section { margin-bottom: 2rem; }
+
+  .flow-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .flow-diagram {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 1rem 0;
+  }
+
+  .flow-node {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-align: center;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    min-width: 80px;
+  }
+
+  .flow-node.packet { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .flow-node.decision { border-radius: 0; transform: rotate(0deg); background: var(--surface-alt); }
+
+  .flow-arrow {
+    flex-shrink: 0;
+    width: 36px;
+    height: 2px;
+    background: var(--border);
+    position: relative;
+  }
+
+  .flow-arrow::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -4px;
+    border: 5px solid transparent;
+    border-left-color: var(--border);
+  }
+
+  /* Table / chain visualization */
+  .table-section {
+    margin-bottom: 2rem;
+    animation: fadeUp 0.2s ease;
+  }
+
+  .table-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .table-header:hover .table-name { color: var(--accent); }
+
+  .table-icon {
+    font-size: 0.85rem;
+    transition: transform 0.15s;
+  }
+
+  .table-icon.collapsed { transform: rotate(-90deg); }
+
+  .table-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    transition: color 0.15s;
+  }
+
+  .table-tag {
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .chain-block {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .chain-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.85rem;
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  .chain-name {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+  }
+
+  .chain-policy {
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    margin-left: auto;
+  }
+
+  .chain-policy.accept { background: var(--green-dim); color: var(--green); }
+  .chain-policy.drop { background: var(--red-dim); color: var(--red); }
+  .chain-policy.reject { background: var(--amber-dim); color: var(--amber); }
+
+  .rule-row {
+    display: grid;
+    grid-template-columns: 36px 80px 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.45rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78rem;
+    transition: background 0.1s;
+  }
+
+  .rule-row:last-child { border-bottom: none; }
+  .rule-row:hover { background: var(--surface-alt); }
+
+  .rule-num {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+
+  .rule-target {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .rule-target.accept { background: var(--green-dim); color: var(--green); }
+  .rule-target.drop { background: var(--red-dim); color: var(--red); }
+  .rule-target.reject { background: var(--amber-dim); color: var(--amber); }
+  .rule-target.log { background: var(--blue-dim); color: var(--blue); }
+  .rule-target.jump { background: var(--accent-dim); color: var(--accent); }
+
+  .rule-match {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.75rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rule-counters {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Empty / error states */
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+
+  .empty-state .icon { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
+
+  .error-msg {
+    padding: 0.65rem 0.85rem;
+    border-radius: 6px;
+    background: var(--red-dim);
+    color: var(--red);
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Tooltip for rule details */
+  .rule-row[title] { cursor: help; }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .rule-row {
+      grid-template-columns: 28px 64px 1fr;
+    }
+    .rule-counters { display: none; }
+    .flow-diagram { font-size: 0.72rem; }
+    .stats-bar { gap: 0.4rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>iptables Visualizer</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Paste iptables output to visualize chains, rules, and packet flow. Supports both <code>iptables-save</code> and <code>iptables -L -v -n</code> formats.</p>
+
+  <div class="input-section">
+    <div class="format-tabs">
+      <button class="format-tab active" data-fmt="save" onclick="setFormat('save')">iptables-save</button>
+      <button class="format-tab" data-fmt="list" onclick="setFormat('list')">iptables -L -v -n</button>
+    </div>
+    <textarea class="rules-input" id="rules-input" placeholder="Paste your iptables rules here..." spellcheck="false"></textarea>
+    <div class="actions">
+      <button class="btn btn-primary" id="parse-btn" onclick="parseAndRender()">Visualize</button>
+      <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+      <span class="sample-label">
+        Load example:
+        <select id="sample-select" onchange="loadSample(this.value)">
+          <option value="">--</option>
+          <option value="basic-save">Basic server (save)</option>
+          <option value="nat-save">NAT gateway (save)</option>
+          <option value="basic-list">Basic server (-L)</option>
+        </select>
+      </span>
+    </div>
+  </div>
+
+  <div id="output"></div>
+</div>
+
+<script>
+const SAMPLES = {
+  'basic-save': `# Generated by iptables-save
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+-A INPUT -i lo -j ACCEPT
+-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 8080 -s 10.0.0.0/8 -j ACCEPT
+-A INPUT -j LOG --log-prefix "DROPPED: " --log-level 4
+-A INPUT -j DROP
+COMMIT`,
+  'nat-save': `# Generated by iptables-save
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+-A PREROUTING -i eth0 -p tcp --dport 80 -j DNAT --to-destination 192.168.1.10:8080
+-A PREROUTING -i eth0 -p tcp --dport 443 -j DNAT --to-destination 192.168.1.10:8443
+-A POSTROUTING -o eth0 -j MASQUERADE
+COMMIT
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+:DOCKER-USER - [0:0]
+-A INPUT -i lo -j ACCEPT
+-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -p tcp --dport 22 -j ACCEPT
+-A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i eth0 -o eth1 -p tcp --dport 8080 -j ACCEPT
+-A FORWARD -i eth0 -o eth1 -p tcp --dport 8443 -j ACCEPT
+-A FORWARD -j DOCKER-USER
+-A DOCKER-USER -s 10.0.0.0/8 -j ACCEPT
+-A DOCKER-USER -j DROP
+COMMIT`,
+  'basic-list': `Chain INPUT (policy DROP 42 packets, 2520 bytes)
+ pkts bytes target     prot opt in     out     source               destination
+  128  9600 ACCEPT     all  --  lo     *       0.0.0.0/0            0.0.0.0/0
+ 3842  512K ACCEPT     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+   12   720 ACCEPT     icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 8
+  256 15360 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:22
+ 1024  128K ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:80
+ 2048  256K ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:443
+   42  2520 LOG        all  --  *      *       0.0.0.0/0            0.0.0.0/0            LOG flags 0 level 4 prefix "DROPPED: "
+   42  2520 DROP       all  --  *      *       0.0.0.0/0            0.0.0.0/0
+
+Chain FORWARD (policy DROP 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination
+
+Chain OUTPUT (policy ACCEPT 5120 packets, 640K bytes)
+ pkts bytes target     prot opt in     out     source               destination`
+};
+
+let currentFormat = 'save';
+
+function setFormat(fmt) {
+  currentFormat = fmt;
+  document.querySelectorAll('.format-tab').forEach(t => t.classList.toggle('active', t.dataset.fmt === fmt));
+  document.getElementById('rules-input').placeholder = fmt === 'save'
+    ? 'Paste iptables-save output here...'
+    : 'Paste iptables -L -v -n output here...';
+}
+
+function loadSample(key) {
+  if (!key) return;
+  const text = SAMPLES[key];
+  document.getElementById('rules-input').value = text;
+  if (key.endsWith('-list')) setFormat('list');
+  else setFormat('save');
+  parseAndRender();
+  document.getElementById('sample-select').value = '';
+}
+
+function clearAll() {
+  document.getElementById('rules-input').value = '';
+  document.getElementById('output').innerHTML = '';
+}
+
+/* ── Parsing ── */
+function parseSaveFormat(text) {
+  const tables = {};
+  let currentTable = null;
+
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    if (line.startsWith('*')) {
+      currentTable = line.slice(1);
+      tables[currentTable] = { chains: {} };
+      continue;
+    }
+
+    if (line === 'COMMIT' || !currentTable) continue;
+
+    // Chain definition :CHAIN POLICY [packets:bytes]
+    const chainMatch = line.match(/^:(\S+)\s+(\S+)\s+\[(\d+):(\d+)\]/);
+    if (chainMatch) {
+      const [, name, policy, pkts, bytes] = chainMatch;
+      tables[currentTable].chains[name] = {
+        name,
+        policy: policy === '-' ? null : policy,
+        counters: { packets: parseInt(pkts), bytes: parseInt(bytes) },
+        rules: []
+      };
+      continue;
+    }
+
+    // Rule: -A CHAIN ...
+    const ruleMatch = line.match(/^-A\s+(\S+)\s+(.*)/);
+    if (ruleMatch) {
+      const [, chainName, ruleStr] = ruleMatch;
+      if (!tables[currentTable].chains[chainName]) {
+        tables[currentTable].chains[chainName] = { name: chainName, policy: null, counters: null, rules: [] };
+      }
+      tables[currentTable].chains[chainName].rules.push(parseSaveRule(ruleStr));
+    }
+  }
+
+  return tables;
+}
+
+function parseSaveRule(str) {
+  const rule = { target: '', protocol: '', source: '', destination: '', inIface: '', outIface: '', match: '', raw: str };
+
+  // Extract target
+  const tMatch = str.match(/-j\s+(\S+)/);
+  if (tMatch) rule.target = tMatch[1];
+
+  // Protocol
+  const pMatch = str.match(/-p\s+(\S+)/);
+  if (pMatch) rule.protocol = pMatch[1];
+
+  // Source
+  const sMatch = str.match(/-s\s+(\S+)/);
+  if (sMatch) rule.source = sMatch[1];
+
+  // Destination
+  const dMatch = str.match(/-d\s+(\S+)/);
+  if (dMatch) rule.destination = dMatch[1];
+
+  // Interfaces
+  const iMatch = str.match(/-i\s+(\S+)/);
+  if (iMatch) rule.inIface = iMatch[1];
+  const oMatch = str.match(/-o\s+(\S+)/);
+  if (oMatch) rule.outIface = oMatch[1];
+
+  // Build human-readable match description
+  const parts = [];
+  if (rule.protocol) parts.push(rule.protocol);
+  if (rule.inIface) parts.push('in:' + rule.inIface);
+  if (rule.outIface) parts.push('out:' + rule.outIface);
+  if (rule.source && rule.source !== '0.0.0.0/0') parts.push('src:' + rule.source);
+  if (rule.destination && rule.destination !== '0.0.0.0/0') parts.push('dst:' + rule.destination);
+
+  // dport / sport
+  const dpMatch = str.match(/--dport\s+(\S+)/);
+  if (dpMatch) parts.push('dport:' + dpMatch[1]);
+  const spMatch = str.match(/--sport\s+(\S+)/);
+  if (spMatch) parts.push('sport:' + spMatch[1]);
+
+  // conntrack
+  const ctMatch = str.match(/--ctstate\s+(\S+)/);
+  if (ctMatch) parts.push('state:' + ctMatch[1]);
+
+  // icmp type
+  const icmpMatch = str.match(/--icmp-type\s+(\S+)/);
+  if (icmpMatch) parts.push('icmp:' + icmpMatch[1]);
+
+  // DNAT/SNAT target details
+  const toDestMatch = str.match(/--to-destination\s+(\S+)/);
+  if (toDestMatch) parts.push('-> ' + toDestMatch[1]);
+  const toSrcMatch = str.match(/--to-source\s+(\S+)/);
+  if (toSrcMatch) parts.push('-> ' + toSrcMatch[1]);
+
+  // log prefix
+  const logMatch = str.match(/--log-prefix\s+"([^"]+)"/);
+  if (logMatch) parts.push('prefix:"' + logMatch[1] + '"');
+
+  rule.match = parts.join('  ');
+  if (!rule.match) rule.match = 'all';
+
+  return rule;
+}
+
+function parseListFormat(text) {
+  const tables = { filter: { chains: {} } };
+  let currentChain = null;
+
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    // Chain header: Chain INPUT (policy DROP 42 packets, 2520 bytes)
+    const chainMatch = line.match(/^Chain\s+(\S+)\s+\(policy\s+(\S+)\s+(\d+)\s+packets,\s+(\S+)\s+bytes\)/);
+    if (chainMatch) {
+      const [, name, policy, pkts, bytes] = chainMatch;
+      currentChain = name;
+      tables.filter.chains[name] = {
+        name, policy,
+        counters: { packets: parseInt(pkts), bytes: parseByteStr(bytes) },
+        rules: []
+      };
+      continue;
+    }
+
+    // Chain with references: Chain DOCKER-USER (1 references)
+    const refChainMatch = line.match(/^Chain\s+(\S+)\s+\((\d+)\s+references?\)/);
+    if (refChainMatch) {
+      const [, name] = refChainMatch;
+      currentChain = name;
+      tables.filter.chains[name] = { name, policy: null, counters: null, rules: [] };
+      continue;
+    }
+
+    // Skip header row
+    if (line.startsWith('pkts') || line.startsWith('num')) continue;
+
+    // Rule row
+    if (currentChain && /^\s*\d/.test(rawLine)) {
+      const rule = parseListRule(rawLine);
+      if (rule) tables.filter.chains[currentChain].rules.push(rule);
+    }
+  }
+
+  return tables;
+}
+
+function parseByteStr(s) {
+  const m = s.match(/^([\d.]+)([KMG])?$/);
+  if (!m) return parseInt(s) || 0;
+  const n = parseFloat(m[1]);
+  switch (m[2]) {
+    case 'K': return Math.round(n * 1024);
+    case 'M': return Math.round(n * 1048576);
+    case 'G': return Math.round(n * 1073741824);
+    default: return Math.round(n);
+  }
+}
+
+function parseListRule(line) {
+  // pkts bytes target prot opt in out source destination [extras]
+  const parts = line.trim().split(/\s+/);
+  if (parts.length < 9) return null;
+
+  const [pkts, bytes, target, prot, , inIf, outIf, src, dst, ...extras] = parts;
+  const matchParts = [];
+
+  if (prot && prot !== 'all') matchParts.push(prot);
+  if (inIf && inIf !== '*') matchParts.push('in:' + inIf);
+  if (outIf && outIf !== '*') matchParts.push('out:' + outIf);
+  if (src && src !== '0.0.0.0/0') matchParts.push('src:' + src);
+  if (dst && dst !== '0.0.0.0/0') matchParts.push('dst:' + dst);
+
+  const extraStr = extras.join(' ');
+  if (extraStr) {
+    // dpt:XX
+    const dpMatch = extraStr.match(/dpt:(\S+)/);
+    if (dpMatch) matchParts.push('dport:' + dpMatch[1]);
+    // spt:XX
+    const spMatch = extraStr.match(/spt:(\S+)/);
+    if (spMatch) matchParts.push('sport:' + spMatch[1]);
+    // ctstate
+    const ctMatch = extraStr.match(/ctstate\s+(\S+)/);
+    if (ctMatch) matchParts.push('state:' + ctMatch[1]);
+    // icmptype
+    const icmpMatch = extraStr.match(/icmptype\s+(\S+)/);
+    if (icmpMatch) matchParts.push('icmp:type' + icmpMatch[1]);
+    // LOG prefix
+    const logMatch = extraStr.match(/prefix\s+"([^"]+)"/);
+    if (logMatch) matchParts.push('prefix:"' + logMatch[1] + '"');
+  }
+
+  return {
+    target: target || '',
+    protocol: prot || '',
+    source: src || '',
+    destination: dst || '',
+    inIface: inIf || '',
+    outIface: outIf || '',
+    match: matchParts.join('  ') || 'all',
+    raw: line.trim(),
+    counters: { packets: parseByteStr(pkts), bytes: parseByteStr(bytes) }
+  };
+}
+
+/* ── Rendering ── */
+function parseAndRender() {
+  const text = document.getElementById('rules-input').value.trim();
+  const output = document.getElementById('output');
+
+  if (!text) {
+    output.innerHTML = '<div class="empty-state"><span class="icon">&#128270;</span>Paste iptables rules above and click Visualize</div>';
+    return;
+  }
+
+  let tables;
+  try {
+    tables = currentFormat === 'save' ? parseSaveFormat(text) : parseListFormat(text);
+  } catch (e) {
+    output.innerHTML = '<div class="error-msg">Failed to parse rules: ' + esc(e.message) + '</div>';
+    return;
+  }
+
+  const tableNames = Object.keys(tables);
+  if (tableNames.length === 0) {
+    output.innerHTML = '<div class="error-msg">No tables or chains found. Check the input format.</div>';
+    return;
+  }
+
+  let html = '';
+
+  // Stats
+  const stats = computeStats(tables);
+  html += renderStats(stats);
+
+  // Packet flow diagram
+  html += renderFlowDiagram(tables);
+
+  // Tables and chains
+  for (const tName of tableNames) {
+    html += renderTable(tName, tables[tName]);
+  }
+
+  output.innerHTML = html;
+}
+
+function computeStats(tables) {
+  const stats = { totalRules: 0, accept: 0, drop: 0, reject: 0, log: 0, other: 0, tables: 0, chains: 0 };
+  for (const tName in tables) {
+    stats.tables++;
+    for (const cName in tables[tName].chains) {
+      stats.chains++;
+      for (const rule of tables[tName].chains[cName].rules) {
+        stats.totalRules++;
+        const t = rule.target.toUpperCase();
+        if (t === 'ACCEPT') stats.accept++;
+        else if (t === 'DROP') stats.drop++;
+        else if (t === 'REJECT') stats.reject++;
+        else if (t === 'LOG') stats.log++;
+        else stats.other++;
+      }
+    }
+  }
+  return stats;
+}
+
+function renderStats(stats) {
+  return '<div class="stats-bar">' +
+    '<span class="stat-badge"><span class="stat-num">' + stats.totalRules + '</span> rules</span>' +
+    '<span class="stat-badge"><span class="stat-num">' + stats.tables + '</span> tables</span>' +
+    '<span class="stat-badge"><span class="stat-num">' + stats.chains + '</span> chains</span>' +
+    (stats.accept ? '<span class="stat-badge accept"><span class="stat-num">' + stats.accept + '</span> ACCEPT</span>' : '') +
+    (stats.drop ? '<span class="stat-badge drop"><span class="stat-num">' + stats.drop + '</span> DROP</span>' : '') +
+    (stats.reject ? '<span class="stat-badge reject"><span class="stat-num">' + stats.reject + '</span> REJECT</span>' : '') +
+    (stats.log ? '<span class="stat-badge other"><span class="stat-num">' + stats.log + '</span> LOG</span>' : '') +
+    '</div>';
+}
+
+function renderFlowDiagram(tables) {
+  const hasNat = !!tables.nat;
+  const hasMangle = !!tables.mangle;
+  const hasRaw = !!tables.raw;
+  const hasFilter = !!tables.filter;
+
+  // Show the standard netfilter packet flow for tables that exist
+  const inNodes = [];
+  inNodes.push({ label: 'Packet In', cls: 'packet' });
+  if (hasRaw) inNodes.push({ label: 'raw\nPREROUTING' });
+  if (hasMangle) inNodes.push({ label: 'mangle\nPREROUTING' });
+  if (hasNat) inNodes.push({ label: 'nat\nPREROUTING' });
+  inNodes.push({ label: 'Routing\nDecision', cls: 'decision' });
+
+  const fwdNodes = [{ label: 'FORWARD', cls: '' }];
+  if (hasNat) fwdNodes.push({ label: 'nat\nPOSTROUTING' });
+  fwdNodes.push({ label: 'Packet Out', cls: 'packet' });
+
+  const localIn = [{ label: 'INPUT' }];
+  localIn.push({ label: 'Local\nProcess', cls: 'decision' });
+
+  const localOut = [{ label: 'OUTPUT' }];
+  if (hasNat) localOut.push({ label: 'nat\nOUTPUT' });
+  localOut.push({ label: 'Packet Out', cls: 'packet' });
+
+  let html = '<div class="flow-section">';
+  html += '<div class="flow-title">Packet Flow &#8212; Ingress</div>';
+  html += '<div class="flow-diagram">' + inNodes.map(renderFlowNode).join(renderArrow()) + '</div>';
+
+  html += '<div class="flow-title" style="margin-top:0.5rem">&#8627; Forward path</div>';
+  html += '<div class="flow-diagram">' + fwdNodes.map(renderFlowNode).join(renderArrow()) + '</div>';
+
+  html += '<div class="flow-title" style="margin-top:0.5rem">&#8627; Local input</div>';
+  html += '<div class="flow-diagram">' + localIn.map(renderFlowNode).join(renderArrow()) + '</div>';
+
+  html += '<div class="flow-title" style="margin-top:0.5rem">&#8627; Local output</div>';
+  html += '<div class="flow-diagram">' + localOut.map(renderFlowNode).join(renderArrow()) + '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+function renderFlowNode(node) {
+  const cls = 'flow-node' + (node.cls ? ' ' + node.cls : '');
+  return '<div class="' + cls + '">' + esc(node.label).replace(/\n/g, '<br>') + '</div>';
+}
+
+function renderArrow() {
+  return '<div class="flow-arrow"></div>';
+}
+
+function renderTable(name, table) {
+  const chainCount = Object.keys(table.chains).length;
+  let totalRules = 0;
+  for (const c in table.chains) totalRules += table.chains[c].rules.length;
+
+  let html = '<div class="table-section" data-table="' + esc(name) + '">';
+  html += '<div class="table-header" onclick="toggleTable(this)">';
+  html += '<span class="table-icon">&#9660;</span>';
+  html += '<span class="table-name">' + esc(name) + '</span>';
+  html += '<span class="table-tag">' + chainCount + ' chains, ' + totalRules + ' rules</span>';
+  html += '</div>';
+  html += '<div class="table-body">';
+
+  for (const cName in table.chains) {
+    html += renderChain(table.chains[cName]);
+  }
+
+  html += '</div></div>';
+  return html;
+}
+
+function renderChain(chain) {
+  let html = '<div class="chain-block">';
+  html += '<div class="chain-header">';
+  html += '<span class="chain-name">' + esc(chain.name) + '</span>';
+  if (chain.policy) {
+    const pCls = chain.policy.toLowerCase();
+    html += '<span class="chain-policy ' + pCls + '">' + esc(chain.policy) + '</span>';
+  }
+  if (chain.counters) {
+    html += '<span class="rule-counters" style="margin-left:auto">' + fmtCount(chain.counters.packets) + ' pkts / ' + fmtBytes(chain.counters.bytes) + '</span>';
+  }
+  html += '</div>';
+
+  if (chain.rules.length === 0) {
+    html += '<div class="rule-row" style="grid-template-columns:1fr;justify-items:center;color:var(--text-muted);font-size:0.78rem;">(empty chain)</div>';
+  } else {
+    chain.rules.forEach((rule, i) => {
+      const tCls = targetClass(rule.target);
+      const counters = rule.counters
+        ? fmtCount(rule.counters.packets) + ' / ' + fmtBytes(rule.counters.bytes)
+        : '';
+      html += '<div class="rule-row" title="' + esc(rule.raw) + '">';
+      html += '<span class="rule-num">' + (i + 1) + '</span>';
+      html += '<span class="rule-target ' + tCls + '">' + esc(rule.target) + '</span>';
+      html += '<span class="rule-match">' + esc(rule.match) + '</span>';
+      html += '<span class="rule-counters">' + counters + '</span>';
+      html += '</div>';
+    });
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function targetClass(target) {
+  switch (target.toUpperCase()) {
+    case 'ACCEPT': return 'accept';
+    case 'DROP': return 'drop';
+    case 'REJECT': return 'reject';
+    case 'LOG': return 'log';
+    case 'MASQUERADE': case 'SNAT': case 'DNAT': case 'REDIRECT': return 'log';
+    default: return 'jump';
+  }
+}
+
+function fmtCount(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + 'G';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
+function fmtBytes(n) {
+  if (n >= 1073741824) return (n / 1073741824).toFixed(1) + ' GB';
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  return n + ' B';
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function toggleTable(header) {
+  const icon = header.querySelector('.table-icon');
+  const body = header.nextElementSibling;
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  icon.classList.toggle('collapsed', !collapsed);
+}
+
+// Auto-parse on Enter key (Ctrl/Cmd+Enter)
+document.getElementById('rules-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    parseAndRender();
+  }
+});
+</script>
+</body>
+</html>
