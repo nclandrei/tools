@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>jq Visualizer</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 1100px; }
+
+  .playground {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 700px) {
+    .playground { grid-template-columns: 1fr; }
+  }
+
+  .filter-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  .filter-bar input {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.9rem;
+    padding: 0.6rem 0.85rem;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .panel-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .panel-actions {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .panel-actions button {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+  }
+
+  .editor {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    padding: 0.85rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    resize: none;
+    min-height: 320px;
+    tab-size: 2;
+  }
+  .editor:focus { border-color: var(--accent); }
+
+  .output-area {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    padding: 0.85rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    min-height: 320px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .error-output {
+    border-color: var(--red);
+    color: var(--red);
+    background: var(--red-dim);
+  }
+
+  /* Syntax highlighting in output */
+  .j-str { color: var(--green); }
+  .j-num { color: var(--blue); }
+  .j-bool { color: var(--amber); }
+  .j-null { color: var(--text-muted); }
+  .j-key { color: var(--accent); }
+  .j-brace { color: var(--text-muted); }
+  .j-colon { color: var(--text-muted); }
+
+  /* Pipeline steps */
+  .pipeline {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: 2rem;
+  }
+  .pipe-step {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pipe-step:hover { border-color: var(--accent); }
+  .pipe-step.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .pipe-arrow {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    user-select: none;
+  }
+
+  /* Cheat sheet */
+  .cheatsheet {
+    grid-column: 1 / -1;
+    margin-top: 0.5rem;
+  }
+  .cheatsheet summary {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .cheatsheet summary:hover { color: var(--text); }
+  .cheatsheet-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .cheat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 4px;
+    background: var(--surface-alt);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .cheat-item:hover { background: var(--accent-dim); }
+  .cheat-expr {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .cheat-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-align: right;
+  }
+
+  /* Presets dropdown */
+  .preset-select {
+    font-size: 0.82rem;
+    padding: 0.5rem 0.7rem;
+    min-width: 140px;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: var(--accent);
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 999;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="/">&larr; All tools</a>
+    <h1>jq Visualizer</h1>
+  </header>
+  <p class="desc">Write jq filters interactively. See each pipeline step, get instant output with syntax highlighting.</p>
+
+  <div class="playground">
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <input type="text" id="filter" value="." placeholder="jq filter expression…" spellcheck="false" autocomplete="off">
+      <select id="presets" class="preset-select">
+        <option value="">Presets…</option>
+        <option value=".">Identity (.)</option>
+        <option value=".[]">Iterate (.[])</option>
+        <option value=".[] | .name">Pluck field</option>
+        <option value="map(select(.age > 25))">Filter by value</option>
+        <option value="group_by(.type) | map({key: .[0].type, value: length}) | from_entries">Group &amp; count</option>
+        <option value="[.[] | {name, age}]">Reshape objects</option>
+        <option value="sort_by(.age) | reverse">Sort descending</option>
+        <option value='[.[] | select(.name | test("^A"))]'>Regex filter</option>
+        <option value="length">Length</option>
+        <option value="keys">Keys</option>
+        <option value="to_entries">To entries</option>
+        <option value="flatten">Flatten</option>
+      </select>
+    </div>
+
+    <!-- Pipeline steps -->
+    <div class="pipeline" id="pipeline"></div>
+
+    <!-- Input panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-label">Input JSON</span>
+        <div class="panel-actions">
+          <button class="btn btn-secondary" onclick="formatInput()">Format</button>
+          <button class="btn btn-secondary" onclick="loadSample()">Sample</button>
+        </div>
+      </div>
+      <textarea class="editor" id="input" spellcheck="false"></textarea>
+    </div>
+
+    <!-- Output panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-label">Output</span>
+        <div class="panel-actions">
+          <button class="btn btn-secondary" id="copyBtn" onclick="copyOutput()">Copy</button>
+        </div>
+      </div>
+      <div class="output-area" id="output"></div>
+    </div>
+
+    <!-- Cheat sheet -->
+    <details class="cheatsheet">
+      <summary>jq cheat sheet</summary>
+      <div class="cheatsheet-grid" id="cheatsheet"></div>
+    </details>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Sample data ──
+const SAMPLE = [
+  { "name": "Alice", "age": 30, "type": "engineer", "active": true, "tags": ["go", "rust"] },
+  { "name": "Bob", "age": 25, "type": "designer", "active": false, "tags": ["figma"] },
+  { "name": "Carol", "age": 35, "type": "engineer", "active": true, "tags": ["python", "sql"] },
+  { "name": "Dan", "age": 28, "type": "pm", "active": true, "tags": [] },
+  { "name": "Eve", "age": 32, "type": "designer", "active": false, "tags": ["sketch", "css"] }
+];
+
+// ── Cheat sheet data ──
+const CHEATS = [
+  ['.', 'Identity'],
+  ['.foo', 'Field access'],
+  ['.foo.bar', 'Nested field'],
+  ['.foo?', 'Optional field'],
+  ['.[]', 'Iterate array/object'],
+  ['.[0]', 'Index array'],
+  ['.[2:5]', 'Slice array'],
+  ['.[] | .name', 'Pluck field'],
+  ['select(.x > 1)', 'Filter values'],
+  ['map(f)', 'Apply to each'],
+  ['length', 'Length'],
+  ['keys', 'Object keys'],
+  ['values', 'Object values'],
+  ['has("key")', 'Key exists?'],
+  ['in(obj)', 'Value in object?'],
+  ['type', 'Value type'],
+  ['sort_by(.f)', 'Sort by field'],
+  ['group_by(.f)', 'Group by field'],
+  ['unique_by(.f)', 'Unique by field'],
+  ['flatten', 'Flatten nested arrays'],
+  ['add', 'Sum / concat'],
+  ['any', 'Any truthy?'],
+  ['all', 'All truthy?'],
+  ['min_by(.f)', 'Minimum by field'],
+  ['max_by(.f)', 'Maximum by field'],
+  ['to_entries', 'Object → [{key,value}]'],
+  ['from_entries', '[{key,value}] → object'],
+  ['with_entries(f)', 'Transform entries'],
+  ['test("re")', 'Regex test'],
+  ['match("re")', 'Regex match'],
+  ['capture("(?<n>re)")', 'Named capture'],
+  ['split(",")', 'Split string'],
+  ['join(",")', 'Join array'],
+  ['ascii_downcase', 'Lowercase'],
+  ['tostring', 'To string'],
+  ['tonumber', 'To number'],
+  ['not', 'Boolean not'],
+  ['if . then a else b end', 'Conditional'],
+  ['try f catch e', 'Try/catch'],
+  ['reduce .[] as $x (0; .+$x)', 'Reduce'],
+  ['limit(n; f)', 'Take first n'],
+  ['first(f)', 'First result'],
+  ['last(f)', 'Last result'],
+  ['env.VAR', 'Env variable'],
+  ['@base64', 'Base64 encode'],
+  ['@uri', 'URI encode'],
+  ['@csv', 'Format as CSV'],
+  ['@tsv', 'Format as TSV'],
+  ['@html', 'HTML escape'],
+  ['@json', 'JSON encode'],
+  ['def f(x): body;', 'Define function'],
+  ['label $x | f', 'Label / break'],
+  ['$__loc__', 'Source location'],
+  ['input', 'Read next input'],
+  ['debug', 'Debug print'],
+  ['path(.f)', 'Path to field'],
+  ['getpath(p)', 'Get by path'],
+  ['setpath(p;v)', 'Set by path'],
+  ['delpaths(ps)', 'Delete paths'],
+  ['leaf_paths', 'All leaf paths'],
+  ['recurse', 'Walk all values'],
+  ['.. | numbers', 'All numbers'],
+  ['[., .]', 'Duplicate value'],
+  ['{a,b}', 'Pick fields'],
+  ['{name: .foo}', 'Rename field'],
+  ['. + {new: 1}', 'Add field'],
+  ['del(.foo)', 'Delete field'],
+  ['to_entries | map(select(.value != null)) | from_entries', 'Remove nulls'],
+  ['[{a:1},{b:2}] | add', 'Merge objects'],
+  ['.. | strings', 'All strings'],
+  ['indices("x")', 'Find indices'],
+  ['inside(b)', 'Is subset?'],
+  ['contains(b)', 'Contains?'],
+  ['ascii_upcase', 'Uppercase'],
+  ['ltrimstr("x")', 'Trim prefix'],
+  ['rtrimstr("x")', 'Trim suffix'],
+  ['gsub("a";"b")', 'Replace all'],
+  ['sub("a";"b")', 'Replace first'],
+  ['null // "default"', 'Alternative (//)'],
+  ['. as $x | f', 'Bind variable'],
+  ['foreach .[] as $x (init; update)', 'Foreach'],
+  ['isnan', 'Is NaN?'],
+  ['isinfinite', 'Is infinite?'],
+  ['nan', 'NaN literal'],
+  ['infinite', 'Infinity literal'],
+  ['builtins | length', 'Count builtins'],
+  ['[range(5)]', 'Generate range'],
+  ['transpose', 'Transpose arrays'],
+  ['combinations', 'All combos'],
+  ['ascii', 'Char code'],
+  ['implode', 'Codes → string'],
+  ['explode', 'String → codes'],
+  ['tojson', 'Encode JSON string'],
+  ['fromjson', 'Decode JSON string'],
+  ['modulemeta', 'Module metadata'],
+  ['halt_error', 'Exit with error'],
+  ['isempty(f)', 'No results?'],
+  ['until(cond; update)', 'Loop until'],
+  ['while(cond; update)', 'Loop while'],
+  ['repeat(f)', 'Repeat forever'],
+  ['nth(n; f)', 'Nth result'],
+  ['paths', 'All paths'],
+  ['getpath(["a","b"])', 'Deep get'],
+  ['setpath(["a"];1)', 'Deep set'],
+  ['walk(f)', 'Transform tree'],
+  ['env', 'All env vars'],
+  ['$ENV', 'Env object'],
+  ['now', 'Unix timestamp'],
+  ['strftime("%Y")', 'Format time'],
+  ['empty', 'No output'],
+  ['error("msg")', 'Raise error'],
+  ['limit(3; .[])', 'First 3 items'],
+  ['[.[] | select(. > 2)]', 'Filter array'],
+  ['map(. * 2)', 'Transform each'],
+  ['group_by(.t) | map({(.[0].t): length}) | add', 'Histogram'],
+  ['[.[] | .tags[]] | unique', 'Unique flat tags'],
+  ['INDEX(.[]; .name)', 'Index by field'],
+  ['IN("a", "b")', 'Value in set?'],
+];
+
+const filterEl = document.getElementById('filter');
+const inputEl = document.getElementById('input');
+const outputEl = document.getElementById('output');
+const pipelineEl = document.getElementById('pipeline');
+const presetsEl = document.getElementById('presets');
+const cheatEl = document.getElementById('cheatsheet');
+
+// ── Init ──
+inputEl.value = JSON.stringify(SAMPLE, null, 2);
+buildCheatsheet();
+evaluate();
+
+// ── Events ──
+filterEl.addEventListener('input', evaluate);
+inputEl.addEventListener('input', evaluate);
+presetsEl.addEventListener('change', () => {
+  if (presetsEl.value) {
+    filterEl.value = presetsEl.value;
+    presetsEl.value = '';
+    evaluate();
+    filterEl.focus();
+  }
+});
+
+// Keyboard shortcut: Ctrl/Cmd+Enter to format
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    formatInput();
+  }
+});
+
+// ── jq Engine (pure JS implementation) ──
+
+function evaluate() {
+  const filter = filterEl.value.trim() || '.';
+  let input;
+  try {
+    input = JSON.parse(inputEl.value);
+  } catch (e) {
+    showError('Invalid JSON input: ' + e.message);
+    buildPipeline([filter]);
+    return;
+  }
+
+  // Parse pipeline steps
+  const steps = parsePipeline(filter);
+  buildPipeline(steps);
+
+  try {
+    const results = runJq(filter, input);
+    showResult(results);
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+function parsePipeline(filter) {
+  // Split on top-level pipes (not inside parens, brackets, or strings)
+  const steps = [];
+  let depth = 0;
+  let inStr = false;
+  let escape = false;
+  let current = '';
+
+  for (let i = 0; i < filter.length; i++) {
+    const ch = filter[i];
+    if (escape) { current += ch; escape = false; continue; }
+    if (ch === '\\') { current += ch; escape = true; continue; }
+    if (ch === '"') { inStr = !inStr; current += ch; continue; }
+    if (inStr) { current += ch; continue; }
+    if ('([{'.includes(ch)) { depth++; current += ch; continue; }
+    if (')]}'.includes(ch)) { depth--; current += ch; continue; }
+    if (ch === '|' && depth === 0) {
+      const s = current.trim();
+      if (s) steps.push(s);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  const s = current.trim();
+  if (s) steps.push(s);
+  return steps.length ? steps : ['.'];
+}
+
+function buildPipeline(steps) {
+  pipelineEl.innerHTML = '';
+  steps.forEach((step, i) => {
+    if (i > 0) {
+      const arrow = document.createElement('span');
+      arrow.className = 'pipe-arrow';
+      arrow.textContent = '→';
+      pipelineEl.appendChild(arrow);
+    }
+    const el = document.createElement('span');
+    el.className = 'pipe-step';
+    el.textContent = step;
+    el.title = 'Click to edit this step';
+    el.addEventListener('click', () => {
+      // Select just this step in the filter input
+      filterEl.focus();
+      filterEl.setSelectionRange(0, filterEl.value.length);
+    });
+    pipelineEl.appendChild(el);
+  });
+}
+
+// ── jq Runtime ──
+// A simplified but reasonably capable jq interpreter in pure JS
+
+function runJq(filter, input) {
+  const steps = parsePipeline(filter);
+  let values = [input];
+
+  for (const step of steps) {
+    const next = [];
+    for (const val of values) {
+      const results = evalStep(step, val);
+      next.push(...results);
+    }
+    values = next;
+  }
+
+  return values;
+}
+
+function evalStep(expr, input) {
+  expr = expr.trim();
+
+  // Identity
+  if (expr === '.') return [input];
+
+  // Empty
+  if (expr === 'empty') return [];
+
+  // null / true / false / numbers
+  if (expr === 'null') return [null];
+  if (expr === 'true') return [true];
+  if (expr === 'false') return [false];
+  if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(expr)) return [Number(expr)];
+
+  // String literal
+  if (/^".*"$/.test(expr)) {
+    try { return [JSON.parse(expr)]; } catch { return [expr.slice(1, -1)]; }
+  }
+
+  // length
+  if (expr === 'length') {
+    if (input === null) return [0];
+    if (typeof input === 'string' || Array.isArray(input)) return [input.length];
+    if (typeof input === 'object') return [Object.keys(input).length];
+    if (typeof input === 'number') return [Math.abs(input)];
+    return [0];
+  }
+
+  // keys / keys_unsorted
+  if (expr === 'keys' || expr === 'keys_unsorted') {
+    if (Array.isArray(input)) return [input.map((_, i) => i)];
+    if (typeof input === 'object' && input !== null) {
+      const k = Object.keys(input);
+      return [expr === 'keys' ? k.sort() : k];
+    }
+    throw new Error('keys requires object or array');
+  }
+
+  // values
+  if (expr === 'values') {
+    if (Array.isArray(input)) return [input];
+    if (typeof input === 'object' && input !== null) return [Object.values(input)];
+    throw new Error('values requires object or array');
+  }
+
+  // type
+  if (expr === 'type') {
+    if (input === null) return ['null'];
+    if (Array.isArray(input)) return ['array'];
+    return [typeof input];
+  }
+
+  // not
+  if (expr === 'not') return [!input];
+
+  // reverse
+  if (expr === 'reverse') {
+    if (Array.isArray(input)) return [[...input].reverse()];
+    if (typeof input === 'string') return [input.split('').reverse().join('')];
+    throw new Error('reverse requires array or string');
+  }
+
+  // flatten
+  if (expr === 'flatten') {
+    if (!Array.isArray(input)) throw new Error('flatten requires array');
+    return [input.flat(Infinity)];
+  }
+  const flattenN = expr.match(/^flatten\((\d+)\)$/);
+  if (flattenN) return [input.flat(Number(flattenN[1]))];
+
+  // add
+  if (expr === 'add') {
+    if (!Array.isArray(input) || input.length === 0) return [null];
+    if (typeof input[0] === 'number') return [input.reduce((a, b) => a + b, 0)];
+    if (typeof input[0] === 'string') return [input.join('')];
+    if (Array.isArray(input[0])) return [input.flat(1)];
+    if (typeof input[0] === 'object') return [Object.assign({}, ...input)];
+    return [null];
+  }
+
+  // any / all
+  if (expr === 'any') { return [Array.isArray(input) ? input.some(Boolean) : !!input]; }
+  if (expr === 'all') { return [Array.isArray(input) ? input.every(Boolean) : !!input]; }
+
+  // min / max
+  if (expr === 'min') { return [Array.isArray(input) ? Math.min(...input) : input]; }
+  if (expr === 'max') { return [Array.isArray(input) ? Math.max(...input) : input]; }
+
+  // unique
+  if (expr === 'unique') {
+    if (!Array.isArray(input)) throw new Error('unique requires array');
+    return [[...new Set(input.map(JSON.stringify))].map(JSON.parse)];
+  }
+
+  // to_entries / from_entries
+  if (expr === 'to_entries') {
+    if (typeof input !== 'object' || input === null || Array.isArray(input))
+      throw new Error('to_entries requires object');
+    return [Object.entries(input).map(([key, value]) => ({ key, value }))];
+  }
+  if (expr === 'from_entries') {
+    if (!Array.isArray(input)) throw new Error('from_entries requires array');
+    const obj = {};
+    for (const e of input) {
+      const k = e.key !== undefined ? e.key : e.name;
+      obj[k] = e.value;
+    }
+    return [obj];
+  }
+
+  // ascii_downcase / ascii_upcase
+  if (expr === 'ascii_downcase') return [String(input).toLowerCase()];
+  if (expr === 'ascii_upcase') return [String(input).toUpperCase()];
+
+  // tostring / tonumber
+  if (expr === 'tostring') return [typeof input === 'string' ? input : JSON.stringify(input)];
+  if (expr === 'tonumber') return [Number(input)];
+
+  // sort (bare)
+  if (expr === 'sort') {
+    if (!Array.isArray(input)) throw new Error('sort requires array');
+    return [[...input].sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') return a - b;
+      return String(a).localeCompare(String(b));
+    })];
+  }
+
+  // first / last
+  if (expr === 'first') {
+    if (Array.isArray(input)) return input.length ? [input[0]] : [];
+    return [input];
+  }
+  if (expr === 'last') {
+    if (Array.isArray(input)) return input.length ? [input[input.length - 1]] : [];
+    return [input];
+  }
+
+  // debug
+  if (expr === 'debug') {
+    console.log('jq debug:', input);
+    return [input];
+  }
+
+  // recurse / ..
+  if (expr === 'recurse' || expr === '..') {
+    const results = [];
+    function walk(v) {
+      results.push(v);
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (typeof v === 'object' && v !== null) Object.values(v).forEach(walk);
+    }
+    walk(input);
+    return results;
+  }
+
+  // .[] — iterate
+  if (expr === '.[]') {
+    if (Array.isArray(input)) return input;
+    if (typeof input === 'object' && input !== null) return Object.values(input);
+    throw new Error('Cannot iterate over ' + typeof input);
+  }
+
+  // .[]? — optional iterate
+  if (expr === '.[]?') {
+    if (Array.isArray(input)) return input;
+    if (typeof input === 'object' && input !== null) return Object.values(input);
+    return [];
+  }
+
+  // .[n] — index
+  const idxMatch = expr.match(/^\.\[(-?\d+)\]$/);
+  if (idxMatch) {
+    const idx = Number(idxMatch[1]);
+    if (Array.isArray(input)) {
+      const i = idx < 0 ? input.length + idx : idx;
+      return [input[i] !== undefined ? input[i] : null];
+    }
+    return [null];
+  }
+
+  // .[n:m] — slice
+  const sliceMatch = expr.match(/^\.\[(\d*):(\d*)\]$/);
+  if (sliceMatch) {
+    if (Array.isArray(input) || typeof input === 'string') {
+      const start = sliceMatch[1] ? Number(sliceMatch[1]) : 0;
+      const end = sliceMatch[2] ? Number(sliceMatch[2]) : input.length;
+      return [input.slice(start, end)];
+    }
+    return [null];
+  }
+
+  // .field or .field.nested or .field? — field access
+  const fieldMatch = expr.match(/^\.([a-zA-Z_][a-zA-Z0-9_]*(?:\??\.(?:[a-zA-Z_][a-zA-Z0-9_]*))*)\??$/);
+  if (fieldMatch) {
+    const path = fieldMatch[1].replace(/\?/g, '');
+    const optional = expr.endsWith('?');
+    const parts = path.split('.');
+    let val = input;
+    for (const part of parts) {
+      if (val === null || val === undefined) return optional ? [] : [null];
+      if (typeof val !== 'object') return optional ? [] : [null];
+      val = val[part];
+    }
+    return [val !== undefined ? val : null];
+  }
+
+  // .field[] — field then iterate
+  const fieldIterMatch = expr.match(/^\.([a-zA-Z_][a-zA-Z0-9_]*)\[\]$/);
+  if (fieldIterMatch) {
+    const val = input?.[fieldIterMatch[1]];
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'object' && val !== null) return Object.values(val);
+    throw new Error('Cannot iterate over ' + typeof val);
+  }
+
+  // Array construction [f]
+  if (expr.startsWith('[') && expr.endsWith(']')) {
+    const inner = expr.slice(1, -1).trim();
+    if (inner === '') return [[]];
+    const results = evalStep(inner, input);
+    return [results];
+  }
+
+  // Object construction {a, b} or {name: .foo}
+  if (expr.startsWith('{') && expr.endsWith('}')) {
+    return evalObjectConstruction(expr, input);
+  }
+
+  // map(f)
+  const mapMatch = expr.match(/^map\((.+)\)$/);
+  if (mapMatch) {
+    if (!Array.isArray(input)) throw new Error('map requires array');
+    const results = [];
+    for (const item of input) {
+      const r = runJq(mapMatch[1], item);
+      results.push(...r);
+    }
+    return [results];
+  }
+
+  // map_values(f)
+  const mapValMatch = expr.match(/^map_values\((.+)\)$/);
+  if (mapValMatch) {
+    if (typeof input === 'object' && input !== null && !Array.isArray(input)) {
+      const obj = {};
+      for (const [k, v] of Object.entries(input)) {
+        const r = runJq(mapValMatch[1], v);
+        obj[k] = r.length === 1 ? r[0] : r;
+      }
+      return [obj];
+    }
+    if (Array.isArray(input)) {
+      return [input.map(v => { const r = runJq(mapValMatch[1], v); return r.length === 1 ? r[0] : r; })];
+    }
+    throw new Error('map_values requires object or array');
+  }
+
+  // select(f)
+  const selMatch = expr.match(/^select\((.+)\)$/);
+  if (selMatch) {
+    const cond = evalCondition(selMatch[1], input);
+    return cond ? [input] : [];
+  }
+
+  // sort_by(.f)
+  const sortByMatch = expr.match(/^sort_by\((.+)\)$/);
+  if (sortByMatch) {
+    if (!Array.isArray(input)) throw new Error('sort_by requires array');
+    const key = sortByMatch[1];
+    return [[...input].sort((a, b) => {
+      const va = runJq(key, a)[0];
+      const vb = runJq(key, b)[0];
+      if (typeof va === 'number' && typeof vb === 'number') return va - vb;
+      return String(va).localeCompare(String(vb));
+    })];
+  }
+
+  // group_by(.f)
+  const groupByMatch = expr.match(/^group_by\((.+)\)$/);
+  if (groupByMatch) {
+    if (!Array.isArray(input)) throw new Error('group_by requires array');
+    const key = groupByMatch[1];
+    const groups = new Map();
+    for (const item of input) {
+      const k = JSON.stringify(runJq(key, item)[0]);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(item);
+    }
+    return [[...groups.values()]];
+  }
+
+  // unique_by(.f)
+  const uniqueByMatch = expr.match(/^unique_by\((.+)\)$/);
+  if (uniqueByMatch) {
+    if (!Array.isArray(input)) throw new Error('unique_by requires array');
+    const key = uniqueByMatch[1];
+    const seen = new Set();
+    const results = [];
+    for (const item of input) {
+      const k = JSON.stringify(runJq(key, item)[0]);
+      if (!seen.has(k)) { seen.add(k); results.push(item); }
+    }
+    return [results];
+  }
+
+  // min_by(.f) / max_by(.f)
+  const minByMatch = expr.match(/^min_by\((.+)\)$/);
+  if (minByMatch) {
+    if (!Array.isArray(input) || !input.length) return [null];
+    return [input.reduce((best, item) => {
+      const v = runJq(minByMatch[1], item)[0];
+      const bv = runJq(minByMatch[1], best)[0];
+      return v < bv ? item : best;
+    })];
+  }
+  const maxByMatch = expr.match(/^max_by\((.+)\)$/);
+  if (maxByMatch) {
+    if (!Array.isArray(input) || !input.length) return [null];
+    return [input.reduce((best, item) => {
+      const v = runJq(maxByMatch[1], item)[0];
+      const bv = runJq(maxByMatch[1], best)[0];
+      return v > bv ? item : best;
+    })];
+  }
+
+  // has("key") or has(n)
+  const hasMatch = expr.match(/^has\((.+)\)$/);
+  if (hasMatch) {
+    const arg = hasMatch[1].trim();
+    if (arg.startsWith('"')) {
+      const key = JSON.parse(arg);
+      return [typeof input === 'object' && input !== null && key in input];
+    }
+    const idx = Number(arg);
+    return [Array.isArray(input) && idx >= 0 && idx < input.length];
+  }
+
+  // contains(b)
+  const containsMatch = expr.match(/^contains\((.+)\)$/);
+  if (containsMatch) {
+    try {
+      const other = JSON.parse(containsMatch[1]);
+      return [JSON.stringify(input).includes(JSON.stringify(other))];
+    } catch {
+      return [JSON.stringify(input).includes(containsMatch[1])];
+    }
+  }
+
+  // test("regex")
+  const testMatch = expr.match(/^test\((".*")\)$/);
+  if (testMatch) {
+    const re = new RegExp(JSON.parse(testMatch[1]));
+    return [re.test(String(input))];
+  }
+
+  // split("sep")
+  const splitMatch = expr.match(/^split\((".*")\)$/);
+  if (splitMatch) {
+    return [String(input).split(JSON.parse(splitMatch[1]))];
+  }
+
+  // join("sep")
+  const joinMatch = expr.match(/^join\((".*")\)$/);
+  if (joinMatch) {
+    if (!Array.isArray(input)) throw new Error('join requires array');
+    return [input.join(JSON.parse(joinMatch[1]))];
+  }
+
+  // ltrimstr / rtrimstr
+  const ltrimMatch = expr.match(/^ltrimstr\((".*")\)$/);
+  if (ltrimMatch) {
+    const s = JSON.parse(ltrimMatch[1]);
+    return [typeof input === 'string' && input.startsWith(s) ? input.slice(s.length) : input];
+  }
+  const rtrimMatch = expr.match(/^rtrimstr\((".*")\)$/);
+  if (rtrimMatch) {
+    const s = JSON.parse(rtrimMatch[1]);
+    return [typeof input === 'string' && input.endsWith(s) ? input.slice(0, -s.length) : input];
+  }
+
+  // gsub / sub
+  const gsubMatch = expr.match(/^gsub\((".*");\s*(".*")\)$/);
+  if (gsubMatch) {
+    const re = new RegExp(JSON.parse(gsubMatch[1]), 'g');
+    return [String(input).replace(re, JSON.parse(gsubMatch[2]))];
+  }
+  const subMatch = expr.match(/^sub\((".*");\s*(".*")\)$/);
+  if (subMatch) {
+    const re = new RegExp(JSON.parse(subMatch[1]));
+    return [String(input).replace(re, JSON.parse(subMatch[2]))];
+  }
+
+  // del(.field)
+  const delMatch = expr.match(/^del\(\.([a-zA-Z_][a-zA-Z0-9_]*)\)$/);
+  if (delMatch) {
+    if (typeof input !== 'object' || input === null) return [input];
+    const copy = Array.isArray(input) ? [...input] : { ...input };
+    delete copy[delMatch[1]];
+    return [copy];
+  }
+
+  // range(n) / range(a;b) / range(a;b;step)
+  const rangeMatch = expr.match(/^range\((.+)\)$/);
+  if (rangeMatch) {
+    const args = splitTopLevel(rangeMatch[1], ';');
+    if (args.length === 1) {
+      const n = Number(args[0]);
+      return Array.from({ length: n }, (_, i) => i);
+    }
+    if (args.length >= 2) {
+      const start = Number(args[0]);
+      const end = Number(args[1]);
+      const step = args.length >= 3 ? Number(args[2]) : 1;
+      const result = [];
+      for (let i = start; step > 0 ? i < end : i > end; i += step) result.push(i);
+      return result;
+    }
+  }
+
+  // limit(n; f)
+  const limitMatch = expr.match(/^limit\((\d+);\s*(.+)\)$/);
+  if (limitMatch) {
+    const n = Number(limitMatch[1]);
+    const results = evalStep(limitMatch[2], input);
+    return results.slice(0, n);
+  }
+
+  // INDEX(.[];.field)
+  const indexMatch = expr.match(/^INDEX\((.+);\s*(.+)\)$/);
+  if (indexMatch) {
+    const items = evalStep(indexMatch[1], input);
+    const obj = {};
+    for (const item of items) {
+      const k = runJq(indexMatch[2], item)[0];
+      obj[k] = item;
+    }
+    return [obj];
+  }
+
+  // with_entries(f)
+  const withEntriesMatch = expr.match(/^with_entries\((.+)\)$/);
+  if (withEntriesMatch) {
+    if (typeof input !== 'object' || input === null || Array.isArray(input))
+      throw new Error('with_entries requires object');
+    const entries = Object.entries(input).map(([key, value]) => ({ key, value }));
+    const mapped = entries.map(e => {
+      const r = runJq(withEntriesMatch[1], e);
+      return r.length === 1 ? r[0] : r;
+    });
+    const obj = {};
+    for (const e of mapped) {
+      const k = e.key !== undefined ? e.key : e.name;
+      obj[k] = e.value;
+    }
+    return [obj];
+  }
+
+  // Arithmetic: . + x, . - x, . * x, . / x, . % x
+  const arithMatch = expr.match(/^(.+?)\s*([+\-*\/%])\s*(.+)$/);
+  if (arithMatch) {
+    const left = runJq(arithMatch[1].trim(), input);
+    const right = runJq(arithMatch[3].trim(), input);
+    if (left.length === 1 && right.length === 1) {
+      const l = left[0], r = right[0];
+      // Object merge with +
+      if (arithMatch[2] === '+' && typeof l === 'object' && typeof r === 'object' && !Array.isArray(l) && !Array.isArray(r)) {
+        return [{ ...l, ...r }];
+      }
+      // Array concat with +
+      if (arithMatch[2] === '+' && Array.isArray(l) && Array.isArray(r)) {
+        return [[...l, ...r]];
+      }
+      // String concat with +
+      if (arithMatch[2] === '+' && typeof l === 'string' && typeof r === 'string') {
+        return [l + r];
+      }
+      const ops = { '+': (a, b) => a + b, '-': (a, b) => a - b, '*': (a, b) => a * b, '/': (a, b) => a / b, '%': (a, b) => a % b };
+      if (typeof l === 'number' && typeof r === 'number') return [ops[arithMatch[2]](l, r)];
+    }
+  }
+
+  // Comparison operators for select conditions used standalone
+  // (handled via evalCondition in select, but try as fallback)
+
+  // Alternative operator: a // b
+  const altMatch = expr.match(/^(.+?)\s*\/\/\s*(.+)$/);
+  if (altMatch) {
+    const left = runJq(altMatch[1].trim(), input);
+    if (left.length > 0 && left[0] !== null && left[0] !== false) return left;
+    return runJq(altMatch[2].trim(), input);
+  }
+
+  // Comma operator: a, b (multiple outputs)
+  const commaExprs = splitTopLevel(expr, ',');
+  if (commaExprs.length > 1) {
+    const results = [];
+    for (const e of commaExprs) {
+      results.push(...evalStep(e.trim(), input));
+    }
+    return results;
+  }
+
+  // as pattern: . as $x | f  (simplified — bind variable)
+  const asMatch = expr.match(/^(.+?)\s+as\s+\$(\w+)$/);
+  if (asMatch) {
+    // This is typically followed by a pipe, handled at a higher level
+    return runJq(asMatch[1], input);
+  }
+
+  // @base64 / @uri / @csv / @tsv / @html / @json
+  if (expr === '@base64') return [btoa(typeof input === 'string' ? input : JSON.stringify(input))];
+  if (expr === '@uri') return [encodeURIComponent(typeof input === 'string' ? input : JSON.stringify(input))];
+  if (expr === '@html') return [String(input).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')];
+  if (expr === '@json') return [JSON.stringify(input)];
+  if (expr === '@csv') {
+    if (!Array.isArray(input)) throw new Error('@csv requires array');
+    return [input.map(v => typeof v === 'string' ? '"' + v.replace(/"/g, '""') + '"' : String(v)).join(',')];
+  }
+  if (expr === '@tsv') {
+    if (!Array.isArray(input)) throw new Error('@tsv requires array');
+    return [input.map(String).join('\t')];
+  }
+
+  // paths / leaf_paths
+  if (expr === 'paths' || expr === 'leaf_paths') {
+    const results = [];
+    function collectPaths(v, path) {
+      if (Array.isArray(v)) {
+        v.forEach((item, i) => { results.push([...path, i]); collectPaths(item, [...path, i]); });
+      } else if (typeof v === 'object' && v !== null) {
+        for (const k of Object.keys(v)) { results.push([...path, k]); collectPaths(v[k], [...path, k]); }
+      }
+    }
+    if (expr === 'leaf_paths') {
+      function collectLeafPaths(v, path) {
+        if (Array.isArray(v)) {
+          if (v.length === 0) results.push(path);
+          else v.forEach((item, i) => collectLeafPaths(item, [...path, i]));
+        } else if (typeof v === 'object' && v !== null) {
+          const keys = Object.keys(v);
+          if (keys.length === 0) results.push(path);
+          else keys.forEach(k => collectLeafPaths(v[k], [...path, k]));
+        } else {
+          results.push(path);
+        }
+      }
+      collectLeafPaths(input, []);
+    } else {
+      collectPaths(input, []);
+    }
+    return results;
+  }
+
+  // getpath(p)
+  const getpathMatch = expr.match(/^getpath\((.+)\)$/);
+  if (getpathMatch) {
+    const path = JSON.parse(getpathMatch[1]);
+    let val = input;
+    for (const k of path) val = val?.[k];
+    return [val !== undefined ? val : null];
+  }
+
+  // transpose
+  if (expr === 'transpose') {
+    if (!Array.isArray(input)) throw new Error('transpose requires array of arrays');
+    const maxLen = Math.max(...input.map(a => a.length));
+    const result = [];
+    for (let i = 0; i < maxLen; i++) result.push(input.map(a => a[i] ?? null));
+    return [result];
+  }
+
+  // indices / index
+  const indicesMatch = expr.match(/^indices\((".*")\)$/);
+  if (indicesMatch) {
+    const sub = JSON.parse(indicesMatch[1]);
+    const str = typeof input === 'string' ? input : JSON.stringify(input);
+    const results = [];
+    let pos = 0;
+    while ((pos = str.indexOf(sub, pos)) !== -1) { results.push(pos); pos++; }
+    return [results];
+  }
+
+  // .. | type_filter (e.g., .. | numbers, .. | strings)
+  const recurseFilter = expr.match(/^\.\.\s*\|\s*(numbers|strings|booleans|nulls|arrays|objects|iterables|scalars|values)$/);
+  if (recurseFilter) {
+    const all = evalStep('..', input);
+    const typeMap = {
+      numbers: v => typeof v === 'number',
+      strings: v => typeof v === 'string',
+      booleans: v => typeof v === 'boolean',
+      nulls: v => v === null,
+      arrays: v => Array.isArray(v),
+      objects: v => typeof v === 'object' && v !== null && !Array.isArray(v),
+      iterables: v => Array.isArray(v) || (typeof v === 'object' && v !== null),
+      scalars: v => v === null || typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean',
+      values: v => v !== null,
+    };
+    return all.filter(typeMap[recurseFilter[1]]);
+  }
+
+  // Type filters (standalone)
+  const typeFilters = { numbers: v => typeof v === 'number', strings: v => typeof v === 'string', booleans: v => typeof v === 'boolean', nulls: v => v === null, arrays: v => Array.isArray(v), objects: v => typeof v === 'object' && v !== null && !Array.isArray(v) };
+  if (typeFilters[expr]) return typeFilters[expr](input) ? [input] : [];
+
+  // reduce .[] as $x (init; update) — simplified
+  const reduceMatch = expr.match(/^reduce\s+(.+?)\s+as\s+\$(\w+)\s*\((.+);\s*(.+)\)$/);
+  if (reduceMatch) {
+    const items = evalStep(reduceMatch[1], input);
+    const varName = reduceMatch[2];
+    let acc = runJq(reduceMatch[3].trim(), input)[0];
+    for (const item of items) {
+      // Replace $var references and . with values
+      let updateExpr = reduceMatch[4].trim();
+      // Simplified: handle ". + $x" style expressions
+      acc = evalReduceUpdate(updateExpr, acc, varName, item);
+    }
+    return [acc];
+  }
+
+  // if-then-else
+  const ifMatch = expr.match(/^if\s+(.+?)\s+then\s+(.+?)(?:\s+else\s+(.+?))?\s+end$/);
+  if (ifMatch) {
+    const cond = evalCondition(ifMatch[1], input);
+    if (cond) return runJq(ifMatch[2], input);
+    if (ifMatch[3]) return runJq(ifMatch[3], input);
+    return [input];
+  }
+
+  // try-catch
+  const tryMatch = expr.match(/^try\s+(.+?)(?:\s+catch\s+(.+))?$/);
+  if (tryMatch) {
+    try { return runJq(tryMatch[1], input); }
+    catch (e) {
+      if (tryMatch[2]) return runJq(tryMatch[2], input);
+      return [];
+    }
+  }
+
+  throw new Error('Unsupported jq expression: ' + expr);
+}
+
+function evalObjectConstruction(expr, input) {
+  const inner = expr.slice(1, -1).trim();
+  if (!inner) return [{}];
+
+  const parts = splitTopLevel(inner, ',');
+  const obj = {};
+  for (let part of parts) {
+    part = part.trim();
+
+    // {key: expr} or {(expr): expr}
+    const colonIdx = findTopLevelColon(part);
+    if (colonIdx !== -1) {
+      let keyPart = part.slice(0, colonIdx).trim();
+      const valExpr = part.slice(colonIdx + 1).trim();
+
+      // Dynamic key: (expr)
+      if (keyPart.startsWith('(') && keyPart.endsWith(')')) {
+        keyPart = String(runJq(keyPart.slice(1, -1), input)[0]);
+      } else {
+        // Remove quotes if present
+        if (keyPart.startsWith('"') && keyPart.endsWith('"')) keyPart = keyPart.slice(1, -1);
+      }
+
+      const val = runJq(valExpr, input);
+      obj[keyPart] = val.length === 1 ? val[0] : val;
+    } else {
+      // Shorthand: {name} → {name: .name}
+      const key = part.startsWith('.') ? part.slice(1) : part;
+      const val = input?.[key];
+      obj[key] = val !== undefined ? val : null;
+    }
+  }
+  return [obj];
+}
+
+function findTopLevelColon(s) {
+  let depth = 0; let inStr = false; let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\') { escape = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if ('([{'.includes(ch)) { depth++; continue; }
+    if (')]}'.includes(ch)) { depth--; continue; }
+    if (ch === ':' && depth === 0) return i;
+  }
+  return -1;
+}
+
+function splitTopLevel(s, sep) {
+  const parts = [];
+  let depth = 0; let inStr = false; let escape = false; let current = '';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { current += ch; escape = false; continue; }
+    if (ch === '\\') { current += ch; escape = true; continue; }
+    if (ch === '"') { inStr = !inStr; current += ch; continue; }
+    if (inStr) { current += ch; continue; }
+    if ('([{'.includes(ch)) { depth++; current += ch; continue; }
+    if (')]}'.includes(ch)) { depth--; current += ch; continue; }
+    if (ch === sep && depth === 0) { parts.push(current); current = ''; continue; }
+    current += ch;
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+function evalCondition(condExpr, input) {
+  condExpr = condExpr.trim();
+
+  // Compound: and / or
+  const orParts = splitTopLevel(condExpr, '|');
+  // Not using | for or — jq uses 'and'/'or' keywords, but let's handle common patterns
+
+  // Check for comparison operators
+  const compMatch = condExpr.match(/^(.+?)\s*(==|!=|>=|<=|>|<)\s*(.+)$/);
+  if (compMatch) {
+    const left = runJq(compMatch[1].trim(), input);
+    let right;
+    try { right = [JSON.parse(compMatch[3].trim())]; }
+    catch { right = runJq(compMatch[3].trim(), input); }
+    if (left.length && right.length) {
+      const l = left[0], r = right[0];
+      const lj = JSON.stringify(l), rj = JSON.stringify(r);
+      switch (compMatch[2]) {
+        case '==': return lj === rj;
+        case '!=': return lj !== rj;
+        case '>': return l > r;
+        case '<': return l < r;
+        case '>=': return l >= r;
+        case '<=': return l <= r;
+      }
+    }
+    return false;
+  }
+
+  // test("re")
+  const testMatch = condExpr.match(/^(.+?)\s*\|\s*test\((".*")\)$/);
+  if (testMatch) {
+    const val = runJq(testMatch[1].trim(), input)[0];
+    const re = new RegExp(JSON.parse(testMatch[2]));
+    return re.test(String(val));
+  }
+
+  // Simple test() without pipe
+  const simpleTestMatch = condExpr.match(/^test\((".*")\)$/);
+  if (simpleTestMatch) {
+    const re = new RegExp(JSON.parse(simpleTestMatch[1]));
+    return re.test(String(input));
+  }
+
+  // not
+  if (condExpr === 'not') return !input;
+  if (condExpr.endsWith(' | not')) {
+    const inner = condExpr.slice(0, -6).trim();
+    return !evalCondition(inner, input);
+  }
+
+  // Evaluate as jq expression — truthy check
+  try {
+    const result = runJq(condExpr, input);
+    return result.length > 0 && result[0] !== false && result[0] !== null;
+  } catch {
+    return false;
+  }
+}
+
+function evalReduceUpdate(expr, acc, varName, item) {
+  // Handle common patterns: . + $x, . + 1, etc.
+  const re = new RegExp('\\$' + varName, 'g');
+  // Simple approach: replace $var with the item value and . with acc
+  try {
+    // For numeric operations
+    if (/^\.\s*\+\s*\$\w+$/.test(expr)) return (acc || 0) + (typeof item === 'number' ? item : 0);
+    if (/^\.\s*\+\s*1$/.test(expr)) return (acc || 0) + 1;
+    if (/^\.\s*\+\s*\[.+\]$/.test(expr)) {
+      const arrExpr = expr.match(/^\.\s*\+\s*(\[.+\])$/)[1];
+      const arrVal = runJq(arrExpr, item);
+      return [...(acc || []), ...(Array.isArray(arrVal[0]) ? arrVal[0] : arrVal)];
+    }
+    // Fallback
+    return acc;
+  } catch {
+    return acc;
+  }
+}
+
+// ── Output formatting ──
+
+function showResult(values) {
+  outputEl.className = 'output-area';
+  if (values.length === 0) {
+    outputEl.innerHTML = '<span class="j-null">empty</span>';
+    return;
+  }
+  const parts = values.map(v => highlightJson(v, 0));
+  outputEl.innerHTML = parts.join('\n');
+}
+
+function showError(msg) {
+  outputEl.className = 'output-area error-output';
+  outputEl.textContent = msg;
+}
+
+function highlightJson(val, indent) {
+  const pad = '  '.repeat(indent);
+  const pad1 = '  '.repeat(indent + 1);
+
+  if (val === null) return `<span class="j-null">null</span>`;
+  if (val === undefined) return `<span class="j-null">null</span>`;
+  if (typeof val === 'boolean') return `<span class="j-bool">${val}</span>`;
+  if (typeof val === 'number') return `<span class="j-num">${val}</span>`;
+  if (typeof val === 'string') return `<span class="j-str">"${escapeHtml(val)}"</span>`;
+
+  if (Array.isArray(val)) {
+    if (val.length === 0) return `<span class="j-brace">[]</span>`;
+    // Compact for small primitive arrays
+    if (val.length <= 5 && val.every(v => v === null || typeof v !== 'object')) {
+      const items = val.map(v => highlightJson(v, 0)).join('<span class="j-brace">, </span>');
+      return `<span class="j-brace">[</span>${items}<span class="j-brace">]</span>`;
+    }
+    const items = val.map(v => pad1 + highlightJson(v, indent + 1));
+    return `<span class="j-brace">[</span>\n${items.join('<span class="j-brace">,</span>\n')}\n${pad}<span class="j-brace">]</span>`;
+  }
+
+  if (typeof val === 'object') {
+    const entries = Object.entries(val);
+    if (entries.length === 0) return `<span class="j-brace">{}</span>`;
+    // Compact for small objects with primitive values
+    if (entries.length <= 3 && entries.every(([, v]) => v === null || typeof v !== 'object')) {
+      const items = entries.map(([k, v]) =>
+        `<span class="j-key">"${escapeHtml(k)}"</span><span class="j-colon">: </span>${highlightJson(v, 0)}`
+      ).join('<span class="j-brace">, </span>');
+      return `<span class="j-brace">{</span>${items}<span class="j-brace">}</span>`;
+    }
+    const items = entries.map(([k, v]) =>
+      `${pad1}<span class="j-key">"${escapeHtml(k)}"</span><span class="j-colon">: </span>${highlightJson(v, indent + 1)}`
+    );
+    return `<span class="j-brace">{</span>\n${items.join('<span class="j-brace">,</span>\n')}\n${pad}<span class="j-brace">}</span>`;
+  }
+
+  return escapeHtml(String(val));
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Actions ──
+
+function formatInput() {
+  try {
+    const parsed = JSON.parse(inputEl.value);
+    inputEl.value = JSON.stringify(parsed, null, 2);
+  } catch {}
+}
+
+function loadSample() {
+  inputEl.value = JSON.stringify(SAMPLE, null, 2);
+  evaluate();
+}
+
+function copyOutput() {
+  const text = outputEl.innerText;
+  navigator.clipboard.writeText(text).then(() => toast('Copied!')).catch(() => {});
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+function buildCheatsheet() {
+  cheatEl.innerHTML = CHEATS.map(([expr, label]) =>
+    `<div class="cheat-item" onclick="useCheat(this)" data-expr="${escapeHtml(expr)}">
+      <span class="cheat-expr">${escapeHtml(expr)}</span>
+      <span class="cheat-label">${escapeHtml(label)}</span>
+    </div>`
+  ).join('');
+}
+
+function useCheat(el) {
+  filterEl.value = el.dataset.expr;
+  evaluate();
+  filterEl.focus();
+}
+</script>
+</body>
+</html>
