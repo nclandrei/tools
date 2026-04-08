@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTTP Header Inspector</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 680px; }
+
+  .input-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .input-group input {
+    flex: 1;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.92rem;
+    border-radius: 6px;
+  }
+
+  .method-select {
+    padding: 0.6rem 0.5rem;
+    font-size: 0.85rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .btn-inspect {
+    padding: 0.6rem 1.2rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-inspect:hover { background: var(--accent-hover); }
+  .btn-inspect:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .options-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .option-label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .option-label input[type="checkbox"] {
+    accent-color: var(--accent);
+  }
+
+  /* Status line */
+  .status-line {
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: none;
+  }
+
+  .status-line.success {
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+    color: var(--green);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .status-line.redirect {
+    background: var(--amber-dim);
+    border: 1px solid var(--amber);
+    color: var(--amber);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .status-line.client-error {
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    color: var(--red);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .status-line.server-error {
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    color: var(--red);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .status-line.error {
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    color: var(--red);
+    display: block;
+  }
+
+  .status-timing {
+    font-weight: 400;
+    font-size: 0.78rem;
+    opacity: 0.8;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+
+  .tab {
+    padding: 0.5rem 1rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .tab:hover { color: var(--text); }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-count {
+    font-size: 0.7rem;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    padding: 0.05rem 0.4rem;
+    border-radius: 8px;
+    margin-left: 0.35rem;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Header rows */
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.5rem 0.7rem;
+    border-radius: 6px;
+    gap: 0.75rem;
+    transition: background 0.1s;
+  }
+
+  .header-row:hover {
+    background: var(--surface);
+  }
+
+  .header-name {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .header-value {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    color: var(--text);
+    word-break: break-all;
+    flex: 1;
+    text-align: right;
+  }
+
+  .header-copy {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0.2rem;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+
+  .header-copy:hover { color: var(--accent); }
+
+  /* Security summary */
+  .security-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .sec-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.82rem;
+  }
+
+  .sec-icon {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    width: 1.2rem;
+    text-align: center;
+  }
+
+  .sec-name {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .sec-detail {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin-left: auto;
+    text-align: right;
+    word-break: break-all;
+  }
+
+  /* Raw view */
+  .raw-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text);
+    max-height: 400px;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  .copy-raw {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .copy-raw:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Loading */
+  .loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    display: none;
+  }
+
+  .loading.visible { display: block; }
+
+  .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .proxy-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 440px) {
+    .input-group { flex-wrap: wrap; }
+    .btn-inspect, .method-select { width: 100%; }
+    .header-row { flex-direction: column; gap: 0.2rem; }
+    .header-value { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>HTTP Header Inspector</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Inspect HTTP response headers for any URL. Uses a CORS proxy to fetch headers from the browser.</p>
+
+  <div class="input-group">
+    <select class="method-select" id="method-select">
+      <option value="GET">GET</option>
+      <option value="HEAD">HEAD</option>
+      <option value="POST">POST</option>
+      <option value="PUT">PUT</option>
+      <option value="DELETE">DELETE</option>
+    </select>
+    <input type="text" id="url-input" placeholder="https://example.com" autocomplete="off" autocapitalize="none" spellcheck="false">
+    <button class="btn-inspect" id="inspect-btn" onclick="inspect()">Inspect</button>
+  </div>
+
+  <div class="options-row">
+    <label class="option-label">
+      <input type="checkbox" id="follow-redirects" checked>
+      Follow redirects
+    </label>
+  </div>
+
+  <div class="loading" id="loading"><span class="spinner"></span>Fetching headers&hellip;</div>
+  <div class="status-line" id="status-line"></div>
+
+  <div id="results"></div>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script>
+const PROXY = 'https://corsproxy.io/?';
+
+document.getElementById('url-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') inspect();
+});
+
+async function inspect() {
+  let url = document.getElementById('url-input').value.trim();
+  if (!url) return;
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  const method = document.getElementById('method-select').value;
+  const followRedirects = document.getElementById('follow-redirects').checked;
+  const loading = document.getElementById('loading');
+  const statusLine = document.getElementById('status-line');
+  const results = document.getElementById('results');
+  const btn = document.getElementById('inspect-btn');
+
+  statusLine.className = 'status-line';
+  statusLine.removeAttribute('style');
+  results.innerHTML = '';
+  loading.classList.add('visible');
+  btn.disabled = true;
+
+  const t0 = performance.now();
+
+  try {
+    const proxyUrl = PROXY + encodeURIComponent(url);
+    const res = await fetch(proxyUrl, {
+      method: method,
+      redirect: followRedirects ? 'follow' : 'manual',
+    });
+
+    const elapsed = Math.round(performance.now() - t0);
+    loading.classList.remove('visible');
+    btn.disabled = false;
+
+    const status = res.status;
+    const statusText = res.statusText || httpStatusText(status);
+
+    // Status line
+    let statusClass = 'success';
+    if (status >= 300 && status < 400) statusClass = 'redirect';
+    else if (status >= 400 && status < 500) statusClass = 'client-error';
+    else if (status >= 500) statusClass = 'server-error';
+
+    statusLine.className = 'status-line ' + statusClass;
+    statusLine.innerHTML =
+      '<span>' + esc(method) + ' ' + esc(url) + ' &mdash; ' + status + ' ' + esc(statusText) + '</span>' +
+      '<span class="status-timing">' + elapsed + ' ms</span>';
+
+    // Collect headers
+    const headers = [];
+    res.headers.forEach((value, name) => {
+      headers.push({ name, value });
+    });
+    headers.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Security headers analysis
+    const security = analyzeSecurityHeaders(headers);
+
+    // Build tabbed UI
+    let html = '<div class="tabs">';
+    html += '<button class="tab active" onclick="switchTab(event, \'headers\')">Headers<span class="tab-count">' + headers.length + '</span></button>';
+    html += '<button class="tab" onclick="switchTab(event, \'security\')">Security<span class="tab-count">' + security.length + '</span></button>';
+    html += '<button class="tab" onclick="switchTab(event, \'raw\')">Raw</button>';
+    html += '</div>';
+
+    // Headers tab
+    html += '<div class="tab-panel active" id="panel-headers">';
+    if (headers.length === 0) {
+      html += '<div class="empty-state">No headers returned</div>';
+    } else {
+      headers.forEach(h => {
+        html += '<div class="header-row">' +
+          '<span class="header-name">' + esc(h.name) + '</span>' +
+          '<span class="header-value">' + esc(h.value) + '</span>' +
+          '<button class="header-copy" onclick="copyText(\'' + escAttr(h.name + ': ' + h.value) + '\')" title="Copy">&#x2398;</button>' +
+        '</div>';
+      });
+    }
+    html += '</div>';
+
+    // Security tab
+    html += '<div class="tab-panel" id="panel-security"><div class="security-grid">';
+    security.forEach(s => {
+      html += '<div class="sec-item">' +
+        '<span class="sec-icon">' + s.icon + '</span>' +
+        '<span class="sec-name">' + esc(s.name) + '</span>' +
+        '<span class="sec-detail">' + esc(s.detail) + '</span>' +
+      '</div>';
+    });
+    html += '</div></div>';
+
+    // Raw tab
+    const rawText = headers.map(h => h.name + ': ' + h.value).join('\n');
+    html += '<div class="tab-panel" id="panel-raw">' +
+      '<div class="raw-block" style="position:relative;">' +
+        '<button class="copy-raw" onclick="copyText(\'' + escAttr(rawText) + '\')">Copy</button>' +
+        esc(method + ' ' + url) + '\n' +
+        status + ' ' + statusText + '\n\n' +
+        esc(rawText) +
+      '</div></div>';
+
+    results.innerHTML = html;
+
+  } catch (err) {
+    loading.classList.remove('visible');
+    btn.disabled = false;
+    statusLine.className = 'status-line error';
+    statusLine.textContent = 'Request failed: ' + err.message;
+  }
+}
+
+function analyzeSecurityHeaders(headers) {
+  const headerMap = {};
+  headers.forEach(h => { headerMap[h.name.toLowerCase()] = h.value; });
+
+  const checks = [
+    {
+      header: 'strict-transport-security',
+      name: 'HSTS',
+      present: v => 'Enabled — ' + v,
+      absent: 'Not set — site may be accessed over plain HTTP',
+    },
+    {
+      header: 'content-security-policy',
+      name: 'CSP',
+      present: v => 'Set — ' + v.slice(0, 80) + (v.length > 80 ? '...' : ''),
+      absent: 'Not set — no content security policy',
+    },
+    {
+      header: 'x-frame-options',
+      name: 'X-Frame-Options',
+      present: v => v,
+      absent: 'Not set — page may be framed',
+    },
+    {
+      header: 'x-content-type-options',
+      name: 'X-Content-Type-Options',
+      present: v => v,
+      absent: 'Not set — MIME sniffing possible',
+    },
+    {
+      header: 'referrer-policy',
+      name: 'Referrer-Policy',
+      present: v => v,
+      absent: 'Not set — browser default applies',
+    },
+    {
+      header: 'permissions-policy',
+      name: 'Permissions-Policy',
+      present: v => 'Set — ' + v.slice(0, 80) + (v.length > 80 ? '...' : ''),
+      absent: 'Not set',
+    },
+    {
+      header: 'x-xss-protection',
+      name: 'X-XSS-Protection',
+      present: v => v,
+      absent: 'Not set (deprecated header)',
+    },
+    {
+      header: 'access-control-allow-origin',
+      name: 'CORS',
+      present: v => 'Allowed: ' + v,
+      absent: 'No CORS header',
+    },
+  ];
+
+  return checks.map(c => {
+    const val = headerMap[c.header];
+    const present = val !== undefined;
+    return {
+      name: c.name,
+      icon: present ? '\u2705' : '\u26A0\uFE0F',
+      detail: present ? c.present(val) : c.absent,
+    };
+  });
+}
+
+function switchTab(e, tabId) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  e.currentTarget.classList.add('active');
+  document.getElementById('panel-' + tabId).classList.add('active');
+}
+
+function httpStatusText(code) {
+  const map = {
+    200:'OK',201:'Created',204:'No Content',301:'Moved Permanently',
+    302:'Found',304:'Not Modified',400:'Bad Request',401:'Unauthorized',
+    403:'Forbidden',404:'Not Found',405:'Method Not Allowed',429:'Too Many Requests',
+    500:'Internal Server Error',502:'Bad Gateway',503:'Service Unavailable'
+  };
+  return map[code] || '';
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function escAttr(s) {
+  return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+}
+
+function copyText(text) {
+  const decoded = text.replace(/\\n/g, '\n').replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+  navigator.clipboard.writeText(decoded).then(() => {
+    const toast = document.getElementById('toast');
+    toast.textContent = 'Copied';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+</script>
+</body>
+</html>
