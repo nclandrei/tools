@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sed Visualizer</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 860px; }
+
+  label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .command-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: stretch;
+  }
+
+  .command-input-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .command-input-wrap:focus-within {
+    border-color: var(--accent);
+  }
+
+  .command-input-wrap.error {
+    border-color: var(--red);
+  }
+
+  .command-prefix {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    padding: 0 0 0 0.75rem;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  #sed-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    padding: 0.6rem 0.75rem 0.6rem 0.4rem;
+    outline: none;
+    min-width: 0;
+  }
+
+  #sed-input::placeholder { color: var(--text-muted); opacity: 0.5; }
+
+  .flags-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .flag-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .flag-toggle input[type="checkbox"] {
+    accent-color: var(--accent);
+  }
+
+  .flag-toggle code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    background: var(--surface-alt);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+  }
+
+  textarea {
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+
+  .input-section { margin-bottom: 1rem; }
+
+  .output-section {
+    margin-top: 1.5rem;
+  }
+
+  .output-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+
+  .output-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-alt);
+  }
+
+  .output-panel-header span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .copy-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+  }
+
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .output-body {
+    padding: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 2.5rem;
+    color: var(--text);
+  }
+
+  .diff-line { padding: 0.05rem 0; }
+  .diff-del {
+    background: var(--red-dim);
+    color: var(--red);
+    text-decoration: line-through;
+  }
+  .diff-ins {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+  .diff-unchanged { color: var(--text-muted); }
+
+  .match-hl { background: var(--accent-dim); color: var(--accent); border-radius: 2px; padding: 0 1px; }
+
+  .explanation-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .explanation-box h3 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 0.5rem 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .explanation-item {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.84rem;
+    line-height: 1.5;
+  }
+
+  .explanation-item .part-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    white-space: nowrap;
+    min-width: 5rem;
+    font-weight: 600;
+  }
+
+  .explanation-item .part-desc {
+    color: var(--text);
+  }
+
+  .error-msg {
+    color: var(--red);
+    font-size: 0.84rem;
+    padding: 0.5rem 0;
+  }
+
+  .presets {
+    margin-bottom: 1.5rem;
+  }
+
+  .presets-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .preset-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .line-numbers {
+    counter-reset: line;
+  }
+
+  .line-num {
+    display: inline-block;
+    width: 2rem;
+    text-align: right;
+    color: var(--text-muted);
+    opacity: 0.5;
+    margin-right: 0.75rem;
+    user-select: none;
+    font-size: 0.78rem;
+  }
+
+  .cheatsheet {
+    margin-top: 2rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .cheatsheet summary {
+    padding: 0.6rem 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: var(--surface-alt);
+    user-select: none;
+  }
+
+  .cheatsheet-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25rem 1rem;
+    padding: 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  .cheatsheet-grid code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+  }
+
+  .cheatsheet-grid span {
+    color: var(--text-muted);
+  }
+
+  .step-view {
+    margin-top: 1rem;
+  }
+
+  .step-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+  }
+
+  .step-content {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-bottom: 0.75rem;
+  }
+
+  .step-arrow {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    margin: 0.25rem 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <a href="/">&larr; All tools</a>
+      <h1>Sed Visualizer</h1>
+      <p class="desc">Visualize sed commands with live output, diff highlighting, and step-by-step breakdown.</p>
+    </div>
+  </header>
+
+  <div class="presets">
+    <label>Presets</label>
+    <div class="presets-list">
+      <button class="preset-btn" data-cmd="s/foo/bar/g" data-input="foo is foo and foo">basic replace</button>
+      <button class="preset-btn" data-cmd="s/[0-9]+/NUM/g" data-input="Order 42 has 3 items worth 100 dollars">numbers &rarr; NUM</button>
+      <button class="preset-btn" data-cmd="/^#/d" data-input="# comment\ncode here\n# another comment\nmore code">delete comments</button>
+      <button class="preset-btn" data-cmd="s/^/  /" data-input="line one\nline two\nline three">indent lines</button>
+      <button class="preset-btn" data-cmd="2,4d" data-input="line 1\nline 2\nline 3\nline 4\nline 5">delete range</button>
+      <button class="preset-btn" data-cmd="s/\b(\w)/\u\1/g" data-input="hello world foo bar">capitalize words</button>
+      <button class="preset-btn" data-cmd="/error/!d" data-input="info: started\nerror: disk full\ninfo: retry\nerror: timeout">keep errors only</button>
+      <button class="preset-btn" data-cmd="s/  +/ /g" data-input="too   many     spaces   here">collapse spaces</button>
+      <button class="preset-btn" data-cmd="/^$/d" data-input="line one\n\nline two\n\n\nline three">delete blank lines</button>
+      <button class="preset-btn" data-cmd="s|/usr/local|/opt|g" data-input="/usr/local/bin/app\n/usr/local/lib/foo">change path</button>
+    </div>
+  </div>
+
+  <div class="input-section">
+    <label for="sed-input">Sed Command</label>
+    <div class="command-row">
+      <div class="command-input-wrap" id="command-wrap">
+        <span class="command-prefix">sed&nbsp;</span>
+        <input type="text" id="sed-input" placeholder="'s/pattern/replacement/flags'" spellcheck="false" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <div class="flags-row">
+    <label class="flag-toggle"><input type="checkbox" id="flag-e" checked> <code>-E</code> extended regex</label>
+    <label class="flag-toggle"><input type="checkbox" id="flag-n"> <code>-n</code> suppress output</label>
+    <label class="flag-toggle"><input type="checkbox" id="flag-i"> <code>-i</code> case-insensitive</label>
+  </div>
+
+  <div class="input-section">
+    <label for="text-input">Input Text</label>
+    <textarea id="text-input" rows="6" placeholder="Paste or type text to transform..."></textarea>
+  </div>
+
+  <div id="explanation"></div>
+
+  <div class="output-section">
+    <div class="output-panel">
+      <div class="output-panel-header">
+        <span>Output</span>
+        <button class="copy-btn" id="copy-output">Copy</button>
+      </div>
+      <div class="output-body" id="output-plain"></div>
+    </div>
+
+    <div class="output-panel">
+      <div class="output-panel-header">
+        <span>Diff</span>
+      </div>
+      <div class="output-body line-numbers" id="output-diff"></div>
+    </div>
+  </div>
+
+  <div id="step-view" class="step-view" style="display:none;"></div>
+
+  <details class="cheatsheet">
+    <summary>Sed Cheat Sheet</summary>
+    <div class="cheatsheet-grid">
+      <code>s/old/new/</code><span>Replace first occurrence per line</span>
+      <code>s/old/new/g</code><span>Replace all occurrences per line</span>
+      <code>s/old/new/2</code><span>Replace 2nd occurrence per line</span>
+      <code>s/old/new/I</code><span>Case-insensitive replace (GNU)</span>
+      <code>/pattern/d</code><span>Delete lines matching pattern</span>
+      <code>/pattern/!d</code><span>Delete lines NOT matching pattern (keep matches)</span>
+      <code>3d</code><span>Delete line 3</span>
+      <code>2,5d</code><span>Delete lines 2 through 5</span>
+      <code>/^$/d</code><span>Delete empty lines</span>
+      <code>/start/,/end/d</code><span>Delete from start pattern to end pattern</span>
+      <code>y/abc/xyz/</code><span>Transliterate: a&rarr;x, b&rarr;y, c&rarr;z</span>
+      <code>3p</code><span>Print line 3 (use with -n)</span>
+      <code>/pattern/p</code><span>Print matching lines (use with -n)</span>
+      <code>2,4s/a/b/</code><span>Substitute only on lines 2-4</span>
+      <code>/pat/s/a/b/</code><span>Substitute only on lines matching /pat/</span>
+      <code>&amp;</code><span>Backreference to whole match in replacement</span>
+      <code>\1 \2</code><span>Backreference to capture groups</span>
+      <code>\b</code><span>Word boundary (extended regex)</span>
+      <code>|</code><span>Alternative delimiter: s|old|new|</span>
+      <code>\u \l</code><span>Uppercase/lowercase next char (GNU)</span>
+      <code>\U \L</code><span>Uppercase/lowercase until \E (GNU)</span>
+    </div>
+  </details>
+</div>
+
+<script>
+const sedInput = document.getElementById('sed-input');
+const textInput = document.getElementById('text-input');
+const outputPlain = document.getElementById('output-plain');
+const outputDiff = document.getElementById('output-diff');
+const explanationEl = document.getElementById('explanation');
+const commandWrap = document.getElementById('command-wrap');
+const flagE = document.getElementById('flag-e');
+const flagN = document.getElementById('flag-n');
+const flagI = document.getElementById('flag-i');
+const copyBtn = document.getElementById('copy-output');
+const stepView = document.getElementById('step-view');
+
+// Presets
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sedInput.value = btn.dataset.cmd;
+    textInput.value = btn.dataset.input.replace(/\\n/g, '\n');
+    run();
+  });
+});
+
+// Parse a sed command string, returns array of commands
+function parseSedScript(raw) {
+  const commands = [];
+  // Remove outer quotes if present
+  let s = raw.trim();
+  if ((s.startsWith("'") && s.endsWith("'")) || (s.startsWith('"') && s.endsWith('"'))) {
+    s = s.slice(1, -1);
+  }
+
+  // Split on ; but not inside brackets or patterns
+  const parts = splitCommands(s);
+
+  for (const part of parts) {
+    const cmd = parseOneCommand(part.trim());
+    if (cmd) commands.push(cmd);
+  }
+  return commands;
+}
+
+function splitCommands(s) {
+  const parts = [];
+  let current = '';
+  let depth = 0;
+  let inPattern = false;
+  let escaped = false;
+
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escaped) { current += ch; escaped = false; continue; }
+    if (ch === '\\') { current += ch; escaped = true; continue; }
+    if (ch === '[') depth++;
+    if (ch === ']' && depth > 0) depth--;
+    if (ch === ';' && depth === 0 && !inPattern) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) parts.push(current);
+  return parts;
+}
+
+function parseOneCommand(s) {
+  if (!s) return null;
+
+  // Parse address prefix
+  let address = null;
+  let rest = s;
+  const addrResult = parseAddress(rest);
+  if (addrResult) {
+    address = addrResult.address;
+    rest = addrResult.rest;
+  }
+
+  // Negation
+  let negate = false;
+  if (rest.startsWith('!')) {
+    negate = true;
+    rest = rest.slice(1);
+  }
+
+  // Detect command type
+  const cmdChar = rest[0];
+  if (!cmdChar) return null;
+
+  if (cmdChar === 's') {
+    return parseSubstitution(rest, address, negate);
+  } else if (cmdChar === 'y') {
+    return parseTransliterate(rest, address, negate);
+  } else if (cmdChar === 'd') {
+    return { type: 'delete', address, negate };
+  } else if (cmdChar === 'p') {
+    return { type: 'print', address, negate };
+  } else if (cmdChar === 'q') {
+    return { type: 'quit', address, negate };
+  } else if (cmdChar === 'a') {
+    const text = rest.slice(1).replace(/^\s*\\?\s*/, '');
+    return { type: 'append', text, address, negate };
+  } else if (cmdChar === 'i') {
+    const text = rest.slice(1).replace(/^\s*\\?\s*/, '');
+    return { type: 'insert', text, address, negate };
+  } else if (cmdChar === 'c') {
+    const text = rest.slice(1).replace(/^\s*\\?\s*/, '');
+    return { type: 'change', text, address, negate };
+  }
+
+  return null;
+}
+
+function parseAddress(s) {
+  let addr1 = null, addr2 = null;
+  let i = 0;
+
+  const r1 = readSingleAddress(s, i);
+  if (!r1) return null;
+  addr1 = r1.addr;
+  i = r1.pos;
+
+  if (s[i] === ',') {
+    i++;
+    const r2 = readSingleAddress(s, i);
+    if (r2) {
+      addr2 = r2.addr;
+      i = r2.pos;
+    }
+  }
+
+  return {
+    address: { addr1, addr2 },
+    rest: s.slice(i)
+  };
+}
+
+function readSingleAddress(s, i) {
+  if (i >= s.length) return null;
+
+  // Line number
+  if (/[0-9]/.test(s[i])) {
+    let num = '';
+    while (i < s.length && /[0-9]/.test(s[i])) { num += s[i]; i++; }
+    return { addr: { type: 'line', value: parseInt(num) }, pos: i };
+  }
+
+  // $ = last line
+  if (s[i] === '$') {
+    return { addr: { type: 'last' }, pos: i + 1 };
+  }
+
+  // /pattern/
+  if (s[i] === '/') {
+    let pat = '';
+    i++; // skip opening /
+    let escaped = false;
+    while (i < s.length) {
+      if (escaped) { pat += s[i]; escaped = false; i++; continue; }
+      if (s[i] === '\\') { pat += s[i]; escaped = true; i++; continue; }
+      if (s[i] === '/') { i++; break; }
+      pat += s[i]; i++;
+    }
+    return { addr: { type: 'pattern', value: pat }, pos: i };
+  }
+
+  return null;
+}
+
+function parseSubstitution(s, address, negate) {
+  const delim = s[1];
+  if (!delim) return null;
+  let i = 2;
+  let pattern = '', replacement = '', flags = '';
+  let escaped = false;
+
+  // Read pattern
+  while (i < s.length) {
+    if (escaped) { pattern += s[i]; escaped = false; i++; continue; }
+    if (s[i] === '\\') { pattern += s[i]; escaped = true; i++; continue; }
+    if (s[i] === delim) { i++; break; }
+    pattern += s[i]; i++;
+  }
+
+  // Read replacement
+  escaped = false;
+  while (i < s.length) {
+    if (escaped) { replacement += s[i]; escaped = false; i++; continue; }
+    if (s[i] === '\\') { replacement += s[i]; escaped = true; i++; continue; }
+    if (s[i] === delim) { i++; break; }
+    replacement += s[i]; i++;
+  }
+
+  // Read flags
+  flags = s.slice(i);
+
+  return { type: 'substitute', pattern, replacement, flags, delim, address, negate };
+}
+
+function parseTransliterate(s, address, negate) {
+  const delim = s[1];
+  if (!delim) return null;
+  let i = 2;
+  let source = '', dest = '';
+  let escaped = false;
+
+  while (i < s.length) {
+    if (escaped) { source += s[i]; escaped = false; i++; continue; }
+    if (s[i] === '\\') { escaped = true; i++; continue; }
+    if (s[i] === delim) { i++; break; }
+    source += s[i]; i++;
+  }
+  escaped = false;
+  while (i < s.length) {
+    if (escaped) { dest += s[i]; escaped = false; i++; continue; }
+    if (s[i] === '\\') { escaped = true; i++; continue; }
+    if (s[i] === delim) { i++; break; }
+    dest += s[i]; i++;
+  }
+
+  return { type: 'transliterate', source, dest, address, negate };
+}
+
+function matchesAddress(address, negate, lineNum, totalLines, line, useExtended) {
+  if (!address) return !negate;
+
+  let inRange = false;
+  const a1 = address.addr1;
+  const a2 = address.addr2;
+
+  function testSingle(addr) {
+    if (addr.type === 'line') return lineNum === addr.value;
+    if (addr.type === 'last') return lineNum === totalLines;
+    if (addr.type === 'pattern') {
+      try {
+        const re = new RegExp(addr.value, useExtended ? '' : '');
+        return re.test(line);
+      } catch { return false; }
+    }
+    return false;
+  }
+
+  if (a2) {
+    // Range
+    const m1 = testSingle(a1);
+    const m2 = testSingle(a2);
+    // Simplified: check if lineNum is within range
+    if (a1.type === 'line' && a2.type === 'line') {
+      inRange = lineNum >= a1.value && lineNum <= a2.value;
+    } else {
+      // Pattern-based ranges are complex; approximate
+      inRange = m1 || m2;
+    }
+  } else {
+    inRange = testSingle(a1);
+  }
+
+  return negate ? !inRange : inRange;
+}
+
+// Build regex from pattern string, handling sed-specific syntax
+function buildRegex(pattern, flags, useExtended, caseInsensitive) {
+  let p = pattern;
+  // Handle \b word boundaries in extended mode
+  let reFlags = '';
+  if (caseInsensitive || flags.includes('I') || flags.includes('i')) reFlags += 'i';
+  if (flags.includes('g')) reFlags += 'g';
+
+  // Handle nth occurrence flag
+  let nth = 0;
+  const nthMatch = flags.match(/^(\d+)/);
+  if (nthMatch && !flags.includes('g')) {
+    nth = parseInt(nthMatch[1]);
+  }
+
+  try {
+    const re = new RegExp(p, reFlags);
+    return { re, nth };
+  } catch (e) {
+    throw new Error(`Invalid regex: ${e.message}`);
+  }
+}
+
+// Apply replacement with sed-like backreferences
+function applyReplacement(match, replacement, groups) {
+  let r = replacement;
+  let result = '';
+  let i = 0;
+  while (i < r.length) {
+    if (r[i] === '\\' && i + 1 < r.length) {
+      const next = r[i + 1];
+      if (next >= '1' && next <= '9') {
+        const idx = parseInt(next);
+        result += (groups && groups[idx]) || '';
+        i += 2;
+        continue;
+      }
+      if (next === 'n') { result += '\n'; i += 2; continue; }
+      if (next === 't') { result += '\t'; i += 2; continue; }
+      if (next === 'u') {
+        // Uppercase next char — we'll handle after
+        i += 2;
+        // Find the next char to uppercase
+        if (i < r.length) {
+          if (r[i] === '\\' && r[i+1] >= '1' && r[i+1] <= '9') {
+            const idx = parseInt(r[i+1]);
+            const g = (groups && groups[idx]) || '';
+            result += g.length ? g[0].toUpperCase() + g.slice(1) : '';
+            i += 2;
+          } else {
+            result += r[i].toUpperCase();
+            i++;
+          }
+        }
+        continue;
+      }
+      if (next === 'l') {
+        i += 2;
+        if (i < r.length) {
+          if (r[i] === '\\' && r[i+1] >= '1' && r[i+1] <= '9') {
+            const idx = parseInt(r[i+1]);
+            const g = (groups && groups[idx]) || '';
+            result += g.length ? g[0].toLowerCase() + g.slice(1) : '';
+            i += 2;
+          } else {
+            result += r[i].toLowerCase();
+            i++;
+          }
+        }
+        continue;
+      }
+      if (next === 'U') {
+        // Uppercase until \E
+        i += 2;
+        let chunk = '';
+        while (i < r.length) {
+          if (r[i] === '\\' && r[i+1] === 'E') { i += 2; break; }
+          if (r[i] === '\\' && r[i+1] >= '1' && r[i+1] <= '9') {
+            const idx = parseInt(r[i+1]);
+            chunk += (groups && groups[idx]) || '';
+            i += 2;
+          } else {
+            chunk += r[i]; i++;
+          }
+        }
+        result += chunk.toUpperCase();
+        continue;
+      }
+      if (next === 'L') {
+        i += 2;
+        let chunk = '';
+        while (i < r.length) {
+          if (r[i] === '\\' && r[i+1] === 'E') { i += 2; break; }
+          if (r[i] === '\\' && r[i+1] >= '1' && r[i+1] <= '9') {
+            const idx = parseInt(r[i+1]);
+            chunk += (groups && groups[idx]) || '';
+            i += 2;
+          } else {
+            chunk += r[i]; i++;
+          }
+        }
+        result += chunk.toLowerCase();
+        continue;
+      }
+      // Escaped literal
+      result += next;
+      i += 2;
+      continue;
+    }
+    if (r[i] === '&') {
+      result += match;
+      i++;
+      continue;
+    }
+    result += r[i];
+    i++;
+  }
+  return result;
+}
+
+function executeSed(script, inputText, extended, suppressOutput, caseInsensitive) {
+  const commands = parseSedScript(script);
+  if (!commands.length) throw new Error('Could not parse sed command');
+
+  let lines = inputText.split('\n');
+  const totalLines = lines.length;
+  const outputLines = [];
+  const lineActions = []; // Track what happened to each input line
+
+  // Track range state for pattern ranges
+  const rangeState = commands.map(() => false);
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    let line = lines[lineIdx];
+    const lineNum = lineIdx + 1;
+    let deleted = false;
+    let printed = false;
+    let extraLines = [];
+
+    for (let ci = 0; ci < commands.length; ci++) {
+      const cmd = commands[ci];
+      const addr = cmd.address;
+      let matches = false;
+
+      if (!addr) {
+        matches = true;
+      } else {
+        const a1 = addr.addr1, a2 = addr.addr2;
+        if (a2) {
+          // Range handling
+          if (a1.type === 'line' && a2.type === 'line') {
+            matches = lineNum >= a1.value && lineNum <= a2.value;
+          } else if (a1.type === 'line' && a2.type === 'last') {
+            matches = lineNum >= a1.value;
+          } else if (a1.type === 'pattern' && a2.type === 'pattern') {
+            const re1 = new RegExp(a1.value, caseInsensitive ? 'i' : '');
+            const re2 = new RegExp(a2.value, caseInsensitive ? 'i' : '');
+            if (rangeState[ci]) {
+              matches = true;
+              if (re2.test(line)) rangeState[ci] = false;
+            } else if (re1.test(line)) {
+              matches = true;
+              rangeState[ci] = true;
+            }
+          } else {
+            // Mixed
+            const testAddr = (a) => {
+              if (a.type === 'line') return lineNum === a.value;
+              if (a.type === 'last') return lineNum === totalLines;
+              if (a.type === 'pattern') {
+                const re = new RegExp(a.value, caseInsensitive ? 'i' : '');
+                return re.test(line);
+              }
+              return false;
+            };
+            if (rangeState[ci]) {
+              matches = true;
+              if (testAddr(a2)) rangeState[ci] = false;
+            } else if (testAddr(a1)) {
+              matches = true;
+              rangeState[ci] = true;
+            }
+          }
+        } else {
+          // Single address
+          if (a1.type === 'line') matches = lineNum === a1.value;
+          else if (a1.type === 'last') matches = lineNum === totalLines;
+          else if (a1.type === 'pattern') {
+            try {
+              const re = new RegExp(a1.value, caseInsensitive ? 'i' : '');
+              matches = re.test(line);
+            } catch { matches = false; }
+          }
+        }
+      }
+
+      if (cmd.negate) matches = !matches;
+      if (!matches) continue;
+
+      if (cmd.type === 'delete') {
+        deleted = true;
+        break;
+      } else if (cmd.type === 'print') {
+        printed = true;
+      } else if (cmd.type === 'substitute') {
+        const { re, nth } = buildRegex(cmd.pattern, cmd.flags, extended, caseInsensitive);
+        if (nth > 0) {
+          // Replace nth occurrence
+          let count = 0;
+          line = line.replace(new RegExp(cmd.pattern, re.flags.replace('g', '') + 'g'), (m, ...args) => {
+            count++;
+            if (count === nth) {
+              const groups = args.slice(0, -2);
+              groups.unshift(m);
+              return applyReplacement(m, cmd.replacement, groups);
+            }
+            return m;
+          });
+        } else {
+          line = line.replace(re, (m, ...args) => {
+            const groups = args.slice(0, -2);
+            groups.unshift(m);
+            return applyReplacement(m, cmd.replacement, groups);
+          });
+        }
+      } else if (cmd.type === 'transliterate') {
+        let newLine = '';
+        for (const ch of line) {
+          const idx = cmd.source.indexOf(ch);
+          newLine += idx >= 0 ? (cmd.dest[idx] || '') : ch;
+        }
+        line = newLine;
+      } else if (cmd.type === 'append') {
+        extraLines.push(cmd.text);
+      } else if (cmd.type === 'insert') {
+        outputLines.push(cmd.text);
+      } else if (cmd.type === 'change') {
+        line = cmd.text;
+      } else if (cmd.type === 'quit') {
+        if (!suppressOutput || printed) outputLines.push(line);
+        lineActions.push({ original: lines[lineIdx], result: line, deleted: false });
+        // Done processing
+        return { outputLines, lineActions, commands };
+      }
+    }
+
+    if (!deleted) {
+      if (!suppressOutput || printed) {
+        outputLines.push(line);
+      }
+      extraLines.forEach(l => outputLines.push(l));
+    }
+
+    lineActions.push({
+      original: lines[lineIdx],
+      result: deleted ? null : line,
+      deleted
+    });
+  }
+
+  return { outputLines, lineActions, commands };
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function explainCommands(commands) {
+  if (!commands.length) return '';
+
+  let html = '<div class="explanation-box"><h3>Breakdown</h3>';
+
+  for (const cmd of commands) {
+    html += '<div class="explanation-item">';
+
+    if (cmd.type === 'substitute') {
+      const addrStr = describeAddress(cmd.address, cmd.negate);
+      html += `<span class="part-label">s${cmd.delim}...${cmd.delim}...${cmd.delim}</span>`;
+      html += `<span class="part-desc">`;
+      if (addrStr) html += `${addrStr}: `;
+      html += `Replace <code>${escapeHtml(cmd.pattern)}</code> with <code>${escapeHtml(cmd.replacement)}</code>`;
+      if (cmd.flags.includes('g')) html += ' (globally, all occurrences)';
+      else if (cmd.flags.match(/^\d+$/)) html += ` (${cmd.flags}${ordSuffix(parseInt(cmd.flags))} occurrence)`;
+      else html += ' (first occurrence per line)';
+      if (cmd.flags.includes('I') || cmd.flags.includes('i')) html += ', case-insensitive';
+      html += '</span>';
+    } else if (cmd.type === 'delete') {
+      const addrStr = describeAddress(cmd.address, cmd.negate);
+      html += `<span class="part-label">d</span>`;
+      html += `<span class="part-desc">Delete${addrStr ? ' ' + addrStr : ' every line'}</span>`;
+    } else if (cmd.type === 'print') {
+      const addrStr = describeAddress(cmd.address, cmd.negate);
+      html += `<span class="part-label">p</span>`;
+      html += `<span class="part-desc">Print${addrStr ? ' ' + addrStr : ' every line'}</span>`;
+    } else if (cmd.type === 'transliterate') {
+      html += `<span class="part-label">y${cmd.source ? '/.../' : ''}</span>`;
+      html += `<span class="part-desc">Transliterate: map each char in <code>${escapeHtml(cmd.source)}</code> to <code>${escapeHtml(cmd.dest)}</code></span>`;
+    } else if (cmd.type === 'append') {
+      html += `<span class="part-label">a</span>`;
+      html += `<span class="part-desc">Append text: <code>${escapeHtml(cmd.text)}</code></span>`;
+    } else if (cmd.type === 'insert') {
+      html += `<span class="part-label">i</span>`;
+      html += `<span class="part-desc">Insert text: <code>${escapeHtml(cmd.text)}</code></span>`;
+    } else if (cmd.type === 'change') {
+      html += `<span class="part-label">c</span>`;
+      html += `<span class="part-desc">Change line to: <code>${escapeHtml(cmd.text)}</code></span>`;
+    } else if (cmd.type === 'quit') {
+      html += `<span class="part-label">q</span>`;
+      html += `<span class="part-desc">Quit after this line</span>`;
+    }
+
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function describeAddress(addr, negate) {
+  if (!addr) return negate ? 'lines NOT matching (all)' : '';
+  const a1 = addr.addr1, a2 = addr.addr2;
+  let desc = '';
+
+  function descOne(a) {
+    if (a.type === 'line') return `line ${a.value}`;
+    if (a.type === 'last') return 'last line';
+    if (a.type === 'pattern') return `lines matching /${a.value}/`;
+    return '';
+  }
+
+  if (a2) {
+    desc = `${descOne(a1)} through ${descOne(a2)}`;
+  } else {
+    desc = descOne(a1);
+  }
+
+  if (negate) desc = `lines NOT matching (${desc})`;
+  return desc;
+}
+
+function ordSuffix(n) {
+  if (n === 1) return 'st';
+  if (n === 2) return 'nd';
+  if (n === 3) return 'rd';
+  return 'th';
+}
+
+function renderDiff(lineActions) {
+  let html = '';
+  lineActions.forEach((action, idx) => {
+    const num = `<span class="line-num">${idx + 1}</span>`;
+    if (action.deleted) {
+      html += `<div class="diff-line diff-del">${num}${escapeHtml(action.original)}</div>`;
+    } else if (action.result !== action.original) {
+      html += `<div class="diff-line diff-del">${num}${escapeHtml(action.original)}</div>`;
+      html += `<div class="diff-line diff-ins">${num}${escapeHtml(action.result)}</div>`;
+    } else {
+      html += `<div class="diff-line diff-unchanged">${num}${escapeHtml(action.original)}</div>`;
+    }
+  });
+  return html;
+}
+
+function run() {
+  const script = sedInput.value.trim();
+  const input = textInput.value;
+  const extended = flagE.checked;
+  const suppress = flagN.checked;
+  const caseIns = flagI.checked;
+
+  commandWrap.classList.remove('error');
+  explanationEl.innerHTML = '';
+  outputPlain.textContent = '';
+  outputDiff.innerHTML = '';
+  stepView.style.display = 'none';
+
+  if (!script) {
+    outputPlain.textContent = input;
+    return;
+  }
+
+  try {
+    const result = executeSed(script, input, extended, suppress, caseIns);
+    outputPlain.textContent = result.outputLines.join('\n');
+    outputDiff.innerHTML = renderDiff(result.lineActions);
+    explanationEl.innerHTML = explainCommands(result.commands);
+
+    // Step view for multi-command scripts
+    if (result.commands.length > 1) {
+      renderStepView(result.commands, input, extended, suppress, caseIns);
+    }
+  } catch (e) {
+    commandWrap.classList.add('error');
+    outputPlain.innerHTML = `<span class="error-msg">${escapeHtml(e.message)}</span>`;
+  }
+}
+
+function renderStepView(commands, input, extended, suppress, caseIns) {
+  let html = '<div class="step-label">Step-by-step</div>';
+  html += `<div class="step-content">${escapeHtml(input)}</div>`;
+
+  let currentText = input;
+  for (let i = 0; i < commands.length; i++) {
+    const singleScript = reconstructCommand(commands[i]);
+    try {
+      const r = executeSed(singleScript, currentText, extended, suppress, caseIns);
+      const out = r.outputLines.join('\n');
+      html += `<div class="step-arrow">&darr; <span style="font-size:0.75rem;color:var(--accent)">${escapeHtml(singleScript)}</span></div>`;
+      html += `<div class="step-content">${escapeHtml(out)}</div>`;
+      currentText = out;
+    } catch {
+      break;
+    }
+  }
+
+  stepView.innerHTML = html;
+  stepView.style.display = 'block';
+}
+
+function reconstructCommand(cmd) {
+  let prefix = '';
+  if (cmd.address) {
+    const a1 = cmd.address.addr1;
+    const a2 = cmd.address.addr2;
+    if (a1) {
+      if (a1.type === 'line') prefix += a1.value;
+      else if (a1.type === 'last') prefix += '$';
+      else if (a1.type === 'pattern') prefix += '/' + a1.value + '/';
+    }
+    if (a2) {
+      prefix += ',';
+      if (a2.type === 'line') prefix += a2.value;
+      else if (a2.type === 'last') prefix += '$';
+      else if (a2.type === 'pattern') prefix += '/' + a2.value + '/';
+    }
+  }
+  if (cmd.negate) prefix += '!';
+
+  if (cmd.type === 'substitute') {
+    return prefix + 's' + cmd.delim + cmd.pattern + cmd.delim + cmd.replacement + cmd.delim + cmd.flags;
+  } else if (cmd.type === 'delete') {
+    return prefix + 'd';
+  } else if (cmd.type === 'print') {
+    return prefix + 'p';
+  } else if (cmd.type === 'transliterate') {
+    return prefix + 'y/' + cmd.source + '/' + cmd.dest + '/';
+  } else if (cmd.type === 'append') {
+    return prefix + 'a ' + cmd.text;
+  } else if (cmd.type === 'insert') {
+    return prefix + 'i ' + cmd.text;
+  } else if (cmd.type === 'change') {
+    return prefix + 'c ' + cmd.text;
+  } else if (cmd.type === 'quit') {
+    return prefix + 'q';
+  }
+  return '';
+}
+
+// Copy output
+copyBtn.addEventListener('click', () => {
+  const text = outputPlain.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+  });
+});
+
+// Live updates
+sedInput.addEventListener('input', run);
+textInput.addEventListener('input', run);
+flagE.addEventListener('change', run);
+flagN.addEventListener('change', run);
+flagI.addEventListener('change', run);
+
+// Initial run
+run();
+</script>
+</body>
+</html>
