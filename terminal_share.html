@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terminal Share</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+  .container { max-width: 900px; }
+
+  .paste-area {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    min-height: 120px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+    background: var(--surface);
+    cursor: text;
+    transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 1rem;
+    outline: none;
+  }
+  .paste-area:focus {
+    border-color: var(--accent);
+  }
+  .paste-area:empty::before {
+    content: 'Paste terminal content here (Cmd+V / Ctrl+V)\nSupports Ghostty & Claude Code sessions';
+    color: var(--text-muted);
+    pointer-events: none;
+    white-space: pre-line;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .actions .spacer { flex: 1; }
+
+  .preview-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.75rem;
+  }
+
+  /* Terminal preview — always dark regardless of site theme */
+  .terminal-preview {
+    background: #1a1b26;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    display: none;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  }
+
+  .terminal-titlebar {
+    background: #24253a;
+    padding: 0.5rem 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+  }
+
+  .terminal-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    display: inline-block;
+  }
+  .terminal-dot.red { background: #ff5f57; }
+  .terminal-dot.yellow { background: #febc2e; }
+  .terminal-dot.green { background: #28c840; }
+
+  .terminal-title-text {
+    flex: 1;
+    text-align: center;
+    font-size: 0.75rem;
+    color: #8b8fa3;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  .terminal-body {
+    padding: 1rem 1.25rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: #c0caf5;
+    overflow-x: auto;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+
+  /* Line types */
+  .t-line { white-space: pre-wrap; word-break: break-word; }
+
+  .t-banner {
+    color: #bb9af7;
+    font-weight: 600;
+  }
+
+  .t-model-info {
+    color: #7aa2f7;
+    font-size: 0.78rem;
+  }
+
+  .t-user-prompt {
+    color: #9ece6a;
+    font-weight: 600;
+  }
+
+  .t-shell-prompt {
+    color: #7dcfff;
+  }
+
+  .t-assistant-marker {
+    color: #bb9af7;
+    font-weight: 600;
+  }
+
+  .t-assistant-text {
+    color: #c0caf5;
+  }
+
+  .t-tool-call {
+    color: #e0af68;
+    font-weight: 500;
+  }
+
+  .t-file-path {
+    color: #7dcfff;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+  }
+
+  .t-diff-add {
+    color: #9ece6a;
+    background: rgba(158, 206, 106, 0.08);
+  }
+
+  .t-diff-del {
+    color: #f7768e;
+    background: rgba(247, 118, 142, 0.08);
+  }
+
+  .t-diff-hunk {
+    color: #7aa2f7;
+    font-style: italic;
+  }
+
+  .t-status-line {
+    color: #e0af68;
+    font-style: italic;
+  }
+
+  .t-code-fence {
+    color: #565f89;
+  }
+
+  .t-code-block {
+    background: rgba(0,0,0,0.25);
+    border-radius: 4px;
+    margin: 0.25rem 0;
+    padding: 0.5rem 0.75rem;
+    overflow-x: auto;
+  }
+
+  .t-code-block code {
+    font-family: inherit;
+    font-size: inherit;
+    background: none !important;
+    padding: 0 !important;
+  }
+
+  .t-separator {
+    border-top: 1px solid #2f3348;
+    margin: 0.5rem 0;
+  }
+
+  .t-muted {
+    color: #565f89;
+  }
+
+  .t-error {
+    color: #f7768e;
+    font-weight: 500;
+  }
+
+  /* Collapsible sections for tool output */
+  .t-collapsible-header {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    user-select: none;
+  }
+  .t-collapsible-header:hover {
+    opacity: 0.85;
+  }
+  .t-collapsible-arrow {
+    display: inline-block;
+    transition: transform 0.15s;
+    font-size: 0.7rem;
+    color: #565f89;
+  }
+  .t-collapsible-arrow.open {
+    transform: rotate(90deg);
+  }
+  .t-collapsible-body {
+    display: none;
+    padding-left: 1.2rem;
+    border-left: 2px solid #2f3348;
+    margin: 0.25rem 0 0.25rem 0.35rem;
+  }
+  .t-collapsible-body.open {
+    display: block;
+  }
+
+  .export-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .terminal-title-input {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #8b8fa3;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.75rem;
+    text-align: center;
+    flex: 1;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    outline: none;
+  }
+  .terminal-title-input:hover,
+  .terminal-title-input:focus {
+    border-color: #3d3f58;
+    color: #c0caf5;
+  }
+
+  @media (max-width: 520px) {
+    .actions { flex-direction: column; }
+    .actions .spacer { display: none; }
+    .actions .btn { width: 100%; }
+    .export-actions { flex-direction: column; }
+    .export-actions .btn { width: 100%; }
+    .terminal-body { font-size: 0.72rem; padding: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Terminal Share</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Paste terminal output from Ghostty or Claude Code sessions and export as a styled, shareable HTML file or PNG screenshot.</p>
+
+  <div class="paste-area" id="paste-area" contenteditable="true" spellcheck="false"></div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="render-btn" disabled onclick="renderPreview()">Render Preview</button>
+    <button class="btn btn-secondary" id="clear-btn" disabled onclick="clearAll()">Clear</button>
+    <span class="spacer"></span>
+  </div>
+
+  <div id="preview-section" style="display:none;">
+    <p class="preview-label">Preview</p>
+    <div class="terminal-preview" id="terminal-preview">
+      <div class="terminal-titlebar">
+        <span class="terminal-dot red"></span>
+        <span class="terminal-dot yellow"></span>
+        <span class="terminal-dot green"></span>
+        <input type="text" class="terminal-title-input" id="terminal-title" value="Terminal" placeholder="Terminal title">
+      </div>
+      <div class="terminal-body" id="terminal-body"></div>
+    </div>
+
+    <div class="export-actions">
+      <button class="btn btn-primary" onclick="exportHTML()">Export HTML</button>
+      <button class="btn btn-secondary" onclick="exportPNG()">Export PNG</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──
+let rawText = '';
+
+// ── Paste handling ──
+const pasteArea = document.getElementById('paste-area');
+const renderBtn = document.getElementById('render-btn');
+const clearBtn = document.getElementById('clear-btn');
+
+pasteArea.addEventListener('paste', (e) => {
+  e.preventDefault();
+  // Prefer plain text from clipboard
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+  if (!text) return;
+  pasteArea.textContent = text;
+  rawText = text;
+  renderBtn.disabled = false;
+  clearBtn.disabled = false;
+});
+
+pasteArea.addEventListener('input', () => {
+  rawText = pasteArea.textContent || pasteArea.innerText || '';
+  const hasContent = rawText.trim().length > 0;
+  renderBtn.disabled = !hasContent;
+  clearBtn.disabled = !hasContent;
+});
+
+function clearAll() {
+  pasteArea.textContent = '';
+  rawText = '';
+  renderBtn.disabled = true;
+  clearBtn.disabled = true;
+  document.getElementById('preview-section').style.display = 'none';
+  document.getElementById('terminal-preview').style.display = 'none';
+  document.getElementById('terminal-body').innerHTML = '';
+}
+
+// ── Parser ──
+
+// Classify each line
+function classifyLine(line, prevType, inCodeBlock) {
+  // Claude Code banner
+  if (/▐▛███▜▌/.test(line) || /╹╹╹╹╹/.test(line) || /▐[▛▜█]+▌/.test(line)) return 'banner';
+
+  // Model info line (e.g., "claude-3.5-sonnet" or model with context info)
+  if (/^(\s*)?(claude-|model:|Model:)/i.test(line) && line.length < 120) return 'model-info';
+  if (/^\s*\d+k context/i.test(line)) return 'model-info';
+
+  // Status lines (bypass permissions, cost info)
+  if (/^(\s*)?(⏵|>>\s*bypass|Total cost|Session cost|Duration)/i.test(line)) return 'status';
+  if (/^\s*⏵⏵/.test(line)) return 'status';
+
+  // Code fence
+  if (/^\s*```/.test(line)) return 'code-fence';
+
+  // If inside code block
+  if (inCodeBlock) return 'code';
+
+  // User prompt: line starting with ❯ or >
+  if (/^\s*❯\s/.test(line)) return 'user-prompt';
+
+  // Shell prompt: ~/path pattern with ❯
+  if (/^[~\/].*❯\s*$/.test(line) || /^[~\/].*❯/.test(line)) return 'shell-prompt';
+  if (/^\s*\$\s/.test(line) && !line.startsWith('  ')) return 'shell-prompt';
+
+  // Assistant response markers
+  if (/^\s*⏺\s/.test(line)) return 'assistant-marker';
+  if (/^\s*⏺$/.test(line)) return 'assistant-marker';
+
+  // Tool call indicators
+  if (/^\s*(Read|Write|Edit|Bash|Grep|Glob|ToolSearch|Skill|WebFetch|WebSearch|TodoRead|TodoWrite)\s*(\(|$)/i.test(line)) return 'tool-call';
+  if (/^\s*(─{3,}|━{3,})/.test(line)) return 'separator';
+
+  // Diff output
+  if (/^(\s*)\+(?!\+\+)/.test(line) && prevType === 'diff-del' || prevType === 'diff-add' || prevType === 'diff-hunk') return 'diff-add';
+  if (/^(\s*)-(?!--)/.test(line) && (prevType === 'diff-add' || prevType === 'diff-del' || prevType === 'diff-hunk')) return 'diff-del';
+  if (/^@@\s.*@@/.test(line)) return 'diff-hunk';
+  if (/^diff --/.test(line)) return 'diff-hunk';
+  if (/^\+{3}\s/.test(line) || /^-{3}\s/.test(line)) return 'diff-hunk';
+
+  // Standalone diff lines (with +/- at beginning and context of file changes)
+  if (/^\+[^+]/.test(line) && (prevType === 'diff-hunk' || prevType === 'diff-add' || prevType === 'diff-del')) return 'diff-add';
+  if (/^-[^-]/.test(line) && (prevType === 'diff-hunk' || prevType === 'diff-add' || prevType === 'diff-del')) return 'diff-del';
+
+  // File paths (standalone paths)
+  if (/^\s*(\/[\w./-]+|~\/[\w./-]+)\s*$/.test(line) && line.trim().length > 2) return 'file-path';
+
+  // Error lines
+  if (/^\s*(Error|error|ERROR|FAIL|FAILED|fatal|Fatal)[:!\s]/i.test(line)) return 'error';
+
+  // Empty line
+  if (line.trim() === '') return 'empty';
+
+  return 'text';
+}
+
+function parseContent(text) {
+  const lines = text.split('\n');
+  const parsed = [];
+  let inCodeBlock = false;
+  let codeBlockLang = '';
+  let codeBuffer = [];
+  let prevType = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const type = classifyLine(line, prevType, inCodeBlock);
+
+    if (type === 'code-fence') {
+      if (!inCodeBlock) {
+        // Opening fence
+        inCodeBlock = true;
+        const m = line.match(/```(\w*)/);
+        codeBlockLang = m ? m[1] : '';
+        codeBuffer = [];
+        parsed.push({ type: 'code-fence-open', text: line, lang: codeBlockLang });
+      } else {
+        // Closing fence
+        inCodeBlock = false;
+        parsed.push({ type: 'code-block', lines: codeBuffer, lang: codeBlockLang });
+        parsed.push({ type: 'code-fence-close', text: line });
+        codeBuffer = [];
+        codeBlockLang = '';
+      }
+      prevType = type;
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+      prevType = 'code';
+      continue;
+    }
+
+    parsed.push({ type, text: line });
+    prevType = type;
+  }
+
+  // If code block was never closed, flush remaining
+  if (inCodeBlock && codeBuffer.length > 0) {
+    parsed.push({ type: 'code-block', lines: codeBuffer, lang: codeBlockLang });
+  }
+
+  return parsed;
+}
+
+// ── Renderer ──
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function detectToolBlocks(parsed) {
+  // Group tool calls with their output into collapsible sections
+  const result = [];
+  let i = 0;
+
+  while (i < parsed.length) {
+    const item = parsed[i];
+
+    if (item.type === 'tool-call') {
+      // Collect all following lines until next prompt, marker, or separator
+      const toolLines = [item];
+      let j = i + 1;
+      let outputLineCount = 0;
+
+      while (j < parsed.length) {
+        const next = parsed[j];
+        if (next.type === 'user-prompt' || next.type === 'shell-prompt' ||
+            next.type === 'assistant-marker' || next.type === 'banner' ||
+            next.type === 'tool-call') {
+          break;
+        }
+        toolLines.push(next);
+        if (next.type !== 'empty') outputLineCount++;
+        j++;
+      }
+
+      // If the tool call has significant output, make it collapsible
+      if (outputLineCount > 5) {
+        result.push({ type: 'collapsible-tool', header: item, body: toolLines.slice(1) });
+      } else {
+        for (const tl of toolLines) result.push(tl);
+      }
+      i = j;
+    } else {
+      result.push(item);
+      i++;
+    }
+  }
+
+  return result;
+}
+
+function renderLine(item) {
+  const text = esc(item.text || '');
+  switch (item.type) {
+    case 'banner':
+      return `<div class="t-line t-banner">${text}</div>`;
+    case 'model-info':
+      return `<div class="t-line t-model-info">${text}</div>`;
+    case 'user-prompt':
+      return `<div class="t-line t-user-prompt">${text}</div>`;
+    case 'shell-prompt':
+      return `<div class="t-line t-shell-prompt">${text}</div>`;
+    case 'assistant-marker':
+      return `<div class="t-line t-assistant-marker">${text}</div>`;
+    case 'tool-call':
+      return `<div class="t-line t-tool-call">${text}</div>`;
+    case 'file-path':
+      return `<div class="t-line t-file-path">${text}</div>`;
+    case 'diff-add':
+      return `<div class="t-line t-diff-add">${text}</div>`;
+    case 'diff-del':
+      return `<div class="t-line t-diff-del">${text}</div>`;
+    case 'diff-hunk':
+      return `<div class="t-line t-diff-hunk">${text}</div>`;
+    case 'status':
+      return `<div class="t-line t-status-line">${text}</div>`;
+    case 'separator':
+      return `<div class="t-separator"></div>`;
+    case 'error':
+      return `<div class="t-line t-error">${text}</div>`;
+    case 'empty':
+      return `<div class="t-line">&nbsp;</div>`;
+    case 'code-fence-open':
+    case 'code-fence-close':
+      return `<div class="t-line t-code-fence">${text}</div>`;
+    default:
+      return `<div class="t-line t-assistant-text">${text}</div>`;
+  }
+}
+
+function renderCodeBlock(item) {
+  const code = item.lines.join('\n');
+  let highlighted;
+  try {
+    if (item.lang && hljs.getLanguage(item.lang)) {
+      highlighted = hljs.highlight(code, { language: item.lang }).value;
+    } else {
+      highlighted = hljs.highlightAuto(code).value;
+    }
+  } catch {
+    highlighted = esc(code);
+  }
+  return `<div class="t-code-block"><code>${highlighted}</code></div>`;
+}
+
+let collapsibleCounter = 0;
+
+function renderCollapsible(item) {
+  const id = 'collapsible-' + (collapsibleCounter++);
+  const headerHtml = esc(item.header.text || '');
+  let bodyHtml = '';
+  for (const bItem of item.body) {
+    if (bItem.type === 'code-block') {
+      bodyHtml += renderCodeBlock(bItem);
+    } else {
+      bodyHtml += renderLine(bItem);
+    }
+  }
+  return `<div class="t-collapsible-header t-tool-call" onclick="toggleCollapsible('${id}')">` +
+    `<span class="t-collapsible-arrow" id="${id}-arrow">&#9654;</span> ${headerHtml}</div>` +
+    `<div class="t-collapsible-body" id="${id}">${bodyHtml}</div>`;
+}
+
+function toggleCollapsible(id) {
+  const body = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open');
+  arrow.classList.toggle('open');
+}
+
+function renderPreview() {
+  if (!rawText.trim()) return;
+
+  collapsibleCounter = 0;
+  const parsed = parseContent(rawText);
+  const structured = detectToolBlocks(parsed);
+
+  let html = '';
+  for (const item of structured) {
+    if (item.type === 'code-block') {
+      html += renderCodeBlock(item);
+    } else if (item.type === 'collapsible-tool') {
+      html += renderCollapsible(item);
+    } else if (item.type === 'code-fence-open' || item.type === 'code-fence-close') {
+      html += renderLine(item);
+    } else {
+      html += renderLine(item);
+    }
+  }
+
+  document.getElementById('terminal-body').innerHTML = html;
+  document.getElementById('preview-section').style.display = 'block';
+  document.getElementById('terminal-preview').style.display = 'block';
+
+  // Try to auto-detect a title from content
+  const bannerLine = rawText.split('\n').find(l => /▐▛███▜▌/.test(l) || /Claude Code/i.test(l));
+  if (bannerLine) {
+    document.getElementById('terminal-title').value = 'Claude Code';
+  }
+}
+
+// ── Export: HTML ──
+
+function exportHTML() {
+  const preview = document.getElementById('terminal-preview');
+  const body = document.getElementById('terminal-body').innerHTML;
+  const title = document.getElementById('terminal-title').value || 'Terminal';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${esc(title)}</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f0f14;display:flex;justify-content:center;padding:2rem 1rem;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.terminal{background:#1a1b26;border-radius:10px;overflow:hidden;max-width:900px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,0.3)}
+.titlebar{background:#24253a;padding:0.5rem 0.85rem;display:flex;align-items:center;gap:0.5rem}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+.title-text{flex:1;text-align:center;font-size:0.75rem;color:#8b8fa3;font-family:'SF Mono','Fira Code','Cascadia Code',monospace}
+.body{padding:1rem 1.25rem;font-family:'SF Mono','Fira Code','Cascadia Code','Menlo',monospace;font-size:0.82rem;line-height:1.6;color:#c0caf5;overflow-x:auto}
+.t-line{white-space:pre-wrap;word-break:break-word}
+.t-banner{color:#bb9af7;font-weight:600}
+.t-model-info{color:#7aa2f7;font-size:0.78rem}
+.t-user-prompt{color:#9ece6a;font-weight:600}
+.t-shell-prompt{color:#7dcfff}
+.t-assistant-marker{color:#bb9af7;font-weight:600}
+.t-assistant-text{color:#c0caf5}
+.t-tool-call{color:#e0af68;font-weight:500}
+.t-file-path{color:#7dcfff;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.t-diff-add{color:#9ece6a;background:rgba(158,206,106,0.08)}
+.t-diff-del{color:#f7768e;background:rgba(247,118,142,0.08)}
+.t-diff-hunk{color:#7aa2f7;font-style:italic}
+.t-status-line{color:#e0af68;font-style:italic}
+.t-code-fence{color:#565f89}
+.t-code-block{background:rgba(0,0,0,0.25);border-radius:4px;margin:0.25rem 0;padding:0.5rem 0.75rem;overflow-x:auto}
+.t-code-block code{font-family:inherit;font-size:inherit;background:none!important;padding:0!important}
+.t-separator{border-top:1px solid #2f3348;margin:0.5rem 0}
+.t-muted{color:#565f89}
+.t-error{color:#f7768e;font-weight:500}
+.t-collapsible-header{cursor:pointer;display:flex;align-items:center;gap:0.4rem;user-select:none}
+.t-collapsible-header:hover{opacity:0.85}
+.t-collapsible-arrow{display:inline-block;transition:transform 0.15s;font-size:0.7rem;color:#565f89}
+.t-collapsible-arrow.open{transform:rotate(90deg)}
+.t-collapsible-body{display:none;padding-left:1.2rem;border-left:2px solid #2f3348;margin:0.25rem 0 0.25rem 0.35rem}
+.t-collapsible-body.open{display:block}
+.meta{text-align:center;padding:1rem;font-size:0.7rem;color:#565f89}
+.meta a{color:#7aa2f7;text-decoration:none}
+</style>
+</head>
+<body>
+<div>
+<div class="terminal">
+<div class="titlebar">
+<span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+<span class="title-text">${esc(title)}</span>
+</div>
+<div class="body">${body}</div>
+</div>
+<div class="meta">Generated with <a href="https://tools.nicolaeandrei.com/terminal_share.html">Terminal Share</a></div>
+</div>
+<script>
+function toggleCollapsible(id){
+  var b=document.getElementById(id),a=document.getElementById(id+'-arrow');
+  b.classList.toggle('open');a.classList.toggle('open');
+}
+</script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (title.replace(/[^a-zA-Z0-9_-]/g, '_') || 'terminal') + '.html';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('HTML downloaded');
+}
+
+// ── Export: PNG ──
+
+async function exportPNG() {
+  const preview = document.getElementById('terminal-preview');
+  showToast('Generating PNG...');
+
+  try {
+    // Temporarily remove max-height for full capture
+    const body = document.getElementById('terminal-body');
+    const oldMaxHeight = body.style.maxHeight;
+    const oldOverflow = body.style.overflowY;
+    body.style.maxHeight = 'none';
+    body.style.overflowY = 'visible';
+
+    const canvas = await html2canvas(preview, {
+      backgroundColor: '#1a1b26',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+
+    body.style.maxHeight = oldMaxHeight;
+    body.style.overflowY = oldOverflow;
+
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const title = document.getElementById('terminal-title').value || 'terminal';
+      a.download = title.replace(/[^a-zA-Z0-9_-]/g, '_') + '.png';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('PNG downloaded');
+    }, 'image/png');
+  } catch (err) {
+    showToast('PNG export failed: ' + err.message);
+  }
+}
+
+// ── Toast ──
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+</script>
+</body>
+</html>
