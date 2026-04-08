@@ -36,7 +36,7 @@
     border-color: var(--accent);
   }
   .paste-area:empty::before {
-    content: 'Paste terminal content here (Cmd+V / Ctrl+V)\nSupports Ghostty & Claude Code sessions';
+    content: 'Paste terminal content here (Cmd+V / Ctrl+V)';
     color: var(--text-muted);
     pointer-events: none;
     white-space: pre-line;
@@ -293,7 +293,7 @@
     <h1>Terminal Share</h1>
     <a href="/">&#8592; all tools</a>
   </header>
-  <p class="desc">Paste terminal output from Ghostty or Claude Code sessions and export as a styled, shareable HTML file or PNG screenshot.</p>
+  <p class="desc">Paste terminal output and export as a styled, shareable HTML file or PNG screenshot.</p>
 
   <div class="paste-area" id="paste-area" contenteditable="true" spellcheck="false"></div>
 
