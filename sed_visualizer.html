@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sed Visualizer</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 900px; }
+
+  label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+  }
+
+  .command-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: flex-end;
+  }
+  .command-row .input-group { flex: 1; }
+  .command-row input {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.88rem;
+  }
+  .command-row .btn { align-self: flex-end; }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1.25rem;
+  }
+  .preset-btn {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--text);
+    background: var(--accent-dim);
+  }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 640px) {
+    .panels { grid-template-columns: 1fr; }
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.3rem;
+  }
+  .panel-header label { margin-bottom: 0; }
+
+  textarea {
+    width: 100%;
+    min-height: 180px;
+    padding: 0.75rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    resize: vertical;
+    border-radius: 8px;
+    tab-size: 4;
+  }
+
+  .output-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    min-height: 180px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* Diff view */
+  .diff-section { margin-bottom: 1.5rem; }
+  .diff-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.82rem;
+    line-height: 1.65;
+  }
+  .diff-line {
+    display: flex;
+    padding: 0 0.75rem;
+    min-height: 1.65em;
+  }
+  .diff-line:first-child { padding-top: 0.5rem; }
+  .diff-line:last-child { padding-bottom: 0.5rem; }
+  .diff-lineno {
+    width: 2.5rem;
+    flex-shrink: 0;
+    text-align: right;
+    padding-right: 0.75rem;
+    color: var(--text-muted);
+    user-select: none;
+    opacity: 0.5;
+  }
+  .diff-content {
+    flex: 1;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .diff-line.added {
+    background: var(--green-dim);
+  }
+  .diff-line.added .diff-content { color: var(--green); }
+  .diff-line.removed {
+    background: var(--red-dim);
+  }
+  .diff-line.removed .diff-content { color: var(--red); }
+  .diff-line.unchanged .diff-content { color: var(--text-muted); }
+
+  /* Inline highlights within a changed line */
+  .hl-add {
+    background: var(--green-dim);
+    color: var(--green);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+  .hl-del {
+    background: var(--red-dim);
+    color: var(--red);
+    border-radius: 2px;
+    padding: 0 1px;
+    text-decoration: line-through;
+  }
+
+  /* Pipeline steps */
+  .pipeline-section { margin-bottom: 1.5rem; }
+  .pipeline-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .pipeline-step-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  .pipeline-step-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .pipeline-step-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+  .pipeline-step-body {
+    display: none;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.78rem;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.65;
+  }
+  .pipeline-step.open .pipeline-step-body { display: block; }
+  .pipeline-step-toggle {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    transition: transform 0.15s;
+  }
+  .pipeline-step.open .pipeline-step-toggle { transform: rotate(90deg); }
+
+  .error-msg {
+    background: var(--red-dim);
+    color: var(--red);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
+    display: none;
+  }
+  .error-msg.visible { display: block; }
+
+  .copy-btn {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.6rem;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    background: var(--accent);
+    color: #fff;
+    padding: 0.5rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .info-box {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+  .info-box code {
+    background: var(--surface-alt);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.75rem;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Sed Visualizer</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+  <p class="desc">Enter a sed expression and input text to see the transformation step by step, with a visual diff of changes.</p>
+
+  <div class="info-box">
+    Supports: <code>s/pattern/replacement/flags</code>, <code>y/src/dst/</code>, <code>d</code> (delete), <code>/pattern/d</code> (conditional delete), <code>NUMBER d</code> (line delete), line addressing (<code>2s/...</code>, <code>1,3s/...</code>, <code>/pat/s/...</code>), and chained commands with <code>;</code>.
+  </div>
+
+  <label>Sed Expression</label>
+  <div class="command-row">
+    <div class="input-group">
+      <input type="text" id="sed-input" placeholder="s/hello/world/g" spellcheck="false" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" id="run-btn">Run</button>
+  </div>
+
+  <div class="presets">
+    <button class="preset-btn" data-cmd="s/foo/bar/g" data-text="foo bar foo baz foo">s/foo/bar/g</button>
+    <button class="preset-btn" data-cmd="s/[0-9]+/NUM/g" data-text="Order 42 has 3 items worth 100 dollars">s/[0-9]+/NUM/g</button>
+    <button class="preset-btn" data-cmd="/^#/d" data-text="# comment line&#10;real data&#10;# another comment&#10;more data">/^#/d</button>
+    <button class="preset-btn" data-cmd="s/^/  /" data-text="line one&#10;line two&#10;line three">s/^/  /</button>
+    <button class="preset-btn" data-cmd="2,4d" data-text="line 1&#10;line 2&#10;line 3&#10;line 4&#10;line 5">2,4d</button>
+    <button class="preset-btn" data-cmd="y/abc/ABC/" data-text="a big cat and a bad cab">y/abc/ABC/</button>
+    <button class="preset-btn" data-cmd="s/  */ /g" data-text="too   many     spaces   here">s/  */ /g</button>
+    <button class="preset-btn" data-cmd="s/(.+)/[\1]/" data-text="wrap me&#10;and me too">s/(.+)/[\1]/</button>
+  </div>
+
+  <div id="error-msg" class="error-msg"></div>
+
+  <div class="panels">
+    <div>
+      <div class="panel-header">
+        <label for="input-text">Input</label>
+      </div>
+      <textarea id="input-text" placeholder="Enter text to transform..." spellcheck="false">Hello World
+foo bar baz
+The quick brown fox
+123 testing 456</textarea>
+    </div>
+    <div>
+      <div class="panel-header">
+        <label>Output</label>
+        <button class="btn btn-secondary copy-btn" id="copy-btn">Copy</button>
+      </div>
+      <div class="output-box" id="output-box"></div>
+    </div>
+  </div>
+
+  <div class="diff-section">
+    <div class="panel-header">
+      <label>Diff</label>
+    </div>
+    <div class="diff-box" id="diff-box"></div>
+  </div>
+
+  <div class="pipeline-section" id="pipeline-section" style="display:none;">
+    <div class="panel-header">
+      <label>Pipeline Steps</label>
+    </div>
+    <div id="pipeline-steps"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Copied!</div>
+
+<script>
+(function() {
+  const sedInput = document.getElementById('sed-input');
+  const inputText = document.getElementById('input-text');
+  const outputBox = document.getElementById('output-box');
+  const diffBox = document.getElementById('diff-box');
+  const errorMsg = document.getElementById('error-msg');
+  const pipelineSection = document.getElementById('pipeline-section');
+  const pipelineSteps = document.getElementById('pipeline-steps');
+  const toast = document.getElementById('toast');
+
+  // --- Sed parser ---
+  function parseSedScript(script) {
+    const commands = [];
+    const raw = script.trim();
+    if (!raw) return commands;
+
+    // Split by semicolons, but respect delimiters inside s/// and y///
+    const parts = splitCommands(raw);
+
+    for (const part of parts) {
+      const cmd = parseSingleCommand(part.trim());
+      if (cmd) commands.push(cmd);
+    }
+    return commands;
+  }
+
+  function splitCommands(script) {
+    const parts = [];
+    let current = '';
+    let i = 0;
+    while (i < script.length) {
+      // Skip address part
+      if (current.trim() === '' || /^[0-9,$\/\\]/.test(script[i])) {
+        // Check if we're in a s or y command
+        if (script[i] === 's' || script[i] === 'y') {
+          const delim = script[i + 1];
+          if (delim) {
+            current += script[i]; // s or y
+            i++;
+            current += script[i]; // delimiter
+            i++;
+            // Read through pattern/replacement/flags
+            let fields = 0;
+            while (i < script.length && fields < 2) {
+              if (script[i] === '\\' && i + 1 < script.length) {
+                current += script[i] + script[i + 1];
+                i += 2;
+                continue;
+              }
+              if (script[i] === delim) fields++;
+              current += script[i];
+              i++;
+            }
+            // Read flags
+            while (i < script.length && script[i] !== ';' && script[i] !== '\n') {
+              current += script[i];
+              i++;
+            }
+            parts.push(current);
+            current = '';
+            if (i < script.length && (script[i] === ';' || script[i] === '\n')) i++;
+            continue;
+          }
+        }
+      }
+      if (script[i] === ';' || script[i] === '\n') {
+        if (current.trim()) parts.push(current);
+        current = '';
+        i++;
+        continue;
+      }
+      current += script[i];
+      i++;
+    }
+    if (current.trim()) parts.push(current);
+    return parts;
+  }
+
+  function parseSingleCommand(cmd) {
+    if (!cmd) return null;
+    let i = 0;
+    let addr = null;
+
+    // Parse address (line number, range, or /pattern/)
+    const addrResult = parseAddress(cmd, i);
+    if (addrResult) {
+      addr = addrResult.addr;
+      i = addrResult.end;
+    }
+
+    // Skip spaces
+    while (i < cmd.length && cmd[i] === ' ') i++;
+
+    if (i >= cmd.length) {
+      // Bare address with no command — could be implicit print, skip
+      return null;
+    }
+
+    const ch = cmd[i];
+
+    // Substitute: s/pattern/replacement/flags
+    if (ch === 's') {
+      const delim = cmd[i + 1];
+      if (!delim) throw new Error('Incomplete s command');
+      i += 2; // skip 's' and delimiter
+      let pattern = '', replacement = '', flags = '';
+      // Read pattern
+      while (i < cmd.length && cmd[i] !== delim) {
+        if (cmd[i] === '\\' && i + 1 < cmd.length) { pattern += cmd[i] + cmd[i + 1]; i += 2; continue; }
+        pattern += cmd[i]; i++;
+      }
+      if (cmd[i] !== delim) throw new Error('Unterminated s command pattern');
+      i++; // skip delimiter
+      // Read replacement
+      while (i < cmd.length && cmd[i] !== delim) {
+        if (cmd[i] === '\\' && i + 1 < cmd.length) { replacement += cmd[i] + cmd[i + 1]; i += 2; continue; }
+        replacement += cmd[i]; i++;
+      }
+      if (cmd[i] === delim) i++; // skip closing delimiter
+      // Read flags
+      flags = cmd.slice(i).trim();
+      return { type: 's', addr, pattern, replacement, flags, raw: cmd };
+    }
+
+    // Transliterate: y/src/dst/
+    if (ch === 'y') {
+      const delim = cmd[i + 1];
+      if (!delim) throw new Error('Incomplete y command');
+      i += 2;
+      let src = '', dst = '';
+      while (i < cmd.length && cmd[i] !== delim) { src += cmd[i]; i++; }
+      i++; // skip delimiter
+      while (i < cmd.length && cmd[i] !== delim) { dst += cmd[i]; i++; }
+      if (src.length !== dst.length) throw new Error('y command: src and dst must be same length');
+      return { type: 'y', addr, src, dst, raw: cmd };
+    }
+
+    // Delete: d
+    if (ch === 'd') {
+      return { type: 'd', addr, raw: cmd };
+    }
+
+    // Print: p
+    if (ch === 'p') {
+      return { type: 'p', addr, raw: cmd };
+    }
+
+    // Quit: q
+    if (ch === 'q') {
+      return { type: 'q', addr, raw: cmd };
+    }
+
+    throw new Error('Unknown command: ' + ch);
+  }
+
+  function parseAddress(cmd, start) {
+    let i = start;
+    let addr1 = null, addr2 = null;
+
+    const r1 = parseSingleAddr(cmd, i);
+    if (!r1) return null;
+    addr1 = r1.addr;
+    i = r1.end;
+
+    if (cmd[i] === ',') {
+      i++;
+      const r2 = parseSingleAddr(cmd, i);
+      if (r2) {
+        addr2 = r2.addr;
+        i = r2.end;
+      }
+    }
+
+    return { addr: { start: addr1, end: addr2 }, end: i };
+  }
+
+  function parseSingleAddr(cmd, i) {
+    // Line number
+    if (/[0-9]/.test(cmd[i])) {
+      let num = '';
+      while (i < cmd.length && /[0-9]/.test(cmd[i])) { num += cmd[i]; i++; }
+      return { addr: { type: 'line', value: parseInt(num) }, end: i };
+    }
+    // Last line
+    if (cmd[i] === '$') {
+      return { addr: { type: 'last' }, end: i + 1 };
+    }
+    // Regex
+    if (cmd[i] === '/') {
+      i++; // skip opening /
+      let pat = '';
+      while (i < cmd.length && cmd[i] !== '/') {
+        if (cmd[i] === '\\' && i + 1 < cmd.length) { pat += cmd[i] + cmd[i + 1]; i += 2; continue; }
+        pat += cmd[i]; i++;
+      }
+      if (cmd[i] === '/') i++; // skip closing /
+      return { addr: { type: 'regex', value: pat }, end: i };
+    }
+    return null;
+  }
+
+  function addressMatches(addr, lineNum, totalLines, lineText) {
+    if (!addr) return true;
+    const startMatch = singleAddrMatches(addr.start, lineNum, totalLines, lineText);
+    if (!addr.end) return startMatch;
+    const endMatch = singleAddrMatches(addr.end, lineNum, totalLines, lineText);
+    // Range: between start and end (inclusive)
+    if (addr.start.type === 'line' && addr.end.type === 'line') {
+      return lineNum >= addr.start.value && lineNum <= addr.end.value;
+    }
+    if (addr.start.type === 'line' && addr.end.type === 'last') {
+      return lineNum >= addr.start.value;
+    }
+    if (addr.start.type === 'last') {
+      return lineNum === totalLines;
+    }
+    // For regex ranges, simplify: match start to end
+    return startMatch || endMatch;
+  }
+
+  function singleAddrMatches(a, lineNum, totalLines, lineText) {
+    if (!a) return true;
+    if (a.type === 'line') return lineNum === a.value;
+    if (a.type === 'last') return lineNum === totalLines;
+    if (a.type === 'regex') {
+      try {
+        return new RegExp(a.value).test(lineText);
+      } catch(e) { return false; }
+    }
+    return false;
+  }
+
+  // --- Sed executor ---
+  function executeSed(script, input) {
+    const commands = parseSedScript(script);
+    if (commands.length === 0) throw new Error('No valid sed commands found');
+
+    const lines = input.split('\n');
+    const totalLines = lines.length;
+    const steps = [];
+    let currentLines = lines.slice();
+
+    for (let ci = 0; ci < commands.length; ci++) {
+      const cmd = commands[ci];
+      const before = currentLines.slice();
+      const resultLines = [];
+
+      for (let li = 0; li < currentLines.length; li++) {
+        const lineNum = li + 1;
+        const line = currentLines[li];
+        const matches = addressMatches(cmd.addr, lineNum, currentLines.length, line);
+
+        if (!matches) {
+          resultLines.push(line);
+          continue;
+        }
+
+        if (cmd.type === 's') {
+          let flagStr = cmd.flags;
+          let global = flagStr.includes('g');
+          let caseI = flagStr.includes('i') || flagStr.includes('I');
+          let rFlags = (global ? 'g' : '') + (caseI ? 'i' : '');
+          try {
+            let re = new RegExp(cmd.pattern, rFlags);
+            let repl = cmd.replacement
+              .replace(/\\n/g, '\n')
+              .replace(/\\t/g, '\t')
+              .replace(/\\(.)/g, '$1');
+            // Handle backreferences: \1 -> $1, & -> $&
+            repl = repl.replace(/&/g, '$&');
+            // Convert \1..\9 already handled by \\(.) but we need $1..$9
+            // Actually let's be more careful
+            let finalRepl = '';
+            for (let ri = 0; ri < cmd.replacement.length; ri++) {
+              if (cmd.replacement[ri] === '\\' && ri + 1 < cmd.replacement.length) {
+                const nc = cmd.replacement[ri + 1];
+                if (nc >= '1' && nc <= '9') {
+                  finalRepl += '$' + nc;
+                  ri++;
+                } else if (nc === 'n') {
+                  finalRepl += '\n'; ri++;
+                } else if (nc === 't') {
+                  finalRepl += '\t'; ri++;
+                } else {
+                  finalRepl += nc; ri++;
+                }
+              } else if (cmd.replacement[ri] === '&') {
+                finalRepl += '$&';
+              } else {
+                finalRepl += cmd.replacement[ri];
+              }
+            }
+            resultLines.push(line.replace(re, finalRepl));
+          } catch(e) {
+            throw new Error('Invalid regex in s command: ' + e.message);
+          }
+        } else if (cmd.type === 'y') {
+          let result = '';
+          for (const ch of line) {
+            const idx = cmd.src.indexOf(ch);
+            result += idx >= 0 ? cmd.dst[idx] : ch;
+          }
+          resultLines.push(result);
+        } else if (cmd.type === 'd') {
+          // Delete — don't push line
+          continue;
+        } else if (cmd.type === 'p') {
+          resultLines.push(line);
+          resultLines.push(line); // print duplicates
+        } else if (cmd.type === 'q') {
+          resultLines.push(line);
+          // Stop processing further lines
+          break;
+        } else {
+          resultLines.push(line);
+        }
+      }
+
+      steps.push({
+        command: cmd.raw,
+        type: cmd.type,
+        description: describeCommand(cmd),
+        before: before,
+        after: resultLines
+      });
+      currentLines = resultLines;
+    }
+
+    return { output: currentLines, steps, commands };
+  }
+
+  function describeCommand(cmd) {
+    if (cmd.type === 's') {
+      const addrStr = cmd.addr ? describeAddr(cmd.addr) + ' ' : '';
+      return addrStr + 'Substitute /' + cmd.pattern + '/ with /' + cmd.replacement + '/' + (cmd.flags || '');
+    }
+    if (cmd.type === 'y') {
+      return 'Transliterate [' + cmd.src + '] to [' + cmd.dst + ']';
+    }
+    if (cmd.type === 'd') {
+      const addrStr = cmd.addr ? describeAddr(cmd.addr) + ': ' : '';
+      return addrStr + 'Delete matching lines';
+    }
+    if (cmd.type === 'p') {
+      return 'Print (duplicate) matching lines';
+    }
+    if (cmd.type === 'q') {
+      return 'Quit after this line';
+    }
+    return cmd.raw;
+  }
+
+  function describeAddr(addr) {
+    if (!addr) return '';
+    let s = describeSingleAddr(addr.start);
+    if (addr.end) s += ',' + describeSingleAddr(addr.end);
+    return s;
+  }
+
+  function describeSingleAddr(a) {
+    if (!a) return '';
+    if (a.type === 'line') return 'line ' + a.value;
+    if (a.type === 'last') return '$';
+    if (a.type === 'regex') return '/' + a.value + '/';
+    return '';
+  }
+
+  // --- Diff rendering ---
+  function renderDiff(inputLines, outputLines) {
+    // Simple line-by-line diff using LCS
+    const diff = computeLineDiff(inputLines, outputLines);
+    let html = '';
+    let lineNo = 0;
+    for (const entry of diff) {
+      if (entry.type === 'unchanged') {
+        lineNo++;
+        html += '<div class="diff-line unchanged">'
+          + '<span class="diff-lineno">' + lineNo + '</span>'
+          + '<span class="diff-content">' + escapeHtml(entry.text) + '</span></div>';
+      } else if (entry.type === 'removed') {
+        html += '<div class="diff-line removed">'
+          + '<span class="diff-lineno">-</span>'
+          + '<span class="diff-content">' + escapeHtml(entry.text) + '</span></div>';
+      } else if (entry.type === 'added') {
+        lineNo++;
+        html += '<div class="diff-line added">'
+          + '<span class="diff-lineno">+</span>'
+          + '<span class="diff-content">' + escapeHtml(entry.text) + '</span></div>';
+      } else if (entry.type === 'changed') {
+        // Show inline diff
+        html += '<div class="diff-line removed">'
+          + '<span class="diff-lineno">-</span>'
+          + '<span class="diff-content">' + renderInlineDiff(entry.old, entry.new, true) + '</span></div>';
+        lineNo++;
+        html += '<div class="diff-line added">'
+          + '<span class="diff-lineno">+</span>'
+          + '<span class="diff-content">' + renderInlineDiff(entry.old, entry.new, false) + '</span></div>';
+      }
+    }
+    return html;
+  }
+
+  function computeLineDiff(a, b) {
+    // Myers-like simple diff
+    const result = [];
+    const m = a.length, n = b.length;
+    // Build LCS table
+    const dp = Array.from({length: m + 1}, () => new Uint16Array(n + 1));
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (a[i-1] === b[j-1]) dp[i][j] = dp[i-1][j-1] + 1;
+        else dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+      }
+    }
+    // Backtrack
+    let i = m, j = n;
+    const ops = [];
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && a[i-1] === b[j-1]) {
+        ops.push({ type: 'unchanged', text: a[i-1] });
+        i--; j--;
+      } else if (i > 0 && j > 0 && dp[i-1][j-1] >= dp[i-1][j] && dp[i-1][j-1] >= dp[i][j-1]) {
+        // Changed line
+        ops.push({ type: 'changed', old: a[i-1], new: b[j-1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+        ops.push({ type: 'added', text: b[j-1] });
+        j--;
+      } else {
+        ops.push({ type: 'removed', text: a[i-1] });
+        i--;
+      }
+    }
+    ops.reverse();
+    return ops;
+  }
+
+  function renderInlineDiff(oldStr, newStr, showOld) {
+    // Character-level diff for inline highlighting
+    const ops = computeCharDiff(oldStr, newStr);
+    let html = '';
+    for (const op of ops) {
+      if (op.type === 'equal') {
+        html += escapeHtml(op.text);
+      } else if (op.type === 'delete' && showOld) {
+        html += '<span class="hl-del">' + escapeHtml(op.text) + '</span>';
+      } else if (op.type === 'insert' && !showOld) {
+        html += '<span class="hl-add">' + escapeHtml(op.text) + '</span>';
+      } else if (op.type === 'equal') {
+        html += escapeHtml(op.text);
+      }
+    }
+    return html;
+  }
+
+  function computeCharDiff(a, b) {
+    const m = a.length, n = b.length;
+    // For very long strings, skip char diff
+    if (m > 500 || n > 500) {
+      return [{ type: 'delete', text: a }, { type: 'insert', text: b }];
+    }
+    const dp = Array.from({length: m + 1}, () => new Uint16Array(n + 1));
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++)
+        dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1]);
+
+    const ops = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && a[i-1] === b[j-1]) {
+        ops.push({ type: 'equal', text: a[i-1] }); i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+        ops.push({ type: 'insert', text: b[j-1] }); j--;
+      } else {
+        ops.push({ type: 'delete', text: a[i-1] }); i--;
+      }
+    }
+    ops.reverse();
+    // Merge consecutive same-type ops
+    const merged = [];
+    for (const op of ops) {
+      if (merged.length > 0 && merged[merged.length - 1].type === op.type) {
+        merged[merged.length - 1].text += op.text;
+      } else {
+        merged.push({ type: op.type, text: op.text });
+      }
+    }
+    return merged;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // --- Pipeline rendering ---
+  function renderPipeline(steps) {
+    if (steps.length <= 1) {
+      pipelineSection.style.display = 'none';
+      return;
+    }
+    pipelineSection.style.display = '';
+    let html = '';
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      html += '<div class="pipeline-step" data-step="' + i + '">'
+        + '<div class="pipeline-step-header">'
+        + '<span class="pipeline-step-label">Step ' + (i + 1) + ': ' + escapeHtml(step.command) + '</span>'
+        + '<span class="pipeline-step-desc">' + escapeHtml(step.description) + '</span>'
+        + '<span class="pipeline-step-toggle">&#9654;</span>'
+        + '</div>'
+        + '<div class="pipeline-step-body">' + escapeHtml(step.after.join('\n')) + '</div>'
+        + '</div>';
+    }
+    pipelineSteps.innerHTML = html;
+
+    // Toggle expand
+    pipelineSteps.querySelectorAll('.pipeline-step-header').forEach(h => {
+      h.addEventListener('click', () => {
+        h.parentElement.classList.toggle('open');
+      });
+    });
+  }
+
+  // --- Main run ---
+  function run() {
+    const script = sedInput.value.trim();
+    const input = inputText.value;
+    errorMsg.classList.remove('visible');
+    errorMsg.textContent = '';
+
+    if (!script) {
+      outputBox.textContent = input;
+      diffBox.innerHTML = '';
+      pipelineSection.style.display = 'none';
+      return;
+    }
+
+    try {
+      const result = executeSed(script, input);
+      const outputText = result.output.join('\n');
+      outputBox.textContent = outputText;
+
+      const inputLines = input.split('\n');
+      diffBox.innerHTML = renderDiff(inputLines, result.output);
+      renderPipeline(result.steps);
+    } catch(e) {
+      errorMsg.textContent = e.message;
+      errorMsg.classList.add('visible');
+      outputBox.textContent = '';
+      diffBox.innerHTML = '';
+      pipelineSection.style.display = 'none';
+    }
+  }
+
+  // Auto-run on input changes
+  sedInput.addEventListener('input', run);
+  inputText.addEventListener('input', run);
+  document.getElementById('run-btn').addEventListener('click', run);
+
+  // Enter key runs
+  sedInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); run(); }
+  });
+
+  // Presets
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sedInput.value = btn.dataset.cmd;
+      if (btn.dataset.text) inputText.value = btn.dataset.text.replace(/&#10;/g, '\n');
+      run();
+    });
+  });
+
+  // Copy output
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    const text = outputBox.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1500);
+    });
+  });
+
+  // Initial run
+  run();
+})();
+</script>
+</body>
+</html>
