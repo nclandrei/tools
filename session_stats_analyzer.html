@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session Stats Analyzer</title>
+<meta name="description" content="Paste a Claude Code or Codex CLI session and get instant charts: tool call frequency, token usage over time, message breakdown, tool durations.">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  .container{max-width:960px}
+  .input-section{margin-bottom:24px}
+  .input-section label{display:block;font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
+  .drop-zone{position:relative;border:2px dashed var(--border);border-radius:12px;background:var(--surface);transition:border-color .15s,background .15s}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:var(--drop-hover)}
+  .drop-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;gap:8px;min-height:100px;cursor:pointer}
+  .drop-inner.hidden{display:none}
+  .drop-icon{font-size:28px;opacity:.3}
+  .drop-text{font-size:14px;color:var(--text-muted)}
+  .drop-hint{font-size:12px;color:var(--text-muted);opacity:.7}
+  textarea#inputArea{width:100%;min-height:160px;max-height:320px;background:transparent;border:none;color:var(--text);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;line-height:1.6;padding:16px;resize:vertical;outline:none;display:none}
+  textarea#inputArea.visible{display:block}
+  .input-file{display:none}
+  .controls{display:flex;align-items:center;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+  .controls button{font-size:13px;font-weight:600;padding:0 14px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .controls button:hover{background:var(--surface-alt);border-color:var(--border-hover)}
+  .detect-info{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);margin-left:auto}
+  .format-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:.5px}
+  .format-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .format-badge.claude{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent)}
+  .format-badge.codex{background:var(--green-dim);color:var(--green);border:1px solid var(--green)}
+  .status{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none;align-items:center;gap:8px}
+  .status.visible{display:flex}
+  .status.error{background:var(--red-dim);border:1px solid var(--red);color:var(--red)}
+
+  /* Stats dashboard */
+  .dashboard{display:none}
+  .dashboard.visible{display:block}
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:28px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
+  .stat-value{font-size:1.5rem;font-weight:700;color:var(--text);line-height:1.2}
+  .stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}
+  @media(max-width:700px){.charts-grid{grid-template-columns:1fr}}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+  .chart-card.full{grid-column:1/-1}
+  .chart-card h3{font-size:13px;font-weight:600;margin:0 0 14px;color:var(--text)}
+  .chart-wrap{position:relative;width:100%;height:260px}
+  .chart-card.tall .chart-wrap{height:320px}
+
+  /* Tool durations table */
+  .dur-table{width:100%;border-collapse:collapse;font-size:13px}
+  .dur-table th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .dur-table td{padding:8px 10px;border-bottom:1px solid var(--border)}
+  .dur-table tr:last-child td{border-bottom:none}
+  .dur-bar{height:8px;border-radius:4px;background:var(--accent);min-width:4px}
+
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1);z-index:999}
+  .toast.show{transform:translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Session Stats Analyzer</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
+  <p class="desc">Paste or drop a Claude Code or Codex CLI session &mdash; get instant charts and stats.</p>
+
+  <div id="status" class="status"></div>
+
+  <div class="input-section">
+    <label>Session Data</label>
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-inner" id="dropPrompt">
+        <div class="drop-icon">&#x1F4CA;</div>
+        <div class="drop-text">Drop a <strong>.jsonl</strong> file here, or click to browse</div>
+        <div class="drop-hint">Claude Code &middot; Codex CLI &mdash; or just paste terminal output</div>
+      </div>
+      <textarea id="inputArea" placeholder="Paste session JSONL here..." spellcheck="false"></textarea>
+      <input type="file" id="fileInput" class="input-file" accept=".jsonl,.json,.txt">
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="btnPaste">&#x1F4CB; Paste</button>
+    <button id="btnClear">&#x2715; Clear</button>
+    <div id="detectInfo" class="detect-info" style="display:none">
+      <span id="formatBadge"></span>
+      <span id="msgCount" style="font-size:12px"></span>
+    </div>
+  </div>
+
+  <div id="dashboard" class="dashboard">
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Tool Call Frequency</h3>
+        <div class="chart-wrap"><canvas id="chartToolFreq"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Messages by Role</h3>
+        <div class="chart-wrap"><canvas id="chartRoles"></canvas></div>
+      </div>
+      <div class="chart-card full tall">
+        <h3>Token Usage Over Time</h3>
+        <div class="chart-wrap"><canvas id="chartTokens"></canvas></div>
+      </div>
+      <div class="chart-card full">
+        <h3>Avg Tool Duration (ms)</h3>
+        <div class="chart-wrap" id="durWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+// ── Analysis Logic (inlined from tested module) ──────────────────────
+
+function detectFormat(lines) {
+  if (!lines || !lines.length) return null;
+  const s = { claude: 0, codex: 0 };
+  for (const o of lines.slice(0, 30)) {
+    if (o.sessionId && o.uuid) s.claude += 3;
+    if (o.type === 'user' && o.message?.role === 'user' && o.uuid) s.claude += 3;
+    if (o.type === 'assistant' && o.message?.role === 'assistant' && o.uuid) s.claude += 3;
+    if (o.parentUuid !== undefined && o.uuid) s.claude += 1;
+    if (o.type === 'result' && o.uuid) s.claude += 2;
+    if (o.type === 'session_meta' && o.payload) s.codex += 5;
+    if (o.type === 'event_msg' && o.payload) s.codex += 3;
+    if (o.type === 'response_item' && o.payload) s.codex += 3;
+    if (o.payload?.type === 'user_message') s.codex += 3;
+    if (o.payload?.type === 'function_call') s.codex += 2;
+  }
+  let best = null, bv = 0;
+  for (const [f, v] of Object.entries(s)) if (v > bv) { bv = v; best = f; }
+  return bv > 0 ? best : null;
+}
+
+function analyzeSession(lines, format) {
+  const stats = {
+    messageCounts: { user: 0, assistant: 0, tool_result: 0 },
+    toolCalls: {},
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    totalCacheReadTokens: 0,
+    totalCacheCreationTokens: 0,
+    tokenTimeline: [],
+    toolDurations: [],
+    sessionDurationMs: 0,
+    models: [],
+    costUsd: 0
+  };
+  if (!lines || !lines.length) return stats;
+  if (format === 'claude') analyzeClaude(lines, stats);
+  else if (format === 'codex') analyzeCodex(lines, stats);
+  stats.models = [...new Set(stats.models)];
+  const timestamps = lines.map(l => l.timestamp).filter(Boolean).map(t => new Date(t).getTime()).filter(t => !isNaN(t));
+  if (timestamps.length >= 2) stats.sessionDurationMs = Math.max(...timestamps) - Math.min(...timestamps);
+  return stats;
+}
+
+function analyzeClaude(lines, stats) {
+  let pendingTools = [];
+  for (const l of lines) {
+    if (l.type === 'user' && l.message) {
+      stats.messageCounts.user++;
+    } else if (l.type === 'assistant' && l.message) {
+      stats.messageCounts.assistant++;
+      const usage = l.message.usage;
+      if (usage) {
+        const inputTokens = usage.input_tokens || 0;
+        const outputTokens = usage.output_tokens || 0;
+        const cacheRead = usage.cache_read_input_tokens || 0;
+        const cacheCreation = usage.cache_creation_input_tokens || 0;
+        stats.totalInputTokens += inputTokens;
+        stats.totalOutputTokens += outputTokens;
+        stats.totalCacheReadTokens += cacheRead;
+        stats.totalCacheCreationTokens += cacheCreation;
+        stats.tokenTimeline.push({ timestamp: l.timestamp, inputTokens, outputTokens, cacheReadTokens: cacheRead, cacheCreationTokens: cacheCreation });
+      }
+      if (l.message.model) stats.models.push(l.message.model);
+      const content = l.message.content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'tool_use') {
+            stats.toolCalls[block.name] = (stats.toolCalls[block.name] || 0) + 1;
+            pendingTools.push({ name: block.name, timestamp: l.timestamp });
+          }
+        }
+      }
+      if (l.costUsd) stats.costUsd += l.costUsd;
+    } else if (l.type === 'result') {
+      stats.messageCounts.tool_result++;
+      if (pendingTools.length > 0) {
+        const pending = pendingTools.shift();
+        if (pending.timestamp && l.timestamp) {
+          const dur = new Date(l.timestamp).getTime() - new Date(pending.timestamp).getTime();
+          if (dur >= 0) stats.toolDurations.push({ name: pending.name, durationMs: dur });
+        }
+      }
+    }
+  }
+}
+
+function analyzeCodex(lines, stats) {
+  let pendingTools = [];
+  for (const l of lines) {
+    if (l.type === 'event_msg' && l.payload?.type === 'user_message') {
+      stats.messageCounts.user++;
+    } else if (l.type === 'response_item' && l.payload) {
+      const p = l.payload;
+      if (p.type === 'function_call') {
+        stats.toolCalls[p.name] = (stats.toolCalls[p.name] || 0) + 1;
+        pendingTools.push({ name: p.name, timestamp: l.timestamp });
+      } else if (p.type === 'function_call_output') {
+        stats.messageCounts.tool_result++;
+        if (pendingTools.length > 0) {
+          const pending = pendingTools.shift();
+          if (pending.timestamp && l.timestamp) {
+            const dur = new Date(l.timestamp).getTime() - new Date(pending.timestamp).getTime();
+            if (dur >= 0) stats.toolDurations.push({ name: pending.name, durationMs: dur });
+          }
+        }
+      } else if (p.type === 'message') {
+        stats.messageCounts.assistant++;
+        const usage = p.usage;
+        if (usage) {
+          const inputTokens = usage.input_tokens || 0;
+          const outputTokens = usage.output_tokens || 0;
+          stats.totalInputTokens += inputTokens;
+          stats.totalOutputTokens += outputTokens;
+          stats.tokenTimeline.push({ timestamp: l.timestamp, inputTokens, outputTokens });
+        }
+        if (p.model) stats.models.push(p.model);
+      }
+    }
+  }
+}
+
+// ── Chart colors ─────────────────────────────────────────────────────
+
+const PALETTE = ['#7c3aed','#2563eb','#16a34a','#d97706','#dc2626','#0891b2','#c026d3','#ea580c','#4f46e5','#059669'];
+function getStyle(prop) { return getComputedStyle(document.documentElement).getPropertyValue(prop).trim(); }
+
+// ── Chart.js defaults ────────────────────────────────────────────────
+
+function applyChartDefaults() {
+  const textColor = getStyle('--text-muted') || '#888';
+  const gridColor = getStyle('--border') || '#e5e5e0';
+  Chart.defaults.color = textColor;
+  Chart.defaults.borderColor = gridColor;
+  Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  Chart.defaults.font.size = 11;
+  Chart.defaults.plugins.legend.labels.boxWidth = 12;
+  Chart.defaults.plugins.legend.labels.padding = 14;
+}
+
+// ── UI Logic ─────────────────────────────────────────────────────────
+
+const $ = id => document.getElementById(id);
+const dropZone = $('dropZone'), dropPrompt = $('dropPrompt'), inputArea = $('inputArea'),
+      fileInput = $('fileInput'), statusEl = $('status'), detectInfo = $('detectInfo'),
+      formatBadge = $('formatBadge'), msgCount = $('msgCount'), dashboard = $('dashboard'),
+      summaryGrid = $('summaryGrid'), toastEl = $('toast');
+
+let toastTimer;
+function toast(m) { toastEl.textContent = m; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2500); }
+function showStatus(m) { statusEl.textContent = m; statusEl.className = 'status visible error'; }
+function clearStatus() { statusEl.className = 'status'; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// File / drop / paste
+dropZone.addEventListener('click', e => { if (e.target === inputArea) return; fileInput.click(); });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+function loadFile(f) { const r = new FileReader(); r.onload = () => { showInput(r.result); }; r.readAsText(f); }
+
+$('btnPaste').addEventListener('click', async () => {
+  try { const t = await navigator.clipboard.readText(); showInput(t); toast('Pasted'); } catch { toast('Clipboard access denied'); }
+});
+$('btnClear').addEventListener('click', () => { inputArea.value = ''; inputArea.classList.remove('visible'); dropPrompt.classList.remove('hidden'); clearAll(); });
+
+let debounceTimer;
+inputArea.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(processInput, 400); });
+
+function showInput(text) {
+  inputArea.value = text;
+  inputArea.classList.add('visible');
+  dropPrompt.classList.add('hidden');
+  processInput();
+}
+
+function clearAll() {
+  detectInfo.style.display = 'none';
+  dashboard.classList.remove('visible');
+  clearStatus();
+  destroyCharts();
+}
+
+// ── Parsing ──────────────────────────────────────────────────────────
+
+function processInput() {
+  clearStatus();
+  const raw = inputArea.value.trim();
+  if (!raw) { clearAll(); return; }
+
+  let parsedLines = [];
+  // Try single JSON object
+  if (raw[0] === '{' && !raw.includes('\n{')) { try { parsedLines = [JSON.parse(raw)]; } catch {} }
+  // Try JSON array
+  if (!parsedLines.length && raw[0] === '[') { try { const a = JSON.parse(raw); if (Array.isArray(a)) parsedLines = a; } catch {} }
+  // JSONL fallback
+  if (!parsedLines.length) {
+    let errCount = 0;
+    for (const ln of raw.split('\n')) {
+      const t = ln.trim();
+      if (!t) continue;
+      try { parsedLines.push(JSON.parse(t)); } catch { errCount++; }
+    }
+    if (errCount > 0 && parsedLines.length === 0) { showStatus('No valid JSON found. Paste a JSONL session file.'); clearAll(); return; }
+  }
+  if (!parsedLines.length) { showStatus('No valid JSON found.'); clearAll(); return; }
+
+  const format = detectFormat(parsedLines);
+  if (!format) { showStatus('Could not detect session format. Supports Claude Code and Codex CLI.'); clearAll(); return; }
+
+  const stats = analyzeSession(parsedLines, format);
+  const LABELS = { claude: 'Claude Code', codex: 'Codex CLI' };
+  formatBadge.innerHTML = `<span class="format-badge ${format}"><span class="dot"></span>${LABELS[format]}</span>`;
+  const totalMsgs = stats.messageCounts.user + stats.messageCounts.assistant + stats.messageCounts.tool_result;
+  msgCount.textContent = `${totalMsgs} entries parsed`;
+  detectInfo.style.display = 'flex';
+
+  renderDashboard(stats, format);
+}
+
+// ── Dashboard Rendering ──────────────────────────────────────────────
+
+let charts = [];
+function destroyCharts() { charts.forEach(c => c.destroy()); charts = []; }
+
+function fmtNum(n) { return n.toLocaleString(); }
+function fmtDur(ms) {
+  if (ms < 1000) return ms + 'ms';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  const m = Math.floor(ms / 60000), s = Math.round((ms % 60000) / 1000);
+  return m + 'm ' + s + 's';
+}
+
+function renderDashboard(stats, format) {
+  destroyCharts();
+  applyChartDefaults();
+  dashboard.classList.add('visible');
+
+  // Summary cards
+  const totalMsgs = stats.messageCounts.user + stats.messageCounts.assistant + stats.messageCounts.tool_result;
+  const totalTools = Object.values(stats.toolCalls).reduce((a, b) => a + b, 0);
+  const totalTokens = stats.totalInputTokens + stats.totalOutputTokens;
+  const cards = [
+    { value: totalMsgs, label: 'Messages' },
+    { value: totalTools, label: 'Tool Calls' },
+    { value: fmtNum(stats.totalInputTokens), label: 'Input Tokens' },
+    { value: fmtNum(stats.totalOutputTokens), label: 'Output Tokens' },
+    { value: fmtDur(stats.sessionDurationMs), label: 'Duration' },
+    { value: stats.models.length ? stats.models[0].split('-').slice(0,2).join(' ') : 'n/a', label: 'Model' }
+  ];
+  if (stats.totalCacheReadTokens > 0) cards.splice(4, 0, { value: fmtNum(stats.totalCacheReadTokens), label: 'Cache Read' });
+  if (stats.costUsd > 0) cards.push({ value: '$' + stats.costUsd.toFixed(4), label: 'Cost' });
+  summaryGrid.innerHTML = cards.map(c => `<div class="stat-card"><div class="stat-value">${c.value}</div><div class="stat-label">${c.label}</div></div>`).join('');
+
+  // Tool call frequency chart
+  renderToolFreqChart(stats);
+  // Messages by role chart
+  renderRolesChart(stats);
+  // Token usage over time
+  renderTokenTimeline(stats);
+  // Tool durations
+  renderToolDurations(stats);
+}
+
+function renderToolFreqChart(stats) {
+  const sorted = Object.entries(stats.toolCalls).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) return;
+  const ctx = $('chartToolFreq').getContext('2d');
+  charts.push(new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([n]) => n),
+      datasets: [{ label: 'Calls', data: sorted.map(([, v]) => v), backgroundColor: sorted.map((_, i) => PALETTE[i % PALETTE.length]), borderRadius: 4, barPercentage: 0.7 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: sorted.length > 6 ? 'y' : 'x',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { display: false }, beginAtZero: true }
+      }
+    }
+  }));
+}
+
+function renderRolesChart(stats) {
+  const data = [stats.messageCounts.user, stats.messageCounts.assistant, stats.messageCounts.tool_result];
+  const labels = ['User', 'Assistant', 'Tool Results'];
+  const colors = [getStyle('--blue') || '#2563eb', getStyle('--accent') || '#7c3aed', getStyle('--amber') || '#d97706'];
+  const ctx = $('chartRoles').getContext('2d');
+  charts.push(new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: {
+        legend: { position: 'bottom' }
+      }
+    }
+  }));
+}
+
+function renderTokenTimeline(stats) {
+  const tl = stats.tokenTimeline;
+  if (!tl.length) return;
+  const labels = tl.map((e, i) => {
+    if (e.timestamp) { const d = new Date(e.timestamp); return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+    return '#' + (i + 1);
+  });
+  const datasets = [
+    { label: 'Input Tokens', data: tl.map(e => e.inputTokens), borderColor: getStyle('--accent') || '#7c3aed', backgroundColor: (getStyle('--accent-dim') || 'rgba(124,58,237,0.08)'), fill: true, tension: 0.3, pointRadius: 2 },
+    { label: 'Output Tokens', data: tl.map(e => e.outputTokens), borderColor: getStyle('--green') || '#16a34a', backgroundColor: (getStyle('--green-dim') || 'rgba(22,163,74,0.08)'), fill: true, tension: 0.3, pointRadius: 2 }
+  ];
+  if (tl.some(e => e.cacheReadTokens > 0)) {
+    datasets.push({ label: 'Cache Read', data: tl.map(e => e.cacheReadTokens || 0), borderColor: getStyle('--blue') || '#2563eb', backgroundColor: (getStyle('--blue-dim') || 'rgba(37,99,235,0.08)'), fill: true, tension: 0.3, pointRadius: 2 });
+  }
+  const ctx = $('chartTokens').getContext('2d');
+  charts.push(new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 12 } },
+        y: { beginAtZero: true, grid: { color: getStyle('--border') || '#e5e5e0' } }
+      }
+    }
+  }));
+}
+
+function renderToolDurations(stats) {
+  const wrap = $('durWrap');
+  if (!stats.toolDurations.length) { wrap.innerHTML = '<p style="color:var(--text-muted);font-size:13px">No tool duration data available.</p>'; return; }
+
+  // Group by tool name and compute average
+  const groups = {};
+  for (const d of stats.toolDurations) {
+    if (!groups[d.name]) groups[d.name] = [];
+    groups[d.name].push(d.durationMs);
+  }
+  const avgs = Object.entries(groups).map(([name, durations]) => ({
+    name,
+    avg: Math.round(durations.reduce((a, b) => a + b, 0) / durations.length),
+    count: durations.length,
+    max: Math.max(...durations)
+  })).sort((a, b) => b.avg - a.avg);
+
+  const maxAvg = Math.max(...avgs.map(a => a.avg), 1);
+  wrap.innerHTML = `<table class="dur-table">
+    <thead><tr><th>Tool</th><th>Avg Duration</th><th>Calls</th><th></th></tr></thead>
+    <tbody>${avgs.map(a => `<tr>
+      <td style="font-weight:500">${esc(a.name)}</td>
+      <td>${fmtDur(a.avg)}</td>
+      <td>${a.count}</td>
+      <td style="width:40%"><div class="dur-bar" style="width:${Math.max((a.avg / maxAvg) * 100, 3)}%"></div></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+</script>
+</body>
+</html>
