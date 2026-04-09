@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prompt Inspector</title>
+<meta name="description" content="Analyze system prompts: token count, cost estimate, readability, structure, duplicates, instruction density, and pattern detection.">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container{max-width:1280px;padding:40px 24px}
+  .desc{margin-bottom:24px}
+  .layout{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  .input-col{position:sticky;top:24px}
+  .input-col textarea{width:100%;min-height:500px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;line-height:1.6;resize:vertical;color:var(--text);outline:none}
+  .input-col textarea:focus{border-color:var(--accent)}
+  .input-col textarea::placeholder{color:var(--text-muted)}
+  .input-actions{display:flex;gap:8px;margin-top:10px;align-items:center}
+  .input-actions .char-count{margin-left:auto;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+  .results{display:flex;flex-direction:column;gap:16px}
+  .empty-state{display:flex;align-items:center;justify-content:center;min-height:500px;color:var(--text-muted);font-size:14px;text-align:center;border:1px dashed var(--border);border-radius:10px;padding:40px}
+
+  /* Metric cards */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;animation:fadeUp .25s ease}
+  .card-title{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+  .card-title .icon{font-size:14px;opacity:0.5}
+
+  /* Size stats row */
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+  .stat{text-align:center;padding:8px 4px}
+  .stat-value{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;color:var(--text);line-height:1}
+  .stat-label{font-size:11px;color:var(--text-muted);margin-top:4px}
+
+  /* Context bar */
+  .context-bar{margin-top:12px}
+  .context-bar-header{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:6px;font-family:'JetBrains Mono',monospace}
+  .bar-track{width:100%;height:8px;background:var(--surface-alt);border-radius:4px;overflow:hidden}
+  .bar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .3s ease;min-width:1px}
+  .bar-fill.warn{background:var(--amber)}
+  .bar-fill.danger{background:var(--red)}
+  .model-select{font-family:'JetBrains Mono',monospace;font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+
+  /* Cost grid */
+  .cost-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin-top:10px}
+  .cost-item{display:flex;justify-content:space-between;font-size:12px;padding:4px 8px;border-radius:4px;background:var(--surface-alt)}
+  .cost-item .model-name{color:var(--text-muted)}
+  .cost-item .cost-val{font-family:'JetBrains Mono',monospace;color:var(--text);font-weight:500}
+
+  /* Headings outline */
+  .outline{list-style:none;padding:0}
+  .outline li{font-size:13px;padding:3px 0;color:var(--text);display:flex;align-items:baseline;gap:6px}
+  .outline li .h-level{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);flex-shrink:0;width:20px}
+  .outline li .h-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .outline li .h-line{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);flex-shrink:0}
+  .outline .depth-1{padding-left:0}
+  .outline .depth-2{padding-left:16px}
+  .outline .depth-3{padding-left:32px}
+  .outline .depth-4{padding-left:48px}
+  .outline .depth-5{padding-left:64px}
+  .outline .depth-6{padding-left:80px}
+
+  /* Tags / pills */
+  .pill-list{display:flex;flex-wrap:wrap;gap:6px}
+  .pill{font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 10px;border-radius:100px;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);font-weight:500}
+  .pill.xml{background:var(--blue-dim);color:var(--blue);border-color:var(--blue)}
+  .pill.var{background:var(--amber-dim);color:var(--amber);border-color:var(--amber)}
+  .pill.pattern{background:var(--green-dim);color:var(--green);border-color:var(--green)}
+  .pill.pattern-off{background:var(--surface-alt);color:var(--text-muted);border-color:var(--border)}
+
+  /* Duplicates */
+  .dupe-item{font-size:12px;padding:8px 10px;border-radius:6px;background:var(--red-dim);border:1px solid var(--red);color:var(--red);margin-bottom:6px;font-family:'JetBrains Mono',monospace;word-break:break-word}
+  .dupe-item .dupe-lines{font-size:10px;opacity:0.7;margin-top:2px}
+
+  /* Instruction density bar */
+  .density-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .density-label{font-size:12px;color:var(--text-muted);min-width:100px}
+  .density-bar{flex:1;height:6px;background:var(--surface-alt);border-radius:3px;overflow:hidden}
+  .density-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .3s}
+  .density-value{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);min-width:40px;text-align:right}
+  .instr-stats{display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--text-muted)}
+  .instr-stats span{font-family:'JetBrains Mono',monospace}
+
+  /* Readability */
+  .readability-display{display:flex;align-items:center;gap:16px}
+  .readability-score{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:600;line-height:1}
+  .readability-meta{font-size:12px;color:var(--text-muted)}
+  .readability-meta .label{font-weight:600;color:var(--text);font-size:14px;margin-bottom:2px}
+
+  /* Markdown elements */
+  .md-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px}
+  .md-item{text-align:center;padding:6px;border-radius:6px;background:var(--surface-alt)}
+  .md-item .md-val{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600}
+  .md-item .md-lbl{font-size:10px;color:var(--text-muted);margin-top:2px}
+
+  .none-msg{font-size:12px;color:var(--text-muted);font-style:italic}
+
+  footer{text-align:center;padding:32px 0 16px;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+  footer a{color:var(--accent);text-decoration:none}
+  footer a:hover{text-decoration:underline}
+
+  @media(max-width:860px){
+    .layout{grid-template-columns:1fr}
+    .input-col{position:static}
+    .input-col textarea{min-height:250px}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Prompt Inspector</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+  <p class="desc">Paste a system prompt to analyze its structure, token cost, readability, instruction density, and detected patterns.</p>
+
+  <div class="layout">
+    <div class="input-col">
+      <textarea id="input" placeholder="Paste your system prompt here..." spellcheck="false"></textarea>
+      <div class="input-actions">
+        <button class="btn btn-secondary" id="btnPaste">Paste</button>
+        <button class="btn btn-secondary" id="btnSample">Load sample</button>
+        <button class="btn btn-secondary" id="btnClear">Clear</button>
+        <span class="char-count" id="charCount"></span>
+      </div>
+    </div>
+    <div class="results" id="results">
+      <div class="empty-state" id="emptyState">Paste or type a prompt to see analysis</div>
+    </div>
+  </div>
+
+  <footer>Built by <a href="https://nicolaeandrei.com">Andrei-Mihai Nicolae</a></footer>
+</div>
+
+<script src="/prompt_inspector_engine.js"></script>
+<script>
+var PI = typeof PromptInspector !== 'undefined' ? PromptInspector : {};
+
+var SAMPLE_PROMPT = [
+  '# System Instructions',
+  '',
+  'You are a helpful coding assistant specialized in JavaScript and TypeScript.',
+  '',
+  '## Guidelines',
+  '',
+  '- Always provide working code examples',
+  '- Never fabricate API endpoints or library functions',
+  '- Use TypeScript when the user\'s project uses TypeScript',
+  '- IMPORTANT: Always validate user input before processing',
+  '',
+  '## Output Format',
+  '',
+  'Respond in JSON format with the following schema:',
+  '```json',
+  '{"explanation": "string", "code": "string", "language": "string"}',
+  '```',
+  '',
+  '## Available Tools',
+  '',
+  '```json',
+  '{"name": "search_docs", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}}}',
+  '```',
+  '',
+  '## Safety',
+  '',
+  'Never provide harmful content. Refuse requests that could damage systems.',
+  'Do not generate code that deletes user data without confirmation.',
+  '',
+  '## Variables',
+  '',
+  'The user\'s name is {{user_name}} and their project is {{project_name}}.',
+  'Working directory: ${HOME}/projects',
+  '',
+  '## Examples',
+  '',
+  'Example:',
+  'Input: How do I sort an array?',
+  'Output: Use Array.prototype.sort()',
+  '',
+  'Example:',
+  'Input: What is a closure?',
+  'Output: A closure is a function that captures variables from its enclosing scope.',
+  '',
+  'Always provide working code examples',
+  '',
+  '<context>',
+  'This is additional context provided at runtime.',
+  '</context>',
+].join('\n');
+
+var MODELS = [
+  { key: 'claude-opus', label: 'Claude Opus' },
+  { key: 'claude-sonnet', label: 'Claude Sonnet' },
+  { key: 'claude-haiku', label: 'Claude Haiku' },
+  { key: 'gpt-4o', label: 'GPT-4o' },
+  { key: 'gpt-4o-mini', label: 'GPT-4o mini' },
+  { key: 'gpt-4.1', label: 'GPT-4.1' },
+  { key: 'gemini-pro', label: 'Gemini Pro' },
+  { key: 'gemini-flash', label: 'Gemini Flash' },
+];
+
+var input = document.getElementById('input');
+var results = document.getElementById('results');
+var emptyState = document.getElementById('emptyState');
+var charCount = document.getElementById('charCount');
+var selectedModel = 'claude-sonnet';
+var debounceTimer;
+
+input.addEventListener('input', function() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(runAnalysis, 200);
+});
+
+document.getElementById('btnPaste').addEventListener('click', async function() {
+  try {
+    input.value = await navigator.clipboard.readText();
+    runAnalysis();
+  } catch(e) { /* clipboard denied */ }
+});
+
+document.getElementById('btnSample').addEventListener('click', function() {
+  input.value = SAMPLE_PROMPT;
+  runAnalysis();
+});
+
+document.getElementById('btnClear').addEventListener('click', function() {
+  input.value = '';
+  runAnalysis();
+});
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatCost(c) {
+  if (c < 0.001) return '<$0.001';
+  if (c < 0.01) return '$' + c.toFixed(4);
+  return '$' + c.toFixed(3);
+}
+
+function runAnalysis() {
+  var text = input.value;
+  charCount.textContent = text.length ? text.length.toLocaleString() + ' chars' : '';
+
+  if (!text.trim()) {
+    results.innerHTML = '';
+    results.appendChild(emptyState);
+    emptyState.style.display = '';
+    return;
+  }
+
+  var a = PI.analyze(text);
+  var html = '';
+
+  // 1. Size metrics
+  html += '<div class="card" id="card-size">';
+  html += '<div class="card-title"><span class="icon">&#x1F4CA;</span> Size</div>';
+  html += '<div class="stats-row">';
+  html += stat(a.words, 'words');
+  html += stat(a.sentences, 'sentences');
+  html += stat(a.lines, 'lines');
+  html += stat(a.tokens, 'tokens (est)');
+  html += '</div>';
+
+  // Context window bar
+  html += '<div class="context-bar">';
+  html += '<div class="context-bar-header">';
+  html += '<span>Context window usage</span>';
+  html += '<span><select class="model-select" id="modelSelect">';
+  for (var i = 0; i < MODELS.length; i++) {
+    var sel = MODELS[i].key === selectedModel ? ' selected' : '';
+    html += '<option value="' + MODELS[i].key + '"' + sel + '>' + MODELS[i].label + '</option>';
+  }
+  html += '</select></span>';
+  html += '</div>';
+  var pct = PI.contextWindowPercent(a.tokens, selectedModel);
+  var barClass = pct > 80 ? 'danger' : pct > 50 ? 'warn' : '';
+  html += '<div class="bar-track"><div class="bar-fill ' + barClass + '" style="width:' + Math.min(pct, 100).toFixed(2) + '%"></div></div>';
+  html += '<div class="context-bar-header" style="margin-top:4px;margin-bottom:0"><span>' + pct.toFixed(2) + '%</span><span>' + a.tokens.toLocaleString() + ' / ' + getContextWindow(selectedModel).toLocaleString() + ' tokens</span></div>';
+  html += '</div>';
+
+  // Cost estimates
+  html += '<div class="cost-grid">';
+  for (var j = 0; j < MODELS.length; j++) {
+    var cost = PI.estimateCost(a.tokens, MODELS[j].key);
+    html += '<div class="cost-item"><span class="model-name">' + MODELS[j].label + '</span><span class="cost-val">' + formatCost(cost) + '</span></div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  // 2. Patterns
+  html += '<div class="card" id="card-patterns">';
+  html += '<div class="card-title"><span class="icon">&#x1F50D;</span> Detected Patterns</div>';
+  html += '<div class="pill-list">';
+  html += patternPill('Role / Persona', a.patterns.role);
+  html += patternPill('Few-Shot Examples' + (a.patterns.fewShotCount ? ' (' + a.patterns.fewShotCount + ')' : ''), a.patterns.fewShot);
+  html += patternPill('Tool Definitions', a.patterns.toolDefinitions);
+  html += patternPill('Guardrails', a.patterns.guardrails);
+  html += patternPill('Output Format', a.patterns.outputFormat);
+  html += '</div>';
+  html += '</div>';
+
+  // 3. Structure
+  html += '<div class="card" id="card-structure">';
+  html += '<div class="card-title"><span class="icon">&#x1F4D1;</span> Structure</div>';
+  if (a.headings.length) {
+    html += '<ul class="outline">';
+    for (var h = 0; h < a.headings.length; h++) {
+      html += '<li class="depth-' + a.headings[h].level + '"><span class="h-level">H' + a.headings[h].level + '</span><span class="h-text">' + esc(a.headings[h].text) + '</span><span class="h-line">L' + a.headings[h].line + '</span></li>';
+    }
+    html += '</ul>';
+  } else {
+    html += '<div class="none-msg">No markdown headings found</div>';
+  }
+  html += '</div>';
+
+  // 4. XML Tags
+  if (a.xmlTags.length) {
+    html += '<div class="card" id="card-xml">';
+    html += '<div class="card-title"><span class="icon">&#x1F3F7;</span> XML Tags</div>';
+    html += '<div class="pill-list">';
+    for (var t = 0; t < a.xmlTags.length; t++) {
+      html += '<span class="pill xml">&lt;' + esc(a.xmlTags[t]) + '&gt;</span>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+
+  // 5. Variables
+  if (a.variables.length) {
+    html += '<div class="card" id="card-variables">';
+    html += '<div class="card-title"><span class="icon">&#x1F4CC;</span> Variables / Placeholders</div>';
+    html += '<div class="pill-list">';
+    for (var v = 0; v < a.variables.length; v++) {
+      html += '<span class="pill var">' + esc(a.variables[v]) + '</span>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+
+  // 6. Instruction Density
+  html += '<div class="card" id="card-instructions">';
+  html += '<div class="card-title"><span class="icon">&#x26A1;</span> Instruction Density</div>';
+  var densPct = (a.instructions.density * 100).toFixed(0);
+  html += '<div class="density-row"><span class="density-label">Directive ratio</span><div class="density-bar"><div class="density-fill" style="width:' + densPct + '%"></div></div><span class="density-value">' + densPct + '%</span></div>';
+  html += '<div class="instr-stats">';
+  html += '<span>' + a.instructions.imperativeCount + ' directives</span>';
+  html += '<span>' + a.instructions.totalSentences + ' sentences</span>';
+  if (a.instructions.capsCount > 0) html += '<span>' + a.instructions.capsCount + ' ALL CAPS</span>';
+  html += '</div>';
+  html += '</div>';
+
+  // 7. Readability
+  html += '<div class="card" id="card-readability">';
+  html += '<div class="card-title"><span class="icon">&#x1F4D6;</span> Readability</div>';
+  html += '<div class="readability-display">';
+  html += '<div class="readability-score">' + a.readability.readingEase + '</div>';
+  html += '<div class="readability-meta"><div class="label">' + a.readability.label + '</div>';
+  html += 'Flesch-Kincaid grade level: ' + a.readability.gradeLevel + '</div>';
+  html += '</div>';
+  html += '</div>';
+
+  // 8. Markdown elements
+  var md = a.markdown;
+  if (md.codeBlocks || md.listItems || md.links || md.bold || md.italic) {
+    html += '<div class="card" id="card-markdown">';
+    html += '<div class="card-title"><span class="icon">&#x270F;</span> Markdown Elements</div>';
+    html += '<div class="md-grid">';
+    if (md.codeBlocks) html += mdItem(md.codeBlocks, 'code blocks');
+    if (md.listItems) html += mdItem(md.listItems, 'list items');
+    if (md.links) html += mdItem(md.links, 'links');
+    if (md.bold) html += mdItem(md.bold, 'bold');
+    if (md.italic) html += mdItem(md.italic, 'italic');
+    html += '</div>';
+    html += '</div>';
+  }
+
+  // 9. Duplicates
+  if (a.duplicates.length) {
+    html += '<div class="card" id="card-duplicates">';
+    html += '<div class="card-title"><span class="icon">&#x26A0;</span> Duplicate / Near-Duplicate Lines</div>';
+    for (var d = 0; d < a.duplicates.length; d++) {
+      html += '<div class="dupe-item">' + esc(a.duplicates[d].text) + '<div class="dupe-lines">Lines ' + a.duplicates[d].lines.join(', ') + '</div></div>';
+    }
+    html += '</div>';
+  }
+
+  results.innerHTML = html;
+
+  // Re-bind model select
+  var sel = document.getElementById('modelSelect');
+  if (sel) {
+    sel.addEventListener('change', function() {
+      selectedModel = this.value;
+      runAnalysis();
+    });
+  }
+}
+
+function stat(val, label) {
+  return '<div class="stat"><div class="stat-value">' + val.toLocaleString() + '</div><div class="stat-label">' + label + '</div></div>';
+}
+
+function patternPill(label, detected) {
+  return '<span class="pill ' + (detected ? 'pattern' : 'pattern-off') + '">' + (detected ? '&#x2713; ' : '') + label + '</span>';
+}
+
+function mdItem(val, label) {
+  return '<div class="md-item"><div class="md-val">' + val + '</div><div class="md-lbl">' + label + '</div></div>';
+}
+
+function getContextWindow(model) {
+  var data = { 'claude-opus': 200000, 'claude-sonnet': 200000, 'claude-haiku': 200000, 'gpt-4o': 128000, 'gpt-4o-mini': 128000, 'gpt-4.1': 1047576, 'gemini-pro': 1000000, 'gemini-flash': 1000000 };
+  return data[model] || 200000;
+}
+</script>
+</body>
+</html>
