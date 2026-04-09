@@ -21,7 +21,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
   }
-  .player { flex: 1; text-align: center; cursor: pointer; }
+  .player { flex: 1; text-align: center; }
   .player-name {
     width: 100%; text-align: center; border: none; background: transparent;
     color: var(--text-muted); font-family: inherit; font-size: 0.72rem;
@@ -176,7 +176,7 @@
 
   <!-- Scoreboard -->
   <div class="scoreboard">
-    <div class="player active" id="p0" onclick="switchPlayer(0)">
+    <div class="player active" id="p0">
       <input class="player-name" value="You" id="n0" maxlength="12">
       <div class="player-score" id="s0">0</div>
     </div>
@@ -189,10 +189,6 @@
         <option value="8000">8000</option>
         <option value="10000">10000</option>
       </select>
-    </div>
-    <div class="player" id="p1" onclick="switchPlayer(1)">
-      <input class="player-name" value="Opponent" id="n1" maxlength="12">
-      <div class="player-score" id="s1">0</div>
     </div>
   </div>
 
@@ -264,8 +260,8 @@ const BUST_P = {1:.667,2:.444,3:.278,4:.157,5:.077,6:.023};
 const AVG_FUTURE = {1:25,2:100,3:175,4:250,5:350,6:500};
 
 const G = {
-  nd: 6, dv: [1,1,1,1,1,1], ts: 0, rn: 1, cp: 0, target: 4000,
-  p: [{name:'You',score:0},{name:'Opponent',score:0}],
+  nd: 6, dv: [1,1,1,1,1,1], ts: 0, rn: 1, target: 4000,
+  p: [{name:'You',score:0}],
   sel: null, strats: null
 };
 
@@ -375,7 +371,7 @@ function analyzeRoll(dv) {
 
   // Evaluate each
   let bestEV=-1,bestI=0;
-  const ps=G.p[G.cp].score;
+  const ps=G.p[0].score;
   strats.forEach((s,i)=>{
     const tot=G.ts+s.points;
     if(ps+tot>=G.target){
@@ -463,42 +459,30 @@ function keepContinue(){
 function bankTurn(){
   if(!G.sel) return;
   G.ts+=G.sel.points;
-  G.p[G.cp].score+=G.ts;
-  const won=G.p[G.cp].score>=G.target;
-  nextPlayer();
+  G.p[0].score+=G.ts;
+  const won=G.p[0].score>=G.target;
+  resetTurn();
   renderBoard();
   if(won){
     el('res').style.display='';
-    el('rc').innerHTML='<div class="win-banner">'+G.p[1-G.cp].name+' wins with '+G.p[1-G.cp].score+' points!</div>';
+    el('rc').innerHTML='<div class="win-banner">'+G.p[0].name+' wins with '+G.p[0].score+' points!</div>';
   }
 }
 
-function bustTurn(){nextPlayer();renderBoard();}
-
-function nextPlayer(){
-  G.cp=1-G.cp; G.ts=0; G.rn=1; G.sel=null; G.strats=null;
-  setND(6); renderBoard(); renderTurn(); hideRes();
-}
+function bustTurn(){resetTurn();renderBoard();}
 
 function resetTurn(){
   G.ts=0; G.rn=1; G.sel=null; G.strats=null;
   setND(6); renderTurn(); hideRes();
 }
 
-function switchPlayer(i){
-  if(i===G.cp) return;
-  G.cp=i; G.ts=0; G.rn=1; setND(6); renderBoard(); renderTurn(); hideRes();
-}
-
 function newGame(){
-  G.p[0].score=0; G.p[1].score=0; G.cp=0; G.ts=0; G.rn=1;
+  G.p[0].score=0; G.ts=0; G.rn=1;
   setND(6); renderBoard(); renderTurn(); hideRes();
 }
 
 function renderBoard(){
-  el('s0').textContent=G.p[0].score; el('s1').textContent=G.p[1].score;
-  el('p0').className='player'+(G.cp===0?' active':'');
-  el('p1').className='player'+(G.cp===1?' active':'');
+  el('s0').textContent=G.p[0].score;
 }
 
 function renderTurn(){
