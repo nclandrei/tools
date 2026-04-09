@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KCD2 Dice Advisor</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 680px; }
+
+  /* Scoreboard */
+  .scoreboard {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .player { flex: 1; text-align: center; cursor: pointer; }
+  .player-name {
+    width: 100%; text-align: center; border: none; background: transparent;
+    color: var(--text-muted); font-family: inherit; font-size: 0.72rem;
+    font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 0; outline: none;
+  }
+  .player-name:focus { color: var(--text); }
+  .player.active .player-name { color: var(--accent); }
+  .player-score { font-size: 1.25rem; font-weight: 700; color: var(--text); margin-top: 0.1rem; }
+  .player.active .player-score { color: var(--accent); }
+  .target-divider { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; padding: 0 0.4rem; }
+  .target-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .target-select {
+    background: var(--surface-alt); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); font-family: inherit; font-size: 0.8rem; font-weight: 600;
+    padding: 1px 4px; text-align: center; cursor: pointer; outline: none;
+  }
+  .target-select:focus { border-color: var(--accent); }
+
+  /* Turn bar */
+  .turn-bar {
+    display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;
+    padding: 0.45rem 0.75rem; background: var(--accent-dim); border: 1px solid var(--accent);
+    border-radius: 6px; font-size: 0.82rem; color: var(--text); flex-wrap: wrap;
+  }
+  .turn-bar strong { color: var(--accent); font-weight: 600; }
+  .turn-actions { margin-left: auto; display: flex; gap: 0.35rem; }
+  .btn-sm {
+    padding: 0.25rem 0.55rem; font-size: 0.72rem; border-radius: 4px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font-family: inherit; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Section */
+  .section { margin-bottom: 1.25rem; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+  .section-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+
+  /* Dice count */
+  .dice-count { display: flex; gap: 2px; background: var(--surface); border-radius: 4px; padding: 2px; border: 1px solid var(--border); }
+  .dice-count button {
+    width: 24px; height: 22px; border: none; background: transparent; color: var(--text-muted);
+    font-family: inherit; font-size: 0.72rem; font-weight: 500; cursor: pointer;
+    border-radius: 3px; transition: all 0.15s;
+  }
+  .dice-count button.active { background: var(--accent); color: #fff; }
+  .dice-count button:not(.active):hover { color: var(--text); }
+
+  /* Dice */
+  .dice-row { display: flex; gap: 0.6rem; justify-content: center; margin-bottom: 0.85rem; flex-wrap: wrap; }
+  .die {
+    width: 56px; height: 56px; display: grid; grid-template-columns: repeat(3,1fr);
+    grid-template-rows: repeat(3,1fr); border-radius: 10px; padding: 10px; box-sizing: border-box;
+    cursor: pointer; background: var(--surface); border: 2px solid var(--border);
+    transition: all 0.15s; user-select: none;
+  }
+  .die:hover { border-color: var(--accent); transform: scale(1.05); }
+  .die:active { transform: scale(0.95); }
+  .pip {
+    width: 9px; height: 9px; border-radius: 50%; align-self: center; justify-self: center;
+    background: transparent; transition: background 0.12s;
+  }
+  .pip.on { background: var(--text); }
+  .analyze-btn { width: 100%; padding: 0.65rem; font-size: 0.88rem; }
+
+  /* Results */
+  .bust-banner {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1rem;
+    background: var(--red-dim); color: var(--red); border: 1px solid var(--red);
+    border-radius: 8px; font-size: 0.88rem; font-weight: 600;
+  }
+  .rec-card {
+    padding: 0.75rem 0.9rem; background: var(--accent-dim); border: 1px solid var(--accent);
+    border-radius: 8px; margin-bottom: 0.85rem;
+  }
+  .rec-tag {
+    font-size: 0.62rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 0.25rem;
+  }
+  .rec-keep { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 0.1rem; }
+  .rec-pts { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.35rem; }
+  .action-badge {
+    font-size: 0.78rem; font-weight: 500; padding: 0.2rem 0.55rem;
+    border-radius: 4px; display: inline-block;
+  }
+  .action-badge.continue { background: var(--green-dim); color: var(--green); }
+  .action-badge.bank { background: var(--amber-dim); color: var(--amber); }
+
+  /* Strategies table */
+  .strat-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 0.85rem; }
+  .strat-table th {
+    text-align: left; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--text-muted); padding: 0.35rem 0.45rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .strat-table td { padding: 0.45rem; border-bottom: 1px solid var(--border); color: var(--text); }
+  .strat-table tr:last-child td { border-bottom: none; }
+  .strat-table tbody tr { cursor: pointer; transition: background 0.1s; }
+  .strat-table tbody tr:hover { background: var(--surface-alt); }
+  .strat-table tbody tr.sel td { background: var(--accent-dim); }
+  .strat-table tbody tr.sel td:first-child { border-left: 3px solid var(--accent); }
+  .pts { font-weight: 600; color: var(--accent); }
+  .tag {
+    font-size: 0.68rem; font-weight: 600; padding: 0.12rem 0.35rem; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .tag-roll { background: var(--green-dim); color: var(--green); }
+  .tag-bank { background: var(--amber-dim); color: var(--amber); }
+  .tag-hot { background: var(--blue-dim); color: var(--blue); }
+
+  /* Action buttons */
+  .actions { display: flex; gap: 0.5rem; }
+  .actions .btn { flex: 1; }
+  .btn-green { background: var(--green); color: #fff; border: none; border-radius: 8px; padding: 0.6rem 1rem; font-family: inherit; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn-green:hover { filter: brightness(1.1); }
+  .btn-amber { background: var(--amber); color: #fff; border: none; border-radius: 8px; padding: 0.6rem 1rem; font-family: inherit; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn-amber:hover { filter: brightness(1.1); }
+
+  /* Reference */
+  .ref { margin-top: 1.5rem; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .ref summary { padding: 0.6rem 0.8rem; font-size: 0.82rem; font-weight: 500; color: var(--text-muted); cursor: pointer; background: var(--surface); user-select: none; }
+  .ref summary:hover { color: var(--text); }
+  .ref-tbl { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .ref-tbl th { text-align: left; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); padding: 0.35rem 0.7rem; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .ref-tbl td { padding: 0.3rem 0.7rem; border-bottom: 1px solid var(--border); color: var(--text); }
+  .ref-tbl tr:last-child td { border-bottom: none; }
+  .ref-tbl td:last-child { font-weight: 600; color: var(--accent); text-align: right; }
+  .ref-tbl tr.rh td { font-weight: 600; color: var(--text-muted); font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; background: var(--surface-alt); text-align: left; }
+
+  .win-banner {
+    padding: 0.75rem 1rem; background: var(--green-dim); border: 1px solid var(--green);
+    border-radius: 8px; font-size: 0.92rem; font-weight: 600; color: var(--green);
+    text-align: center; margin-bottom: 0.85rem;
+  }
+
+  @media (max-width: 500px) {
+    .die { width: 48px; height: 48px; padding: 8px; }
+    .pip { width: 8px; height: 8px; }
+    .scoreboard { gap: 0.4rem; padding: 0.5rem; }
+    .player-score { font-size: 1.05rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>KCD2 Dice Advisor</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+  <p class="desc">Analyze your Farkle rolls in Kingdom Come: Deliverance 2. Get optimal keep/bank recommendations and track scores across rounds.</p>
+
+  <!-- Scoreboard -->
+  <div class="scoreboard">
+    <div class="player active" id="p0" onclick="switchPlayer(0)">
+      <input class="player-name" value="You" id="n0" maxlength="12">
+      <div class="player-score" id="s0">0</div>
+    </div>
+    <div class="target-divider">
+      <span class="target-label">Target</span>
+      <select class="target-select" id="tgt" onchange="G.target=+this.value">
+        <option value="2000">2000</option>
+        <option value="4000" selected>4000</option>
+        <option value="5000">5000</option>
+        <option value="8000">8000</option>
+        <option value="10000">10000</option>
+      </select>
+    </div>
+    <div class="player" id="p1" onclick="switchPlayer(1)">
+      <input class="player-name" value="Opponent" id="n1" maxlength="12">
+      <div class="player-score" id="s1">0</div>
+    </div>
+  </div>
+
+  <!-- Turn bar -->
+  <div class="turn-bar">
+    <span>Turn: <strong id="ts">0</strong> pts</span>
+    <span>Roll <strong id="rn">1</strong></span>
+    <div class="turn-actions">
+      <button class="btn-sm" onclick="bustTurn()" title="Bust — lose turn points">Bust</button>
+      <button class="btn-sm" onclick="resetTurn()" title="Reset current turn">Reset</button>
+      <button class="btn-sm" onclick="newGame()" title="New game">New Game</button>
+    </div>
+  </div>
+
+  <!-- Dice input -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-label">Your Roll</span>
+      <div class="dice-count" id="dc"></div>
+    </div>
+    <div class="dice-row" id="dr"></div>
+    <button class="btn btn-primary analyze-btn" id="ab" onclick="analyze()">Analyze Roll</button>
+  </div>
+
+  <!-- Results -->
+  <div class="section" id="res" style="display:none">
+    <div class="section-label" style="margin-bottom:0.5rem">Analysis</div>
+    <div id="rc"></div>
+  </div>
+
+  <!-- Scoring reference -->
+  <details class="ref">
+    <summary>Scoring Reference</summary>
+    <table class="ref-tbl">
+      <thead><tr><th>Combination</th><th>Points</th></tr></thead>
+      <tbody>
+        <tr class="rh"><td colspan="2">Singles</td></tr>
+        <tr><td>Single 1</td><td>100</td></tr>
+        <tr><td>Single 5</td><td>50</td></tr>
+        <tr class="rh"><td colspan="2">Three of a Kind</td></tr>
+        <tr><td>Three 1s</td><td>1,000</td></tr>
+        <tr><td>Three 2s</td><td>200</td></tr>
+        <tr><td>Three 3s</td><td>300</td></tr>
+        <tr><td>Three 4s</td><td>400</td></tr>
+        <tr><td>Three 5s</td><td>500</td></tr>
+        <tr><td>Three 6s</td><td>600</td></tr>
+        <tr class="rh"><td colspan="2">Four+ of a Kind (each extra doubles)</td></tr>
+        <tr><td>Four 1s</td><td>2,000</td></tr>
+        <tr><td>Five 1s</td><td>4,000</td></tr>
+        <tr><td>Six 1s</td><td>8,000</td></tr>
+        <tr><td>Four 5s</td><td>1,000</td></tr>
+        <tr><td>Five 5s</td><td>2,000</td></tr>
+        <tr><td>Six 5s</td><td>4,000</td></tr>
+        <tr class="rh"><td colspan="2">Straights</td></tr>
+        <tr><td>Small (1-2-3-4-5)</td><td>500</td></tr>
+        <tr><td>Large (2-3-4-5-6)</td><td>750</td></tr>
+        <tr><td>Full (1-2-3-4-5-6)</td><td>1,500</td></tr>
+        <tr class="rh"><td colspan="2">Special</td></tr>
+        <tr><td>Hot Dice (all 6 score)</td><td>Re-roll all 6</td></tr>
+      </tbody>
+    </table>
+  </details>
+</div>
+
+<script>
+// Pip positions for dice faces (1-indexed in a 3x3 grid)
+const PIPS = {1:[5],2:[3,7],3:[3,5,7],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,4,7,3,6,9]};
+const BUST_P = {1:.667,2:.444,3:.278,4:.157,5:.077,6:.023};
+const AVG_FUTURE = {1:25,2:100,3:175,4:250,5:350,6:500};
+
+const G = {
+  nd: 6, dv: [1,1,1,1,1,1], ts: 0, rn: 1, cp: 0, target: 4000,
+  p: [{name:'You',score:0},{name:'Opponent',score:0}],
+  sel: null, strats: null
+};
+
+function el(id){return document.getElementById(id)}
+
+// --- Dice rendering ---
+function renderDC() {
+  const c = el('dc'); c.innerHTML = '';
+  for (let i=1;i<=6;i++){
+    const b=document.createElement('button');
+    b.textContent=i; b.className=i===G.nd?'active':'';
+    b.onclick=()=>setND(i); c.appendChild(b);
+  }
+}
+function setND(n) {
+  G.nd=n;
+  while(G.dv.length<n) G.dv.push(1);
+  G.dv=G.dv.slice(0,n);
+  renderDC(); renderDice(); hideRes();
+}
+function renderDice() {
+  const r=el('dr'); r.innerHTML='';
+  for(let i=0;i<G.nd;i++){
+    const d=document.createElement('div');
+    d.className='die';
+    const v=G.dv[i], pos=PIPS[v];
+    for(let p=1;p<=9;p++){
+      const s=document.createElement('span');
+      s.className='pip'+(pos.includes(p)?' on':'');
+      d.appendChild(s);
+    }
+    d.onclick=()=>{G.dv[i]=G.dv[i]%6+1;renderDice();hideRes()};
+    d.oncontextmenu=e=>{e.preventDefault();G.dv[i]=(G.dv[i]+4)%6+1;renderDice();hideRes()};
+    r.appendChild(d);
+  }
+}
+function hideRes(){el('res').style.display='none';G.sel=null;G.strats=null;}
+
+// --- Scoring engine ---
+function analyzeRoll(dv) {
+  const n=dv.length, c=Array(7).fill(0);
+  dv.forEach(v=>c[v]++);
+
+  const has1=c[1]>0, has5=c[5]>0;
+  const tri=[1,2,3,4,5,6].some(v=>c[v]>=3);
+  const sS=n>=5&&[1,2,3,4,5].every(v=>c[v]>=1);
+  const lS=n>=5&&[2,3,4,5,6].every(v=>c[v]>=1);
+  const fS=n>=6&&[1,2,3,4,5,6].every(v=>c[v]>=1);
+
+  if(!has1&&!has5&&!tri&&!sS&&!lS) return {bust:true,strats:[]};
+
+  // Build per-value options
+  const opts=[];
+  for(let v=1;v<=6;v++){
+    const cn=c[v], o=[{k:0,p:0,l:''}];
+    if(v===1){
+      for(let k=1;k<=cn;k++){
+        if(k<3) o.push({k,p:k*100,l:k===1?'Single 1':'2\u00d7 Single 1'});
+        else o.push({k,p:1000*Math.pow(2,k-3),l:['','','','Three 1s','Four 1s','Five 1s','Six 1s'][k]});
+      }
+    } else if(v===5){
+      for(let k=1;k<=cn;k++){
+        if(k<3) o.push({k,p:k*50,l:k===1?'Single 5':'2\u00d7 Single 5'});
+        else o.push({k,p:500*Math.pow(2,k-3),l:['','','','Three 5s','Four 5s','Five 5s','Six 5s'][k]});
+      }
+    } else {
+      const nm={3:'Three',4:'Four',5:'Five',6:'Six'};
+      for(let k=3;k<=cn;k++) o.push({k,p:v*100*Math.pow(2,k-3),l:nm[k]+' '+v+'s'});
+    }
+    opts.push(o);
+  }
+
+  // Cartesian product
+  const raw=[];
+  function go(vi,tp,tk,ls){
+    if(vi>=6){
+      if(tp>0) raw.push({points:tp,kept:tk,rem:n-tk,desc:ls.filter(x=>x).join(' + '),hot:n-tk===0});
+      return;
+    }
+    for(const o of opts[vi]) if(tk+o.k<=n){ls[vi]=o.l;go(vi+1,tp+o.p,tk+o.k,ls);}
+  }
+  go(0,0,0,Array(6).fill(''));
+
+  // Straights
+  if(fS) raw.push({points:1500,kept:6,rem:0,desc:'Full Straight (1-2-3-4-5-6)',hot:true});
+  function addStraight(vals,base,name){
+    const rm=c.slice(); vals.forEach(v=>rm[v]--);
+    raw.push({points:base,kept:vals.length,rem:n-vals.length,desc:name,hot:n===vals.length});
+    let ep=0,el='',ed=0;
+    if(rm[1]>0){ep+=100;el='Single 1';ed++;}
+    if(rm[5]>0){ep+=50;el+=(el?' + ':'')+'Single 5';ed++;}
+    if(ep>0&&vals.length+ed<=n)
+      raw.push({points:base+ep,kept:vals.length+ed,rem:n-vals.length-ed,
+        desc:name+' + '+el,hot:n-vals.length-ed===0});
+  }
+  if(sS&&!fS) addStraight([1,2,3,4,5],500,'Small Straight');
+  if(lS&&!fS) addStraight([2,3,4,5,6],750,'Large Straight');
+
+  // Dedupe
+  const seen=new Set, uniq=[];
+  for(const s of raw){const k=s.points+'|'+s.kept+'|'+s.desc;if(!seen.has(k)){seen.add(k);uniq.push(s);}}
+
+  // Pareto: best points per diceKept
+  const best={};
+  for(const s of uniq) if(!best[s.kept]||s.points>best[s.kept].points) best[s.kept]=s;
+  const strats=Object.values(best).sort((a,b)=>a.kept-b.kept);
+
+  // Evaluate each
+  let bestEV=-1,bestI=0;
+  const ps=G.p[G.cp].score;
+  strats.forEach((s,i)=>{
+    const tot=G.ts+s.points;
+    if(ps+tot>=G.target){
+      s.act='bank';s.reason='Banking wins the game!';s.ev=tot;
+    } else if(s.hot){
+      const ev=(1-BUST_P[6])*(tot+AVG_FUTURE[6]);
+      s.act='continue';s.reason='Hot dice! Re-roll all 6 (2% bust)';s.ev=ev;
+    } else {
+      const bp=BUST_P[s.rem]||.667, af=AVG_FUTURE[s.rem]||25;
+      const evC=(1-bp)*(tot+af), evB=tot;
+      if(evC>evB){s.act='continue';s.reason=s.rem+' dice, '+(bp*100).toFixed(0)+'% bust';s.ev=evC;}
+      else{s.act='bank';s.reason=(bp*100).toFixed(0)+'% bust, '+tot+' at stake';s.ev=evB;}
+    }
+    if(s.ev>bestEV){bestEV=s.ev;bestI=i;}
+  });
+  if(strats.length) strats[bestI].rec=true;
+  return {bust:false,strats};
+}
+
+// --- UI ---
+function analyze(){
+  const r=analyzeRoll(G.dv.slice(0,G.nd));
+  G.strats=r.strats;
+  G.sel=r.strats.find(s=>s.rec)||r.strats[0]||null;
+  renderRes(r);
+}
+
+function renderRes(r){
+  const sec=el('res'), rc=el('rc'); sec.style.display='';
+  if(r.bust){
+    rc.innerHTML='<div class="bust-banner"><span style="font-size:1.1rem">\u2717</span> BUST! No scoring dice \u2014 turn points lost.</div>'+
+      '<div class="actions" style="margin-top:0.75rem"><button class="btn-amber btn" onclick="bustTurn()">End Turn (0 pts)</button></div>';
+    return;
+  }
+  const rec=G.sel; let h='';
+
+  // Recommendation card
+  if(rec){
+    const tot=G.ts+rec.points;
+    h+='<div class="rec-card"><div class="rec-tag">Recommended</div>'+
+      '<div class="rec-keep">Keep: '+rec.desc+'</div>'+
+      '<div class="rec-pts">'+rec.points+' pts'+(G.ts?' ('+tot+' this turn)':'')+'</div>'+
+      '<span class="action-badge '+rec.act+'">\u2192 '+(rec.act==='continue'?'Continue rolling':'Bank points')+' \u2014 '+rec.reason+'</span></div>';
+  }
+
+  // Table
+  if(r.strats.length>1){
+    h+='<table class="strat-table"><thead><tr><th>Keep</th><th>Pts</th><th>Left</th><th>Risk</th><th></th></tr></thead><tbody>';
+    r.strats.forEach((s,i)=>{
+      const bp=s.hot?'2%':(s.rem>0?(BUST_P[s.rem]*100).toFixed(0)+'%':'\u2014');
+      const rem=s.hot?'0 \u2192 6':s.rem;
+      const tc=s.hot?'tag-hot':s.act==='continue'?'tag-roll':'tag-bank';
+      const tl=s.hot?'Hot':s.act==='continue'?'Roll':'Bank';
+      h+='<tr class="'+(s===G.sel?'sel':'')+'" onclick="pickStrat('+i+')">'+
+        '<td>'+s.desc+'</td><td class="pts">'+s.points+'</td><td>'+rem+'</td><td>'+bp+'</td>'+
+        '<td><span class="tag '+tc+'">'+tl+'</span></td></tr>';
+    });
+    h+='</tbody></table>';
+  }
+
+  // Action buttons
+  if(rec){
+    const tot=G.ts+rec.points;
+    h+='<div class="actions"><button class="btn-green btn" onclick="keepContinue()">Keep &amp; Roll</button>'+
+      '<button class="btn-amber btn" id="bankBtn" onclick="bankTurn()">Bank '+tot+' pts</button></div>';
+  }
+  rc.innerHTML=h;
+}
+
+function pickStrat(i){
+  G.sel=G.strats[i];
+  document.querySelectorAll('.strat-table tbody tr').forEach((tr,j)=>{tr.className=j===i?'sel':'';});
+  const tot=G.ts+G.sel.points;
+  const bb=document.getElementById('bankBtn');
+  if(bb) bb.textContent='Bank '+tot+' pts';
+}
+
+function keepContinue(){
+  if(!G.sel) return;
+  G.ts+=G.sel.points; G.rn++;
+  const rem=G.sel.hot?6:G.sel.rem;
+  setND(rem); renderTurn(); hideRes();
+}
+
+function bankTurn(){
+  if(!G.sel) return;
+  G.ts+=G.sel.points;
+  G.p[G.cp].score+=G.ts;
+  const won=G.p[G.cp].score>=G.target;
+  nextPlayer();
+  renderBoard();
+  if(won){
+    el('res').style.display='';
+    el('rc').innerHTML='<div class="win-banner">'+G.p[1-G.cp].name+' wins with '+G.p[1-G.cp].score+' points!</div>';
+  }
+}
+
+function bustTurn(){nextPlayer();renderBoard();}
+
+function nextPlayer(){
+  G.cp=1-G.cp; G.ts=0; G.rn=1; G.sel=null; G.strats=null;
+  setND(6); renderBoard(); renderTurn(); hideRes();
+}
+
+function resetTurn(){
+  G.ts=0; G.rn=1; G.sel=null; G.strats=null;
+  setND(6); renderTurn(); hideRes();
+}
+
+function switchPlayer(i){
+  if(i===G.cp) return;
+  G.cp=i; G.ts=0; G.rn=1; setND(6); renderBoard(); renderTurn(); hideRes();
+}
+
+function newGame(){
+  G.p[0].score=0; G.p[1].score=0; G.cp=0; G.ts=0; G.rn=1;
+  setND(6); renderBoard(); renderTurn(); hideRes();
+}
+
+function renderBoard(){
+  el('s0').textContent=G.p[0].score; el('s1').textContent=G.p[1].score;
+  el('p0').className='player'+(G.cp===0?' active':'');
+  el('p1').className='player'+(G.cp===1?' active':'');
+}
+
+function renderTurn(){
+  el('ts').textContent=G.ts; el('rn').textContent=G.rn;
+}
+
+// Keyboard
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.activeElement.tagName!=='INPUT') analyze();
+});
+
+// Init
+renderDC(); renderDice(); renderBoard(); renderTurn();
+</script>
+</body>
+</html>
