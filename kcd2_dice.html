@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KCD2 Dice Advisor</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 640px; }
+
+  /* Dice grid */
+  .dice-input { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .die-slot {
+    width: 64px; height: 64px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; font-weight: 600; color: var(--text);
+    transition: all 0.15s;
+    user-select: none;
+    position: relative;
+  }
+  .die-slot:hover { border-color: var(--accent); }
+  .die-slot.set { border-color: var(--accent); background: var(--accent-dim); }
+  .die-slot.empty { color: var(--text-muted); font-size: 1.2rem; }
+
+  /* Die picker dropdown */
+  .die-picker {
+    position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px; padding: 6px 8px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 10;
+  }
+  .die-pick {
+    width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); cursor: pointer; font-size: 1rem; font-weight: 600;
+    color: var(--text); display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .die-pick:hover { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+
+  /* Dot patterns */
+  .die-face { width: 100%; height: 100%; display: grid; padding: 10px; box-sizing: border-box; }
+  .die-face .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--text);
+  }
+  .die-slot.set .die-face .dot { background: var(--accent); }
+  .die-face[data-val="1"] { grid-template: 1fr / 1fr; place-items: center; }
+  .die-face[data-val="2"] { grid-template: 1fr 1fr / 1fr; }
+  .die-face[data-val="2"] .dot:nth-child(1) { justify-self: end; align-self: start; }
+  .die-face[data-val="2"] .dot:nth-child(2) { justify-self: start; align-self: end; }
+  .die-face[data-val="3"] { grid-template: 1fr 1fr 1fr / 1fr; }
+  .die-face[data-val="3"] .dot:nth-child(1) { justify-self: end; align-self: start; }
+  .die-face[data-val="3"] .dot:nth-child(2) { justify-self: center; align-self: center; }
+  .die-face[data-val="3"] .dot:nth-child(3) { justify-self: start; align-self: end; }
+  .die-face[data-val="4"] { grid-template: 1fr 1fr / 1fr 1fr; place-items: center; }
+  .die-face[data-val="5"] { grid-template: 1fr 1fr 1fr / 1fr 1fr 1fr; place-items: center; }
+  .die-face[data-val="5"] .dot:nth-child(1) { grid-area: 1/1; }
+  .die-face[data-val="5"] .dot:nth-child(2) { grid-area: 1/3; }
+  .die-face[data-val="5"] .dot:nth-child(3) { grid-area: 2/2; }
+  .die-face[data-val="5"] .dot:nth-child(4) { grid-area: 3/1; }
+  .die-face[data-val="5"] .dot:nth-child(5) { grid-area: 3/3; }
+  .die-face[data-val="6"] { grid-template: 1fr 1fr 1fr / 1fr 1fr; place-items: center; }
+
+  /* Buttons */
+  .actions { display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+
+  /* Scoring options */
+  .scoring-section { margin-bottom: 1.5rem; }
+  .scoring-section h3 { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
+  .scoring-option {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: 6px;
+    margin-bottom: 0.4rem; cursor: pointer; transition: all 0.15s;
+    background: var(--surface);
+  }
+  .scoring-option:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .scoring-option.selected { border-color: var(--accent); background: var(--accent-dim); }
+  .scoring-option .combo-name { font-size: 0.88rem; font-weight: 500; color: var(--text); }
+  .scoring-option .combo-dice { font-size: 0.82rem; color: var(--text-muted); margin-left: 0.5rem; }
+  .scoring-option .combo-pts { font-size: 0.92rem; font-weight: 600; color: var(--accent); }
+  .scoring-option.best { border-color: var(--green); background: var(--green-dim); }
+  .scoring-option.best .combo-pts { color: var(--green); }
+  .best-tag { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--green); margin-left: 0.4rem; }
+
+  /* Recommendation */
+  .recommendation {
+    padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem;
+    font-size: 0.88rem; font-weight: 500; line-height: 1.5;
+  }
+  .recommendation.bank { background: var(--green-dim); border: 1px solid var(--green); color: var(--green); }
+  .recommendation.cont { background: var(--blue-dim); border: 1px solid var(--blue); color: var(--blue); }
+  .recommendation.bust { background: var(--red-dim); border: 1px solid var(--red); color: var(--red); }
+
+  /* Scoreboard */
+  .scoreboard {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .score-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.75rem; text-align: center;
+  }
+  .score-card .label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.2rem; }
+  .score-card .value { font-size: 1.3rem; font-weight: 600; }
+  .score-card.you .value { color: var(--accent); }
+  .score-card.turn .value { color: var(--amber); }
+  .score-card.opp .value { color: var(--text-muted); }
+
+  /* History */
+  .history { margin-top: 1.5rem; }
+  .history h3 { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
+  .history-entry {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.4rem 0.6rem; font-size: 0.82rem; border-bottom: 1px solid var(--border);
+  }
+  .history-entry .he-player { font-weight: 500; color: var(--text); min-width: 80px; }
+  .history-entry .he-detail { color: var(--text-muted); flex: 1; margin: 0 0.5rem; }
+  .history-entry .he-pts { font-weight: 600; min-width: 60px; text-align: right; }
+  .history-entry .he-pts.pos { color: var(--green); }
+  .history-entry .he-pts.neg { color: var(--red); }
+
+  /* Scoring ref toggle */
+  .ref-toggle {
+    font-size: 0.82rem; color: var(--accent); cursor: pointer; margin-bottom: 0.75rem;
+    display: inline-block; font-weight: 500;
+  }
+  .ref-toggle:hover { text-decoration: underline; }
+  .ref-table { display: none; margin-bottom: 1.5rem; }
+  .ref-table.show { display: block; }
+  .ref-table table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .ref-table th, .ref-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); text-align: left; }
+  .ref-table th { font-weight: 600; color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .ref-table td:last-child { text-align: right; font-weight: 600; color: var(--accent); }
+
+  /* Target score input */
+  .target-row {
+    display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;
+    font-size: 0.85rem;
+  }
+  .target-row label { color: var(--text-muted); font-weight: 500; }
+  .target-row input {
+    width: 80px; padding: 0.35rem 0.5rem; text-align: center;
+    font-size: 0.88rem; font-weight: 600;
+  }
+  .target-row .opp-label { margin-left: auto; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>KCD2 Dice Advisor</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Farkle dice game advisor for Kingdom Come: Deliverance 2. Enter your dice roll and get scoring recommendations.</p>
+
+  <!-- Scoring reference -->
+  <span class="ref-toggle" id="refToggle">Show scoring reference</span>
+  <div class="ref-table" id="refTable">
+    <table>
+      <tr><th>Combination</th><th>Points</th></tr>
+      <tr><td>Single 1</td><td>100</td></tr>
+      <tr><td>Single 5</td><td>50</td></tr>
+      <tr><td>Three 1s</td><td>1,000</td></tr>
+      <tr><td>Three 2s</td><td>200</td></tr>
+      <tr><td>Three 3s</td><td>300</td></tr>
+      <tr><td>Three 4s</td><td>400</td></tr>
+      <tr><td>Three 5s</td><td>500</td></tr>
+      <tr><td>Three 6s</td><td>600</td></tr>
+      <tr><td>4/5/6 of a kind</td><td>Each extra die doubles</td></tr>
+      <tr><td>Straight 1-2-3-4-5</td><td>500</td></tr>
+      <tr><td>Straight 2-3-4-5-6</td><td>750</td></tr>
+      <tr><td>Straight 1-2-3-4-5-6</td><td>1,500</td></tr>
+    </table>
+  </div>
+
+  <!-- Scoreboard -->
+  <div class="target-row">
+    <label>Target:</label>
+    <input type="number" id="targetScore" value="5000" min="1000" step="500">
+    <label class="opp-label">Opponent:</label>
+    <input type="number" id="oppScore" value="0" min="0" step="50">
+  </div>
+
+  <div class="scoreboard">
+    <div class="score-card you">
+      <div class="label">Your score</div>
+      <div class="value" id="yourScore">0</div>
+    </div>
+    <div class="score-card turn">
+      <div class="label">This turn</div>
+      <div class="value" id="turnScore">0</div>
+    </div>
+    <div class="score-card opp">
+      <div class="label">Opponent</div>
+      <div class="value" id="oppScoreDisplay">0</div>
+    </div>
+  </div>
+
+  <!-- Dice input -->
+  <div class="dice-input" id="diceInput"></div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="btn btn-primary" id="analyzeBtn" disabled>Analyze roll</button>
+    <button class="btn btn-secondary" id="clearBtn">Clear dice</button>
+    <button class="btn btn-secondary" id="newTurnBtn">New turn</button>
+    <button class="btn btn-secondary" id="newGameBtn">New game</button>
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="hidden">
+    <div id="recommendation" class="recommendation"></div>
+
+    <div class="scoring-section">
+      <h3>Scoring options — pick one to keep</h3>
+      <div id="scoringOptions"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="keepBtn" disabled>Keep selected &amp; roll again</button>
+      <button class="btn btn-secondary" id="bankBtn" disabled>Bank turn score</button>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="history" id="historySection">
+    <h3>Turn history</h3>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ── Scoring rules ──
+  function threeOfAKindScore(face) { return face === 1 ? 1000 : face * 100; }
+
+  function scoreSingles(dice) {
+    // Returns array of possible single-die scoring picks
+    const opts = [];
+    const ones = dice.filter(d => d === 1).length;
+    const fives = dice.filter(d => d === 5).length;
+    for (let i = 1; i <= ones; i++) opts.push({ name: i + '× One', dice: Array(i).fill(1), pts: i * 100, diceUsed: i });
+    for (let i = 1; i <= fives; i++) opts.push({ name: i + '× Five', dice: Array(i).fill(5), pts: i * 50, diceUsed: i });
+    return opts;
+  }
+
+  function findAllOptions(dice) {
+    const n = dice.length;
+    const sorted = [...dice].sort((a, b) => a - b);
+    const counts = {};
+    sorted.forEach(d => counts[d] = (counts[d] || 0) + 1);
+    const opts = [];
+
+    // Straights (only from full roll sets)
+    const unique = [...new Set(sorted)].sort((a, b) => a - b);
+    if (n >= 6 && unique.join('') === '12345' + (counts[6] ? '6' : '')) {
+      // Check full straight 1-6
+      if (n === 6 && unique.length === 6 && unique.join('') === '123456') {
+        opts.push({ name: 'Full straight 1-2-3-4-5-6', dice: [1,2,3,4,5,6], pts: 1500, diceUsed: 6 });
+      }
+    }
+    if (n >= 5) {
+      const has12345 = [1,2,3,4,5].every(v => counts[v] >= 1);
+      const has23456 = [2,3,4,5,6].every(v => counts[v] >= 1);
+      if (has12345 && has23456 && n >= 6 && [1,2,3,4,5,6].every(v => counts[v] >= 1)) {
+        // Already handled full straight above
+      } else {
+        if (has23456) opts.push({ name: 'Upper straight 2-3-4-5-6', dice: [2,3,4,5,6], pts: 750, diceUsed: 5 });
+        if (has12345) opts.push({ name: 'Lower straight 1-2-3-4-5', dice: [1,2,3,4,5], pts: 500, diceUsed: 5 });
+      }
+    }
+
+    // N-of-a-kind (3, 4, 5, 6)
+    for (const [faceStr, count] of Object.entries(counts)) {
+      const face = parseInt(faceStr);
+      if (count >= 3) {
+        const base = threeOfAKindScore(face);
+        for (let k = 3; k <= count; k++) {
+          const multiplier = Math.pow(2, k - 3);
+          const pts = base * multiplier;
+          const kindNames = { 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six' };
+          opts.push({
+            name: kindNames[k] + ' ' + face + 's',
+            dice: Array(k).fill(face),
+            pts: pts,
+            diceUsed: k
+          });
+        }
+      }
+    }
+
+    // Singles (1s and 5s not already part of a triple+)
+    if (counts[1]) {
+      const extraOnes = counts[1] >= 3 ? counts[1] - 3 : counts[1];
+      // Always offer individual 1s as standalone option
+      for (let i = 1; i <= counts[1]; i++) {
+        // Skip counts that overlap exactly with a triple+ we already listed
+        if (counts[1] >= 3 && i >= 3) continue;
+        opts.push({ name: i === 1 ? 'Single 1' : i + '× Ones', dice: Array(i).fill(1), pts: i * 100, diceUsed: i });
+      }
+    }
+    if (counts[5]) {
+      for (let i = 1; i <= counts[5]; i++) {
+        if (counts[5] >= 3 && i >= 3) continue;
+        opts.push({ name: i === 1 ? 'Single 5' : i + '× Fives', dice: Array(i).fill(5), pts: i * 50, diceUsed: i });
+      }
+    }
+
+    return opts;
+  }
+
+  // Find the best combination(s) the player can keep
+  // We look at all non-overlapping subsets of scoring options
+  function findBestKeep(dice) {
+    const allOpts = findAllOptions(dice);
+    if (allOpts.length === 0) return null;
+
+    // Generate all valid non-overlapping subsets
+    const combos = [];
+    function canCombine(selected, candidate) {
+      // Check if adding candidate doesn't exceed available dice
+      const used = {};
+      for (const opt of selected) {
+        for (const d of opt.dice) used[d] = (used[d] || 0) + 1;
+      }
+      for (const d of candidate.dice) used[d] = (used[d] || 0) + 1;
+      const counts = {};
+      dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
+      for (const [face, cnt] of Object.entries(used)) {
+        if (cnt > (counts[face] || 0)) return false;
+      }
+      return true;
+    }
+
+    function buildCombos(idx, selected, totalPts, totalDice) {
+      combos.push({ options: [...selected], pts: totalPts, diceUsed: totalDice });
+      for (let i = idx; i < allOpts.length; i++) {
+        if (canCombine(selected, allOpts[i])) {
+          const newDice = totalDice + allOpts[i].diceUsed;
+          if (newDice <= dice.length) {
+            selected.push(allOpts[i]);
+            buildCombos(i + 1, selected, totalPts + allOpts[i].pts, newDice);
+            selected.pop();
+          }
+        }
+      }
+    }
+    buildCombos(0, [], 0, 0);
+
+    // Filter out empty combo
+    const valid = combos.filter(c => c.options.length > 0);
+    if (valid.length === 0) return null;
+
+    // Sort by points descending, then by fewer dice used (more remaining = safer to continue)
+    valid.sort((a, b) => b.pts - a.pts || a.diceUsed - b.diceUsed);
+    return valid;
+  }
+
+  // ── State ──
+  let numDice = 6;
+  let diceValues = Array(6).fill(0); // 0 = unset
+  let turnAccum = 0; // accumulated turn score (from prior sub-rolls)
+  let yourTotal = 0;
+  let activePicker = -1;
+  let selectedOptionIdx = -1;
+  let history = [];
+
+  // ── DOM ──
+  const diceInput = document.getElementById('diceInput');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const newTurnBtn = document.getElementById('newTurnBtn');
+  const newGameBtn = document.getElementById('newGameBtn');
+  const results = document.getElementById('results');
+  const recommendation = document.getElementById('recommendation');
+  const scoringOptions = document.getElementById('scoringOptions');
+  const keepBtn = document.getElementById('keepBtn');
+  const bankBtn = document.getElementById('bankBtn');
+  const refToggle = document.getElementById('refToggle');
+  const refTable = document.getElementById('refTable');
+  const targetInput = document.getElementById('targetScore');
+  const oppInput = document.getElementById('oppScore');
+  const historyList = document.getElementById('historyList');
+
+  function renderDieFace(val) {
+    const dots = val === 0 ? '' : Array(val).fill('<span class="dot"></span>').join('');
+    return `<div class="die-face" data-val="${val}">${dots}</div>`;
+  }
+
+  function renderDice() {
+    diceInput.innerHTML = '';
+    for (let i = 0; i < numDice; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'die-slot' + (diceValues[i] ? ' set' : ' empty');
+      slot.innerHTML = diceValues[i] ? renderDieFace(diceValues[i]) : '?';
+      slot.dataset.idx = i;
+      slot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePicker(i);
+      });
+      diceInput.appendChild(slot);
+    }
+    updateAnalyzeBtn();
+  }
+
+  function togglePicker(idx) {
+    // Close any existing
+    document.querySelectorAll('.die-picker').forEach(p => p.remove());
+    if (activePicker === idx) { activePicker = -1; return; }
+    activePicker = idx;
+    const slot = diceInput.children[idx];
+    const picker = document.createElement('div');
+    picker.className = 'die-picker';
+    for (let v = 1; v <= 6; v++) {
+      const btn = document.createElement('button');
+      btn.className = 'die-pick';
+      btn.textContent = v;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        diceValues[idx] = v;
+        activePicker = -1;
+        picker.remove();
+        renderDice();
+        // Auto-advance to next empty die
+        const nextEmpty = diceValues.findIndex((d, i) => i > idx && d === 0);
+        if (nextEmpty !== -1) setTimeout(() => togglePicker(nextEmpty), 100);
+      });
+      picker.appendChild(btn);
+    }
+    slot.appendChild(picker);
+  }
+
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.die-picker').forEach(p => p.remove());
+    activePicker = -1;
+  });
+
+  function updateAnalyzeBtn() {
+    const filled = diceValues.slice(0, numDice).filter(v => v > 0).length;
+    analyzeBtn.disabled = filled !== numDice;
+  }
+
+  function updateScoreboard() {
+    document.getElementById('yourScore').textContent = yourTotal.toLocaleString();
+    document.getElementById('turnScore').textContent = turnAccum.toLocaleString();
+    document.getElementById('oppScoreDisplay').textContent = parseInt(oppInput.value || 0).toLocaleString();
+  }
+
+  oppInput.addEventListener('input', updateScoreboard);
+
+  function analyze() {
+    const dice = diceValues.slice(0, numDice);
+    const combos = findBestKeep(dice);
+
+    results.classList.remove('hidden');
+    scoringOptions.innerHTML = '';
+    selectedOptionIdx = -1;
+    keepBtn.disabled = true;
+    bankBtn.disabled = true;
+
+    if (!combos) {
+      // BUST!
+      recommendation.className = 'recommendation bust';
+      recommendation.innerHTML = '<strong>BUST!</strong> No scoring dice. You lose ' + turnAccum.toLocaleString() + ' points from this turn.';
+      addHistory('You', 'Busted', -turnAccum);
+      turnAccum = 0;
+      updateScoreboard();
+      return;
+    }
+
+    // Show all individual scoring options
+    const allOpts = findAllOptions(dice);
+    const best = combos[0]; // highest scoring combo
+
+    allOpts.forEach((opt, i) => {
+      const div = document.createElement('div');
+      div.className = 'scoring-option';
+      const isBest = best.options.some(b => b.name === opt.name && b.pts === opt.pts);
+      if (isBest) div.classList.add('best');
+      div.innerHTML = `
+        <span>
+          <span class="combo-name">${opt.name}</span>
+          ${isBest ? '<span class="best-tag">recommended</span>' : ''}
+          <span class="combo-dice">[${opt.dice.join(', ')}]</span>
+        </span>
+        <span class="combo-pts">+${opt.pts.toLocaleString()}</span>
+      `;
+      div.addEventListener('click', () => selectOption(i, allOpts));
+      scoringOptions.appendChild(div);
+    });
+
+    // Auto-select best
+    selectOption(allOpts.findIndex(o => best.options[0] && o.name === best.options[0].name && o.pts === best.options[0].pts), allOpts);
+
+    // Recommendation
+    const remaining = numDice - best.diceUsed;
+    const potentialTurn = turnAccum + best.pts;
+    const target = parseInt(targetInput.value) || 5000;
+    const opp = parseInt(oppInput.value) || 0;
+
+    if (remaining === 0) {
+      recommendation.className = 'recommendation cont';
+      recommendation.innerHTML = `<strong>Hot dice!</strong> All ${numDice} dice score for +${best.pts.toLocaleString()} (turn total: ${potentialTurn.toLocaleString()}). You get to re-roll all ${numDice} dice!`;
+    } else if (yourTotal + potentialTurn >= target) {
+      recommendation.className = 'recommendation bank';
+      recommendation.innerHTML = `<strong>Bank it!</strong> Keep ${best.options.map(o => o.name).join(' + ')} for +${best.pts.toLocaleString()} and bank ${potentialTurn.toLocaleString()} to win!`;
+    } else if (remaining <= 2) {
+      recommendation.className = 'recommendation bank';
+      recommendation.innerHTML = `<strong>Bank recommended.</strong> Only ${remaining} ${remaining === 1 ? 'die' : 'dice'} left — high bust risk. Bank ${potentialTurn.toLocaleString()} points.`;
+    } else {
+      recommendation.className = 'recommendation cont';
+      recommendation.innerHTML = `<strong>Continue rolling.</strong> Keep ${best.options.map(o => o.name).join(' + ')} for +${best.pts.toLocaleString()}, roll ${remaining} remaining ${remaining === 1 ? 'die' : 'dice'}. Turn total would be ${potentialTurn.toLocaleString()}.`;
+    }
+  }
+
+  function selectOption(idx, allOpts) {
+    if (idx < 0) return;
+    selectedOptionIdx = idx;
+    document.querySelectorAll('.scoring-option').forEach((el, i) => {
+      el.classList.toggle('selected', i === idx);
+    });
+    keepBtn.disabled = false;
+    bankBtn.disabled = false;
+  }
+
+  function keepAndRoll() {
+    if (selectedOptionIdx < 0) return;
+    const dice = diceValues.slice(0, numDice);
+    const allOpts = findAllOptions(dice);
+    const chosen = allOpts[selectedOptionIdx];
+    if (!chosen) return;
+
+    turnAccum += chosen.pts;
+    const remaining = numDice - chosen.diceUsed;
+
+    addHistory('You', 'Kept ' + chosen.name, chosen.pts);
+
+    if (remaining === 0) {
+      // Hot dice — re-roll all
+      numDice = 6;
+    } else {
+      numDice = remaining;
+    }
+
+    diceValues = Array(6).fill(0);
+    results.classList.add('hidden');
+    updateScoreboard();
+    renderDice();
+  }
+
+  function bankTurn() {
+    if (selectedOptionIdx < 0) return;
+    const dice = diceValues.slice(0, numDice);
+    const allOpts = findAllOptions(dice);
+    const chosen = allOpts[selectedOptionIdx];
+    if (!chosen) return;
+
+    turnAccum += chosen.pts;
+    yourTotal += turnAccum;
+
+    addHistory('You', 'Banked', turnAccum);
+
+    turnAccum = 0;
+    numDice = 6;
+    diceValues = Array(6).fill(0);
+    results.classList.add('hidden');
+    updateScoreboard();
+    renderDice();
+
+    const target = parseInt(targetInput.value) || 5000;
+    if (yourTotal >= target) {
+      recommendation.className = 'recommendation bank';
+      recommendation.innerHTML = '<strong>You win!</strong> Final score: ' + yourTotal.toLocaleString();
+      results.classList.remove('hidden');
+      scoringOptions.innerHTML = '';
+      keepBtn.disabled = true;
+      bankBtn.disabled = true;
+    }
+  }
+
+  function addHistory(player, detail, pts) {
+    history.unshift({ player, detail, pts });
+    renderHistory();
+  }
+
+  function renderHistory() {
+    historyList.innerHTML = '';
+    history.forEach(h => {
+      const div = document.createElement('div');
+      div.className = 'history-entry';
+      const ptsClass = h.pts > 0 ? 'pos' : h.pts < 0 ? 'neg' : '';
+      const ptsStr = h.pts > 0 ? '+' + h.pts.toLocaleString() : h.pts === 0 ? '0' : h.pts.toLocaleString();
+      div.innerHTML = `
+        <span class="he-player">${h.player}</span>
+        <span class="he-detail">${h.detail}</span>
+        <span class="he-pts ${ptsClass}">${ptsStr}</span>
+      `;
+      historyList.appendChild(div);
+    });
+  }
+
+  // ── Event listeners ──
+  analyzeBtn.addEventListener('click', analyze);
+
+  clearBtn.addEventListener('click', () => {
+    diceValues = Array(6).fill(0);
+    results.classList.add('hidden');
+    renderDice();
+  });
+
+  newTurnBtn.addEventListener('click', () => {
+    if (turnAccum > 0) {
+      addHistory('You', 'Turn abandoned', 0);
+    }
+    turnAccum = 0;
+    numDice = 6;
+    diceValues = Array(6).fill(0);
+    results.classList.add('hidden');
+    updateScoreboard();
+    renderDice();
+  });
+
+  newGameBtn.addEventListener('click', () => {
+    yourTotal = 0;
+    turnAccum = 0;
+    numDice = 6;
+    diceValues = Array(6).fill(0);
+    oppInput.value = 0;
+    history = [];
+    results.classList.add('hidden');
+    updateScoreboard();
+    renderDice();
+    renderHistory();
+  });
+
+  keepBtn.addEventListener('click', keepAndRoll);
+  bankBtn.addEventListener('click', bankTurn);
+
+  refToggle.addEventListener('click', () => {
+    refTable.classList.toggle('show');
+    refToggle.textContent = refTable.classList.contains('show') ? 'Hide scoring reference' : 'Show scoring reference';
+  });
+
+  // ── Init ──
+  renderDice();
+  updateScoreboard();
+})();
+</script>
+</body>
+</html>
