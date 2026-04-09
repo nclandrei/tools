@@ -279,6 +279,7 @@
     let currentMaskData = null;
     let currentOriginalData = null;
     let selectedBg = 'transparent';
+    let currentResultBlobUrl = null;
 
     // --- File handling ---
 
@@ -399,7 +400,7 @@
       });
     }
 
-    function renderResult() {
+    async function renderResult() {
       if (!currentOriginalData || !currentMaskData) return;
 
       const origW = currentOriginalData.width;
@@ -440,7 +441,12 @@
       }
 
       ctx.putImageData(output, 0, 0);
-      resultImg.src = workCanvas.toDataURL('image/png');
+
+      // Use blob URL instead of data URL to avoid Safari iOS navigating to data: URI
+      if (currentResultBlobUrl) URL.revokeObjectURL(currentResultBlobUrl);
+      const blob = await new Promise(r => workCanvas.toBlob(r, 'image/png'));
+      currentResultBlobUrl = URL.createObjectURL(blob);
+      resultImg.src = currentResultBlobUrl;
 
       // Show/hide checkerboard
       if (selectedBg === 'transparent') {
@@ -472,11 +478,16 @@
 
     // --- Actions ---
 
-    downloadBtn.addEventListener('click', () => {
+    downloadBtn.addEventListener('click', async () => {
+      // Re-export from canvas as blob to ensure fresh blob URL for download
+      // Using blob URLs instead of data URLs prevents Safari iOS from navigating to data: URI
+      const blob = await new Promise(r => workCanvas.toBlob(r, 'image/png'));
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = resultImg.src;
+      a.href = url;
       a.download = 'background-removed.png';
       a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
 
     resetBtn.addEventListener('click', () => {
@@ -487,6 +498,10 @@
       fileInput.value = '';
       currentMaskData = null;
       currentOriginalData = null;
+      if (currentResultBlobUrl) {
+        URL.revokeObjectURL(currentResultBlobUrl);
+        currentResultBlobUrl = null;
+      }
     });
 
     // --- UI helpers ---
