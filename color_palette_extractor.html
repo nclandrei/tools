@@ -626,7 +626,7 @@ function getActivePalette() {
 }
 
 // ── File handling ──
-dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('click', (e) => { if (e.target !== fileInput) fileInput.click(); });
 ['dragenter', 'dragover'].forEach(e => dropZone.addEventListener(e, ev => {
   ev.preventDefault(); ev.stopPropagation(); dropZone.classList.add('dragover');
 }));
