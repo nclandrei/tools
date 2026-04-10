@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Favicon Generator</title>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+  <style>
+    .container { max-width: 860px; }
+    header { margin-bottom: 2rem; }
+    h1 { font-size: 1.75rem; }
+
+    .mode-tabs {
+      display: flex; gap: .25rem; margin-bottom: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: .25rem;
+    }
+    .mode-tab {
+      flex: 1; padding: .55rem .75rem; background: transparent;
+      border: none; border-radius: 6px; cursor: pointer;
+      font-family: inherit; font-size: .88rem; color: var(--text-muted);
+      transition: all .15s ease;
+    }
+    .mode-tab:hover { color: var(--text); }
+    .mode-tab.active { background: var(--surface-alt); color: var(--text); }
+
+    .drop-zone { position: relative; }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .drop-icon { font-size: 2rem; margin-bottom: .5rem; color: var(--text-muted); line-height: 1; }
+
+    .source-preview {
+      display: flex; align-items: center; gap: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;
+    }
+    .source-preview img {
+      width: 64px; height: 64px; object-fit: contain;
+      border-radius: 6px; background: var(--surface-alt);
+    }
+    .source-info { flex: 1; }
+    .source-info .name { font-weight: 500; margin-bottom: .2rem; word-break: break-all; }
+    .source-info .dims { color: var(--text-muted); font-family: monospace; font-size: .85rem; }
+    .change-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      padding: .4rem .75rem; border-radius: 6px; cursor: pointer;
+      font-family: inherit; font-size: .85rem; transition: all .15s ease;
+    }
+    .change-btn:hover { border-color: var(--border-hover); color: var(--text); }
+
+    .text-input-panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem;
+    }
+    .text-input-panel input[type="text"] {
+      width: 100%; padding: .55rem .75rem;
+      font-family: inherit; font-size: 1rem;
+    }
+    .text-input-panel label {
+      display: block; font-size: .85rem; color: var(--text-muted);
+      margin-bottom: .35rem;
+    }
+
+    .controls {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem;
+    }
+    .controls h3 { font-size: .95rem; margin-bottom: .85rem; }
+    .control-row {
+      display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: center;
+      margin-bottom: .85rem;
+    }
+    .control-row:last-child { margin-bottom: 0; }
+    .control-group { display: flex; align-items: center; gap: .5rem; }
+    .control-group > label { font-size: .85rem; color: var(--text-muted); white-space: nowrap; }
+    select { padding: .4rem .6rem; font-size: .85rem; cursor: pointer; }
+    input[type="range"] { width: 120px; accent-color: var(--accent); }
+    input[type="color"] {
+      width: 36px; height: 30px; padding: 0; border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer; background: var(--surface-alt);
+    }
+    .range-val { font-family: monospace; font-size: .85rem; color: var(--text-muted); min-width: 3ch; }
+    .cb-label {
+      display: flex; align-items: center; gap: 6px; font-size: .85rem;
+      color: var(--text-muted); cursor: pointer; user-select: none;
+    }
+    .cb-label input { accent-color: var(--accent); cursor: pointer; }
+
+    .preview-section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem;
+    }
+    .preview-section h3 { font-size: .95rem; margin-bottom: .85rem; }
+    .preview-row {
+      display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: flex-end;
+    }
+    .preview-item { display: flex; flex-direction: column; align-items: center; gap: .4rem; }
+    .preview-item canvas {
+      background: var(--surface-alt); border-radius: 6px;
+      image-rendering: pixelated;
+    }
+    .preview-label { font-family: monospace; font-size: .75rem; color: var(--text-muted); }
+
+    .browser-mock {
+      display: flex; align-items: center; gap: .5rem;
+      background: var(--surface-alt); border: 1px solid var(--border);
+      border-radius: 8px 8px 0 0; padding: .55rem .85rem;
+      margin-top: 1rem; max-width: 380px;
+      border-bottom: none;
+    }
+    .browser-mock canvas { width: 16px; height: 16px; flex-shrink: 0; }
+    .browser-mock .tab-title {
+      font-size: .82rem; color: var(--text); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .browser-mock .tab-close {
+      color: var(--text-muted); font-size: .9rem; margin-left: auto;
+    }
+
+    .actions {
+      display: flex; gap: .75rem; flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .snippet-section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem;
+    }
+    .snippet-section h3 {
+      font-size: .95rem; margin-bottom: .6rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .snippet-section pre {
+      background: var(--surface-alt); border: 1px solid var(--border);
+      border-radius: 6px; padding: .85rem; overflow-x: auto;
+      font-size: .78rem; line-height: 1.55; margin: 0;
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+    }
+    .copy-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      padding: .3rem .65rem; border-radius: 5px; cursor: pointer;
+      font-family: inherit; font-size: .75rem; transition: all .15s ease;
+    }
+    .copy-btn:hover { border-color: var(--border-hover); color: var(--text); }
+    .copy-btn.copied { color: var(--green); border-color: var(--green-dim); }
+
+    .hint {
+      font-size: .8rem; color: var(--text-muted); margin-top: .75rem;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 1.35rem; }
+      .control-row { gap: .85rem; }
+      .preview-row { gap: .85rem; }
+    }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Favicon Generator</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+
+  <main>
+    <p class="desc">Generate a complete favicon set from an image or text. Outputs <code>favicon.ico</code> (multi-size), PNGs, Apple touch icon, web manifest, and the HTML snippet to drop into your <code>&lt;head&gt;</code>. Runs entirely in your browser.</p>
+
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="image">Image</button>
+      <button class="mode-tab" data-mode="text">Text / Emoji</button>
+    </div>
+
+    <div id="imageMode">
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-icon">&#8595;</div>
+        <p>Drop an image here or click to browse</p>
+        <p style="color:var(--text-muted);font-size:.82rem;margin-top:.35rem">Square SVG or high-res PNG works best</p>
+        <input type="file" id="fileInput" accept="image/*">
+      </div>
+
+      <div id="sourcePreview" class="source-preview" hidden>
+        <img id="sourceImg" alt="Source">
+        <div class="source-info">
+          <div class="name" id="sourceName"></div>
+          <div class="dims" id="sourceDims"></div>
+        </div>
+        <button class="change-btn" id="changeBtn">Change</button>
+      </div>
+    </div>
+
+    <div id="textMode" hidden>
+      <div class="text-input-panel">
+        <label for="textInput">Letter, word, or emoji</label>
+        <input type="text" id="textInput" value="A" maxlength="4" autocomplete="off">
+      </div>
+    </div>
+
+    <div id="controlsSection" hidden>
+      <div class="controls">
+        <h3>Style</h3>
+        <div class="control-row">
+          <div class="control-group">
+            <label for="shape">Shape</label>
+            <select id="shape">
+              <option value="square">Square</option>
+              <option value="rounded" selected>Rounded</option>
+              <option value="circle">Circle</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="bgColor">Background</label>
+            <input type="color" id="bgColor" value="#7c3aed">
+            <label class="cb-label" style="margin-left:.25rem">
+              <input type="checkbox" id="transparentBg"> Transparent
+            </label>
+          </div>
+        </div>
+        <div class="control-row">
+          <div class="control-group">
+            <label for="padding">Padding</label>
+            <input type="range" id="padding" min="0" max="25" value="10" step="1">
+            <span class="range-val" id="paddingVal">10%</span>
+          </div>
+          <div class="control-group" id="fgColorGroup" hidden>
+            <label for="fgColor">Text color</label>
+            <input type="color" id="fgColor" value="#ffffff">
+          </div>
+          <div class="control-group" id="fontWeightGroup" hidden>
+            <label for="fontWeight">Weight</label>
+            <select id="fontWeight">
+              <option value="400">Regular</option>
+              <option value="500">Medium</option>
+              <option value="600" selected>Semibold</option>
+              <option value="700">Bold</option>
+              <option value="800">Extrabold</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <h3>Preview</h3>
+        <div class="preview-row" id="previewRow"></div>
+        <div class="browser-mock">
+          <canvas id="tabFavicon" width="16" height="16"></canvas>
+          <span class="tab-title">Your site &mdash; Home</span>
+          <span class="tab-close">&times;</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="downloadBtn">Download favicon pack (.zip)</button>
+        <button class="btn btn-secondary" id="downloadIcoBtn">Download favicon.ico only</button>
+      </div>
+
+      <div class="snippet-section">
+        <h3>
+          HTML snippet
+          <button class="copy-btn" id="copyHtmlBtn">Copy</button>
+        </h3>
+        <pre id="htmlSnippet"></pre>
+        <p class="hint">Drop these tags into your <code>&lt;head&gt;</code>. The ZIP places all referenced files at the site root.</p>
+      </div>
+
+      <div class="snippet-section">
+        <h3>
+          site.webmanifest
+          <button class="copy-btn" id="copyManifestBtn">Copy</button>
+        </h3>
+        <pre id="manifestSnippet"></pre>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// Output sizes. `ico` flag = included in multi-size favicon.ico.
+const OUTPUT_SIZES = [
+  { name: 'favicon-16x16.png',   w: 16,  ico: true },
+  { name: 'favicon-32x32.png',   w: 32,  ico: true },
+  { name: 'favicon-48x48.png',   w: 48,  ico: true },
+  { name: 'favicon-96x96.png',   w: 96 },
+  { name: 'apple-touch-icon.png', w: 180 },
+  { name: 'android-chrome-192x192.png', w: 192 },
+  { name: 'android-chrome-512x512.png', w: 512 },
+];
+
+// Visible preview sizes (subset, scaled up where small)
+const PREVIEW_SIZES = [16, 32, 48, 96, 180];
+
+let sourceImage = null;
+let currentMode = 'image';
+
+// --- Mode switching ---
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentMode = tab.dataset.mode;
+    $('imageMode').hidden = currentMode !== 'image';
+    $('textMode').hidden = currentMode !== 'text';
+    $('fgColorGroup').hidden = currentMode !== 'text';
+    $('fontWeightGroup').hidden = currentMode !== 'text';
+
+    if (currentMode === 'text') {
+      $('controlsSection').hidden = false;
+      updatePreview();
+    } else if (currentMode === 'image' && !sourceImage) {
+      $('controlsSection').hidden = true;
+    }
+  });
+});
+
+// --- Image upload ---
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    sourceImage = img;
+    $('sourceImg').src = url;
+    $('sourceName').textContent = file.name;
+    $('sourceDims').textContent = `${img.naturalWidth} \u00D7 ${img.naturalHeight}`;
+    dropZone.hidden = true;
+    $('sourcePreview').hidden = false;
+    $('controlsSection').hidden = false;
+    updatePreview();
+  };
+  img.onerror = () => alert('Could not load image.');
+  img.src = url;
+}
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+$('changeBtn').addEventListener('click', () => {
+  dropZone.hidden = false;
+  $('sourcePreview').hidden = true;
+  $('controlsSection').hidden = true;
+  sourceImage = null;
+  fileInput.value = '';
+});
+
+// --- Controls ---
+const shape = $('shape');
+const bgColor = $('bgColor');
+const transparentBg = $('transparentBg');
+const padding = $('padding');
+const paddingVal = $('paddingVal');
+const fgColor = $('fgColor');
+const fontWeight = $('fontWeight');
+const textInput = $('textInput');
+
+padding.addEventListener('input', () => {
+  paddingVal.textContent = padding.value + '%';
+  updatePreview();
+});
+[shape, bgColor, transparentBg, fgColor, fontWeight, textInput].forEach(el => {
+  el.addEventListener('input', updatePreview);
+  el.addEventListener('change', updatePreview);
+});
+
+// --- Rendering ---
+function drawBackground(ctx, size) {
+  if (transparentBg.checked) return;
+  ctx.fillStyle = bgColor.value;
+  const s = shape.value;
+  if (s === 'square') {
+    ctx.fillRect(0, 0, size, size);
+  } else if (s === 'circle') {
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // rounded
+    const r = size * 0.22;
+    roundRectPath(ctx, 0, 0, size, size, r);
+    ctx.fill();
+  }
+}
+
+function clipToShape(ctx, size) {
+  const s = shape.value;
+  if (s === 'square') return; // no clip needed
+  if (s === 'circle') {
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.clip();
+  } else {
+    const r = size * 0.22;
+    roundRectPath(ctx, 0, 0, size, size, r);
+    ctx.clip();
+  }
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function renderIcon(size) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  drawBackground(ctx, size);
+
+  ctx.save();
+  clipToShape(ctx, size);
+
+  const pad = size * (parseInt(padding.value) / 100);
+  const inner = size - pad * 2;
+
+  if (currentMode === 'image' && sourceImage) {
+    // Fit image into inner square preserving aspect
+    const iw = sourceImage.naturalWidth;
+    const ih = sourceImage.naturalHeight;
+    const scale = Math.min(inner / iw, inner / ih);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    ctx.drawImage(sourceImage, pad + (inner - dw) / 2, pad + (inner - dh) / 2, dw, dh);
+  } else if (currentMode === 'text') {
+    const text = textInput.value || 'A';
+    ctx.fillStyle = fgColor.value;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Pick a font size that fits
+    let fontSize = inner;
+    ctx.font = `${fontWeight.value} ${fontSize}px Inter, system-ui, -apple-system, sans-serif`;
+    // Shrink until width fits
+    while (ctx.measureText(text).width > inner && fontSize > 4) {
+      fontSize -= 1;
+      ctx.font = `${fontWeight.value} ${fontSize}px Inter, system-ui, -apple-system, sans-serif`;
+    }
+    // Also cap by height ratio (approx cap height ~0.72 of font size)
+    const maxByHeight = inner / 0.78;
+    if (fontSize > maxByHeight) {
+      fontSize = maxByHeight;
+      ctx.font = `${fontWeight.value} ${fontSize}px Inter, system-ui, -apple-system, sans-serif`;
+    }
+    ctx.fillText(text, size / 2, size / 2 + fontSize * 0.04);
+  }
+
+  ctx.restore();
+  return canvas;
+}
+
+function updatePreview() {
+  if (currentMode === 'image' && !sourceImage) return;
+  const row = $('previewRow');
+  row.innerHTML = '';
+
+  for (const s of PREVIEW_SIZES) {
+    const canvas = renderIcon(s);
+    const displaySize = Math.max(s, 48); // show small sizes at real px, larger ones capped
+    const capped = Math.min(displaySize, 96);
+    canvas.style.width = capped + 'px';
+    canvas.style.height = capped + 'px';
+
+    const item = document.createElement('div');
+    item.className = 'preview-item';
+    item.appendChild(canvas);
+    const label = document.createElement('div');
+    label.className = 'preview-label';
+    label.textContent = `${s}\u00D7${s}`;
+    item.appendChild(label);
+    row.appendChild(item);
+  }
+
+  // Browser tab mock
+  const tab = $('tabFavicon');
+  const tctx = tab.getContext('2d');
+  tctx.clearRect(0, 0, 16, 16);
+  const favCanvas = renderIcon(16);
+  tctx.drawImage(favCanvas, 0, 0);
+
+  updateSnippets();
+}
+
+// --- HTML snippet / manifest ---
+function updateSnippets() {
+  const themeColor = transparentBg.checked ? '#ffffff' : bgColor.value;
+  $('htmlSnippet').textContent = [
+    '<link rel="icon" href="/favicon.ico" sizes="any">',
+    '<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">',
+    '<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">',
+    '<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">',
+    '<link rel="manifest" href="/site.webmanifest">',
+    `<meta name="theme-color" content="${themeColor}">`,
+  ].join('\n');
+
+  $('manifestSnippet').textContent = JSON.stringify({
+    name: '',
+    short_name: '',
+    icons: [
+      { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    theme_color: themeColor,
+    background_color: themeColor,
+    display: 'standalone',
+  }, null, 2);
+}
+
+// --- ICO encoder ---
+// Builds a multi-size .ico file from PNG blobs. Modern browsers and Windows
+// both accept embedded PNG data in ICO entries.
+async function buildIco(pngBlobs) {
+  // Decode blobs into arrays so we can measure and concat
+  const entries = [];
+  for (const { blob, size } of pngBlobs) {
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    entries.push({ size, data: buf });
+  }
+
+  const headerSize = 6;
+  const dirEntrySize = 16;
+  const dirSize = headerSize + dirEntrySize * entries.length;
+
+  let totalSize = dirSize;
+  for (const e of entries) totalSize += e.data.length;
+
+  const out = new Uint8Array(totalSize);
+  const view = new DataView(out.buffer);
+
+  // ICONDIR
+  view.setUint16(0, 0, true);            // reserved
+  view.setUint16(2, 1, true);            // type 1 = icon
+  view.setUint16(4, entries.length, true); // count
+
+  let offset = dirSize;
+  for (let i = 0; i < entries.length; i++) {
+    const { size, data } = entries[i];
+    const dirOff = headerSize + i * dirEntrySize;
+    // width / height: 0 means 256
+    view.setUint8(dirOff + 0, size >= 256 ? 0 : size);
+    view.setUint8(dirOff + 1, size >= 256 ? 0 : size);
+    view.setUint8(dirOff + 2, 0);          // color count
+    view.setUint8(dirOff + 3, 0);          // reserved
+    view.setUint16(dirOff + 4, 1, true);   // color planes
+    view.setUint16(dirOff + 6, 32, true);  // bits per pixel
+    view.setUint32(dirOff + 8, data.length, true);  // byte size
+    view.setUint32(dirOff + 12, offset, true);      // offset
+
+    out.set(data, offset);
+    offset += data.length;
+  }
+
+  return new Blob([out], { type: 'image/x-icon' });
+}
+
+function canvasToBlob(canvas) {
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+async function buildAllAssets() {
+  const pngs = [];
+  const icoSources = [];
+  for (const entry of OUTPUT_SIZES) {
+    const canvas = renderIcon(entry.w);
+    const blob = await canvasToBlob(canvas);
+    pngs.push({ name: entry.name, blob });
+    if (entry.ico) icoSources.push({ size: entry.w, blob });
+  }
+  const icoBlob = await buildIco(icoSources);
+  return { pngs, icoBlob };
+}
+
+// --- Downloads ---
+$('downloadBtn').addEventListener('click', async () => {
+  const btn = $('downloadBtn');
+  btn.disabled = true;
+  btn.textContent = 'Building\u2026';
+  try {
+    const { pngs, icoBlob } = await buildAllAssets();
+    const zip = new JSZip();
+    zip.file('favicon.ico', icoBlob);
+    for (const p of pngs) zip.file(p.name, p.blob);
+    zip.file('site.webmanifest', $('manifestSnippet').textContent);
+    zip.file('README.txt',
+      'Favicon pack\n============\n\n' +
+      'Place these files at your site root and add the HTML snippet from the\n' +
+      'generator to your <head>.\n\nFiles:\n' +
+      '  favicon.ico                     multi-size ICO (16, 32, 48)\n' +
+      '  favicon-16x16.png               classic browser favicon\n' +
+      '  favicon-32x32.png               retina browser favicon\n' +
+      '  favicon-48x48.png               Windows taskbar\n' +
+      '  favicon-96x96.png               shortcut icon\n' +
+      '  apple-touch-icon.png            iOS home screen (180x180)\n' +
+      '  android-chrome-192x192.png      Android home screen\n' +
+      '  android-chrome-512x512.png      PWA splash / large tile\n' +
+      '  site.webmanifest                PWA manifest\n'
+    );
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = 'favicon-pack.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Download favicon pack (.zip)';
+  }
+});
+
+$('downloadIcoBtn').addEventListener('click', async () => {
+  const btn = $('downloadIcoBtn');
+  btn.disabled = true;
+  btn.textContent = 'Building\u2026';
+  try {
+    const icoSources = [];
+    for (const entry of OUTPUT_SIZES.filter(e => e.ico)) {
+      const canvas = renderIcon(entry.w);
+      const blob = await canvasToBlob(canvas);
+      icoSources.push({ size: entry.w, blob });
+    }
+    const icoBlob = await buildIco(icoSources);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(icoBlob);
+    a.download = 'favicon.ico';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Download favicon.ico only';
+  }
+});
+
+// --- Copy buttons ---
+function wireCopy(btnId, preId) {
+  $(btnId).addEventListener('click', async () => {
+    await navigator.clipboard.writeText($(preId).textContent);
+    const btn = $(btnId);
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 1400);
+  });
+}
+wireCopy('copyHtmlBtn', 'htmlSnippet');
+wireCopy('copyManifestBtn', 'manifestSnippet');
+
+// Initial snippet render so it's populated before first preview
+updateSnippets();
+</script>
+</body>
+</html>
