@@ -1,6 +1,16 @@
 const ALLOWED_DOMAINS = [
   'sumodb.sumogames.de',
+  'www.youtube.com',
+  'youtube.com',
 ];
+
+// Per-domain User-Agent overrides. YouTube serves a stripped-down page
+// (or a consent interstitial with no player response) to unrecognised UAs,
+// so we pose as a recent desktop browser for those requests.
+const UA_OVERRIDES = {
+  'www.youtube.com': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'youtube.com': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+};
 
 export async function onRequest(context) {
   const { request } = context;
@@ -38,8 +48,12 @@ export async function onRequest(context) {
   }
 
   try {
+    const userAgent = UA_OVERRIDES[parsed.hostname] || 'ToolsProxy/1.0';
     const resp = await fetch(url, {
-      headers: { 'User-Agent': 'ToolsProxy/1.0' },
+      headers: {
+        'User-Agent': userAgent,
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
     });
 
     const body = await resp.text();
