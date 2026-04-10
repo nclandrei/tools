@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JWT Signer</title>
+<meta name="description" content="Sign JSON Web Tokens with HS256/384/512 and RS256/384/512. Runs entirely in your browser.">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  textarea, select, input[type="text"] {
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    resize: vertical;
+    outline: none;
+    line-height: 1.5;
+    box-sizing: border-box;
+  }
+
+  select {
+    font-family: 'Inter', sans-serif;
+    padding: 0.55rem 0.75rem;
+    cursor: pointer;
+  }
+
+  textarea:focus, select:focus, input:focus {
+    border-color: var(--accent);
+  }
+
+  textarea::placeholder, input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 720px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  .section {
+    margin-bottom: 1rem;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .btn {
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.55rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  .output-section {
+    margin-top: 1.5rem;
+  }
+
+  .token-box {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.9rem;
+    min-height: 2.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+
+  .token-box.empty {
+    color: var(--text-muted);
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.55rem;
+  }
+
+  .error-box {
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.82rem;
+    color: var(--red);
+    display: none;
+    margin-bottom: 1rem;
+  }
+
+  .error-box.visible { display: block; }
+
+  .t-header { color: var(--red); }
+  .t-payload { color: var(--blue); }
+  .t-sig { color: var(--green); }
+  .t-dot { color: var(--text-muted); }
+
+  .hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 0.35rem;
+  }
+
+  .key-row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  @media (max-width: 720px) {
+    .key-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>JWT Signer</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
+  <p class="desc">Build and sign JSON Web Tokens with HS256/384/512 or RS256/384/512. Everything runs in your browser — keys never leave the page.</p>
+
+  <div class="grid-2">
+    <div class="section">
+      <label for="header-input">Header</label>
+      <textarea id="header-input" rows="5" spellcheck="false">{
+  "typ": "JWT"
+}</textarea>
+      <div class="hint">The <code>alg</code> field is overridden by the selector below.</div>
+    </div>
+    <div class="section">
+      <label for="payload-input">Payload</label>
+      <textarea id="payload-input" rows="5" spellcheck="false">{
+  "sub": "1234567890",
+  "name": "John Doe",
+  "iat": 1516239022
+}</textarea>
+    </div>
+  </div>
+
+  <div class="key-row section">
+    <div>
+      <label for="alg-select">Algorithm</label>
+      <select id="alg-select">
+        <optgroup label="HMAC">
+          <option value="HS256">HS256</option>
+          <option value="HS384">HS384</option>
+          <option value="HS512">HS512</option>
+        </optgroup>
+        <optgroup label="RSA">
+          <option value="RS256">RS256</option>
+          <option value="RS384">RS384</option>
+          <option value="RS512">RS512</option>
+        </optgroup>
+      </select>
+    </div>
+    <div>
+      <label for="key-input" id="key-label">Secret</label>
+      <textarea id="key-input" rows="5" spellcheck="false" placeholder="your-256-bit-secret"></textarea>
+      <div class="hint" id="key-hint">HMAC uses a raw UTF-8 secret. Any length accepted.</div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="sign-btn">Sign token</button>
+    <button class="btn" id="sample-btn">Load sample</button>
+    <button class="btn" id="clear-btn">Clear</button>
+  </div>
+
+  <div id="error" class="error-box"></div>
+
+  <div class="output-section">
+    <label>Signed Token</label>
+    <div class="token-box empty" id="token-output-wrap">
+      <button class="btn copy-btn" id="copy-btn" style="display:none">Copy</button>
+      <span id="token-output">Fill in the fields above and click <strong>Sign token</strong>.</span>
+    </div>
+    <div class="btn-row" style="margin-top: 0.75rem">
+      <a class="btn" id="decode-link" href="#" style="display:none">Open in JWT Decoder &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const HS_ALGS = { HS256: 'SHA-256', HS384: 'SHA-384', HS512: 'SHA-512' };
+  const RS_ALGS = { RS256: 'SHA-256', RS384: 'SHA-384', RS512: 'SHA-512' };
+
+  function base64urlFromBytes(bytes) {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function base64urlFromString(str) {
+    return base64urlFromBytes(new TextEncoder().encode(str));
+  }
+
+  function pemToArrayBuffer(pem) {
+    const trimmed = pem.trim();
+    if (!trimmed) throw new Error('Private key is empty.');
+    const match = trimmed.match(/-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END \1-----/);
+    if (!match) throw new Error('Key must be a PEM-encoded PKCS#8 private key (BEGIN PRIVATE KEY).');
+    const label = match[1];
+    if (!/PRIVATE KEY/.test(label)) throw new Error('Key must be a PRIVATE KEY block (PKCS#8).');
+    if (/RSA PRIVATE KEY/.test(label)) {
+      throw new Error('PKCS#1 "RSA PRIVATE KEY" is not supported. Convert to PKCS#8 with:\nopenssl pkcs8 -topk8 -nocrypt -in key.pem -out pkcs8.pem');
+    }
+    const b64 = match[2].replace(/\s+/g, '');
+    let bin;
+    try { bin = atob(b64); } catch (e) { throw new Error('Private key base64 is invalid.'); }
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return buf.buffer;
+  }
+
+  async function sign({ header, payload, algorithm, key }) {
+    if (!algorithm || (!HS_ALGS[algorithm] && !RS_ALGS[algorithm])) {
+      throw new Error(`Unsupported algorithm: ${algorithm}`);
+    }
+    if (typeof key !== 'string' || key.length === 0) {
+      throw new Error('Key is required.');
+    }
+    if (header == null || typeof header !== 'object') throw new Error('Header must be an object.');
+    if (payload == null || typeof payload !== 'object') throw new Error('Payload must be an object.');
+
+    // Build header with alg first (matches RFC 7519 convention), then any
+    // user-supplied fields, then typ default if missing.
+    const { alg: _ignored, ...rest } = header;
+    const finalHeader = { alg: algorithm, ...rest };
+    if (finalHeader.typ === undefined) finalHeader.typ = 'JWT';
+
+    const headerPart = base64urlFromString(JSON.stringify(finalHeader));
+    const payloadPart = base64urlFromString(JSON.stringify(payload));
+    const signingInput = `${headerPart}.${payloadPart}`;
+    const signingBytes = new TextEncoder().encode(signingInput);
+
+    let sigBytes;
+    if (HS_ALGS[algorithm]) {
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(key),
+        { name: 'HMAC', hash: HS_ALGS[algorithm] },
+        false,
+        ['sign']
+      );
+      const sig = await crypto.subtle.sign('HMAC', cryptoKey, signingBytes);
+      sigBytes = new Uint8Array(sig);
+    } else {
+      const keyBuf = pemToArrayBuffer(key);
+      let cryptoKey;
+      try {
+        cryptoKey = await crypto.subtle.importKey(
+          'pkcs8',
+          keyBuf,
+          { name: 'RSASSA-PKCS1-v1_5', hash: RS_ALGS[algorithm] },
+          false,
+          ['sign']
+        );
+      } catch (e) {
+        throw new Error('Could not import private key. Ensure it is a PKCS#8 RSA key.');
+      }
+      const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, signingBytes);
+      sigBytes = new Uint8Array(sig);
+    }
+
+    return `${signingInput}.${base64urlFromBytes(sigBytes)}`;
+  }
+
+  // Expose for tests
+  window.__JWTSigner = { sign, base64urlFromString, pemToArrayBuffer };
+
+  // ---------- UI wiring ----------
+  const headerInput = document.getElementById('header-input');
+  const payloadInput = document.getElementById('payload-input');
+  const algSelect = document.getElementById('alg-select');
+  const keyInput = document.getElementById('key-input');
+  const keyLabel = document.getElementById('key-label');
+  const keyHint = document.getElementById('key-hint');
+  const errorBox = document.getElementById('error');
+  const signBtn = document.getElementById('sign-btn');
+  const tokenWrap = document.getElementById('token-output-wrap');
+  const tokenOutput = document.getElementById('token-output');
+  const copyBtn = document.getElementById('copy-btn');
+  const decodeLink = document.getElementById('decode-link');
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.add('visible');
+  }
+
+  function clearError() {
+    errorBox.textContent = '';
+    errorBox.classList.remove('visible');
+  }
+
+  function setOutput(token) {
+    if (!token) {
+      tokenWrap.classList.add('empty');
+      tokenOutput.textContent = 'Fill in the fields above and click Sign token.';
+      copyBtn.style.display = 'none';
+      decodeLink.style.display = 'none';
+      return;
+    }
+    tokenWrap.classList.remove('empty');
+    const parts = token.split('.');
+    tokenOutput.innerHTML =
+      `<span class="t-header">${parts[0]}</span>` +
+      `<span class="t-dot">.</span>` +
+      `<span class="t-payload">${parts[1]}</span>` +
+      `<span class="t-dot">.</span>` +
+      `<span class="t-sig">${parts[2]}</span>`;
+    copyBtn.style.display = '';
+    decodeLink.style.display = '';
+    decodeLink.href = `/jwt_decoder.html#${encodeURIComponent(token)}`;
+  }
+
+  function updateKeyUi() {
+    const alg = algSelect.value;
+    if (alg.startsWith('HS')) {
+      keyLabel.textContent = 'Secret';
+      keyInput.placeholder = 'your-256-bit-secret';
+      keyHint.textContent = 'HMAC uses a raw UTF-8 secret. Any length accepted.';
+    } else {
+      keyLabel.textContent = 'Private Key (PKCS#8 PEM)';
+      keyInput.placeholder = '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----';
+      keyHint.textContent = 'Paste a PKCS#8 RSA private key. Convert PKCS#1 with: openssl pkcs8 -topk8 -nocrypt -in key.pem -out pkcs8.pem';
+    }
+  }
+
+  algSelect.addEventListener('change', updateKeyUi);
+  updateKeyUi();
+
+  async function doSign() {
+    clearError();
+    let header, payload;
+    try {
+      header = JSON.parse(headerInput.value);
+    } catch (e) {
+      showError('Header is not valid JSON: ' + e.message);
+      setOutput(null);
+      return;
+    }
+    try {
+      payload = JSON.parse(payloadInput.value);
+    } catch (e) {
+      showError('Payload is not valid JSON: ' + e.message);
+      setOutput(null);
+      return;
+    }
+    try {
+      const token = await sign({
+        header,
+        payload,
+        algorithm: algSelect.value,
+        key: keyInput.value,
+      });
+      setOutput(token);
+    } catch (e) {
+      showError(e.message);
+      setOutput(null);
+    }
+  }
+
+  signBtn.addEventListener('click', doSign);
+
+  copyBtn.addEventListener('click', () => {
+    const text = tokenOutput.textContent.trim();
+    navigator.clipboard.writeText(text).then(() => {
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy', 1200);
+    });
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    headerInput.value = '{\n  "typ": "JWT"\n}';
+    payloadInput.value = '{}';
+    keyInput.value = '';
+    clearError();
+    setOutput(null);
+  });
+
+  document.getElementById('sample-btn').addEventListener('click', () => {
+    const now = Math.floor(Date.now() / 1000);
+    headerInput.value = JSON.stringify({ typ: 'JWT' }, null, 2);
+    payloadInput.value = JSON.stringify({
+      sub: '1234567890',
+      name: 'Jane Doe',
+      iss: 'tools.nicolaeandrei.com',
+      iat: now,
+      exp: now + 3600,
+      admin: true,
+    }, null, 2);
+    algSelect.value = 'HS256';
+    updateKeyUi();
+    keyInput.value = 'your-256-bit-secret';
+    clearError();
+    setOutput(null);
+  });
+})();
+</script>
+</body>
+</html>
