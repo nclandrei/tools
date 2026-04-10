@@ -308,7 +308,7 @@
   </div>
 
   <div class="notice">
-    <strong>How it works:</strong> YouTube doesn't expose a public CORS-friendly transcript API, so the request is routed through this site's own Cloudflare Pages Function that whitelists YouTube hosts. The tool parses the player response from the watch page, grabs the caption track XML, and renders it here. Nothing is stored. Videos without captions (or with captions disabled by the uploader) can't be extracted.
+    <strong>How it works:</strong> YouTube doesn't expose a public CORS-friendly transcript API, so requests are routed through this site's own Cloudflare Pages Functions. Video metadata is fetched via YouTube's InnerTube <code>/youtubei/v1/player</code> endpoint using an ANDROID client context (the same path the mobile apps use, which isn't rate-limited the way the HTML watch page is), and caption track XML is pulled through a small whitelist proxy. Nothing is stored. Videos without captions (or with captions disabled by the uploader) can't be extracted.
   </div>
 </div>
 
@@ -400,28 +400,6 @@ async function proxyFetch(url) {
   return text;
 }
 
-// Pulls a balanced JSON object that starts after a given marker.
-function extractJsonAfter(html, marker) {
-  const idx = html.indexOf(marker);
-  if (idx === -1) return null;
-  const start = html.indexOf('{', idx);
-  if (start === -1) return null;
-  let depth = 0, inStr = false, esc = false;
-  for (let i = start; i < html.length; i++) {
-    const c = html[i];
-    if (esc) { esc = false; continue; }
-    if (c === '\\') { esc = true; continue; }
-    if (c === '"') { inStr = !inStr; continue; }
-    if (inStr) continue;
-    if (c === '{') depth++;
-    else if (c === '}') {
-      depth--;
-      if (depth === 0) return html.substring(start, i + 1);
-    }
-  }
-  return null;
-}
-
 function decodeEntities(str) {
   const ta = document.createElement('textarea');
   ta.innerHTML = str;
@@ -466,30 +444,26 @@ async function loadVideo(videoId) {
   videoSection.classList.remove('show');
   currentState = { videoId, title: '', author: '', tracks: [], entries: [] };
 
-  showStatus('Fetching video page…', true);
-  const watchUrl = 'https://www.youtube.com/watch?v=' + videoId + '&hl=en';
-  let html;
+  showStatus('Fetching video metadata…', true);
+  // Hit our Pages Function that calls YouTube's InnerTube /youtubei/v1/player
+  // endpoint with an ANDROID client context. This is dramatically more
+  // reliable from server IPs than scraping the HTML watch page, which
+  // YouTube rate-limits (HTTP 429) from Cloudflare Pages egress ranges.
+  let data;
   try {
-    html = await proxyFetch(watchUrl);
+    const res = await fetch('/api/youtube_player?v=' + encodeURIComponent(videoId), { cache: 'no-store' });
+    if (!res.ok) {
+      let msg = 'HTTP ' + res.status;
+      try {
+        const body = await res.json();
+        if (body && body.error) msg = body.error;
+      } catch {}
+      throw new Error(msg);
+    }
+    data = await res.json();
   } catch (e) {
     hideStatus();
     showError('<strong>Couldn\'t reach YouTube.</strong> ' + escapeHtml(e.message || 'Unknown error') + '. Try again in a moment.');
-    return;
-  }
-
-  const jsonStr = extractJsonAfter(html, 'ytInitialPlayerResponse');
-  if (!jsonStr) {
-    hideStatus();
-    showError('<strong>Could not parse the video page.</strong> YouTube may have changed its page structure, or the response was an age/consent interstitial. Try a different video or retry.');
-    return;
-  }
-
-  let data;
-  try {
-    data = JSON.parse(jsonStr);
-  } catch {
-    hideStatus();
-    showError('<strong>Invalid player response.</strong> Failed to parse the JSON blob from the YouTube page.');
     return;
   }
 
