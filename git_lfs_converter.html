@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git LFS Converter</title>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .container { max-width: 760px; }
+    h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .url-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .url-row input[type="text"] {
+      flex: 1;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 0.82rem;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.65rem 0.75rem;
+      outline: none;
+    }
+    .url-row input[type="text"]:focus { border-color: var(--accent); }
+
+    .divider {
+      display: flex; align-items: center; gap: 0.75rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 1.5rem 0 1rem;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      border-top: 1px solid var(--border);
+    }
+
+    .drop-zone {
+      position: relative;
+      padding: 2rem 1rem;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .drop-zone .icon { font-size: 1.75rem; }
+
+    .result {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      margin-top: 1.25rem;
+      animation: fadeUp .3s ease;
+    }
+    .result h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+    .result table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .result td {
+      padding: 0.3rem 0;
+      vertical-align: top;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      word-break: break-all;
+    }
+    .result td:first-child {
+      color: var(--text-muted);
+      white-space: nowrap;
+      padding-right: 1rem;
+      font-family: inherit;
+      width: 100px;
+    }
+    .result .actions {
+      display: flex; gap: 0.5rem; flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .result a.btn { text-decoration: none; display: inline-block; }
+
+    .error {
+      background: var(--red-dim, rgba(239,68,68,0.08));
+      border: 1px solid var(--red);
+      color: var(--red);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      margin-top: 1.25rem;
+      animation: fadeUp .3s ease;
+    }
+
+    .status {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      margin-top: 0.5rem;
+    }
+
+    .help {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9rem 1.1rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-top: 1.75rem;
+    }
+    .help strong { color: var(--text); }
+    .help code {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 0.78rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.05rem 0.3rem;
+    }
+    .help ul { margin: 0.4rem 0 0 1rem; padding: 0; }
+    .help li { margin-bottom: 0.2rem; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Git LFS Converter</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
+
+  <p class="desc">
+    Turn a Git LFS pointer into the real file. Paste a public GitHub URL (blob, raw, or media)
+    and the tool rewrites it to GitHub's media host, fetches the actual object, and hands you the binary.
+    You can also drop or paste a pointer file to inspect its <code>oid</code> and <code>size</code>.
+  </p>
+
+  <label for="urlInput">Public GitHub URL</label>
+  <div class="url-row">
+    <input type="text" id="urlInput" placeholder="https://github.com/owner/repo/blob/main/path/to/file.bin" spellcheck="false" autocomplete="off">
+    <button class="btn btn-primary" id="fetchBtn">Fetch</button>
+  </div>
+  <p class="status" id="status"></p>
+
+  <div class="divider">or drop a pointer file</div>
+
+  <div class="drop-zone" id="dropZone">
+    <span class="icon">&#128206;</span>
+    <p>Drop an LFS pointer file here, click to select, or paste its text below</p>
+    <input type="file" id="fileInput">
+  </div>
+
+  <label for="pointerText" style="margin-top:0.5rem;">Or paste pointer text</label>
+  <textarea id="pointerText" rows="4" placeholder="version https://git-lfs.github.com/spec/v1&#10;oid sha256:...&#10;size 12345"
+    style="width:100%;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:0.8rem;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.65rem 0.75rem;outline:none;resize:vertical;"></textarea>
+
+  <div id="output"></div>
+
+  <div class="help">
+    <strong>How it works.</strong> GitHub-hosted LFS objects are available at
+    <code>media.githubusercontent.com/media/{owner}/{repo}/{ref}/{path}</code> — the same URL the web
+    "Download" button uses. This tool rewrites any <code>github.com/.../blob/...</code> or
+    <code>raw.githubusercontent.com/...</code> URL to that media URL and fetches it.
+    <ul>
+      <li><strong>Public repos only.</strong> Private repos need auth and won't work from a browser.</li>
+      <li><strong>GitHub only.</strong> GitLab, Bitbucket, and self-hosted LFS endpoints don't allow cross-origin fetches.</li>
+      <li>If CORS ever blocks the fetch, the result box shows a direct download link you can open in a new tab.</li>
+      <li>Pointer files alone aren't enough to download — the <code>oid</code> needs an LFS server. If you only have the pointer, also paste the GitHub blob URL above.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const urlInput   = document.getElementById('urlInput');
+const fetchBtn   = document.getElementById('fetchBtn');
+const statusEl   = document.getElementById('status');
+const dropZone   = document.getElementById('dropZone');
+const fileInput  = document.getElementById('fileInput');
+const pointerTxt = document.getElementById('pointerText');
+const output     = document.getElementById('output');
+
+function fmtSize(bytes) {
+  if (!Number.isFinite(bytes)) return '?';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function showError(msg) {
+  output.innerHTML = `<div class="error">${escapeHtml(msg)}</div>`;
+}
+
+/**
+ * Rewrite a GitHub-hosted URL to the media.githubusercontent.com URL
+ * that serves LFS objects as their real content.
+ *
+ *   github.com/{o}/{r}/blob/{ref}/{path}          -> media.githubusercontent.com/media/{o}/{r}/{ref}/{path}
+ *   github.com/{o}/{r}/raw/{ref}/{path}           -> media.githubusercontent.com/media/{o}/{r}/{ref}/{path}
+ *   raw.githubusercontent.com/{o}/{r}/{ref}/{...} -> media.githubusercontent.com/media/{o}/{r}/{ref}/{...}
+ *   media.githubusercontent.com/...               -> unchanged
+ */
+function toMediaUrl(input) {
+  let u;
+  try { u = new URL(input.trim()); }
+  catch { throw new Error('That is not a valid URL.'); }
+
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+    throw new Error('URL must be http(s).');
+  }
+
+  if (u.hostname === 'media.githubusercontent.com') {
+    return u.toString();
+  }
+
+  if (u.hostname === 'raw.githubusercontent.com') {
+    // Path already looks like /{owner}/{repo}/{ref-or-refs/heads/..}/path
+    return 'https://media.githubusercontent.com/media' + u.pathname;
+  }
+
+  if (u.hostname === 'github.com' || u.hostname === 'www.github.com') {
+    const m = u.pathname.match(/^\/([^/]+)\/([^/]+)\/(?:blob|raw)\/(.+)$/);
+    if (!m) throw new Error('Expected a github.com blob or raw URL, e.g. github.com/owner/repo/blob/main/file.bin');
+    const [, owner, repo, rest] = m;
+    return `https://media.githubusercontent.com/media/${owner}/${repo}/${rest}`;
+  }
+
+  throw new Error(`Unsupported host: ${u.hostname}. Use a github.com, raw.githubusercontent.com, or media.githubusercontent.com URL.`);
+}
+
+function filenameFromUrl(u) {
+  try {
+    const path = new URL(u).pathname;
+    const last = path.split('/').pop();
+    return last ? decodeURIComponent(last) : 'download.bin';
+  } catch { return 'download.bin'; }
+}
+
+async function fetchAndOffer(mediaUrl, sourceUrl) {
+  statusEl.textContent = 'Fetching…';
+  fetchBtn.disabled = true;
+  try {
+    const res = await fetch(mediaUrl, { redirect: 'follow' });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    }
+    const blob = await res.blob();
+
+    // Sanity check: if the response itself is still a pointer, something went wrong.
+    if (blob.size < 400 && (blob.type.startsWith('text/') || blob.type === '')) {
+      const text = await blob.text();
+      if (text.includes('git-lfs.github.com/spec')) {
+        throw new Error('Server returned a pointer, not the real object. This usually means the repo, branch, or path is wrong, or the repo is private.');
+      }
+    }
+
+    const name = filenameFromUrl(sourceUrl || mediaUrl);
+    const blobUrl = URL.createObjectURL(blob);
+    output.innerHTML = `
+      <div class="result">
+        <h3>Fetched</h3>
+        <table>
+          <tr><td>Filename</td><td>${escapeHtml(name)}</td></tr>
+          <tr><td>Size</td><td>${fmtSize(blob.size)} (${blob.size.toLocaleString()} bytes)</td></tr>
+          <tr><td>Type</td><td>${escapeHtml(blob.type || 'application/octet-stream')}</td></tr>
+          <tr><td>Media URL</td><td><a href="${escapeHtml(mediaUrl)}" target="_blank" rel="noopener">${escapeHtml(mediaUrl)}</a></td></tr>
+        </table>
+        <div class="actions">
+          <a class="btn btn-primary" href="${blobUrl}" download="${escapeHtml(name)}">Download</a>
+          <button class="btn btn-secondary" id="copyUrlBtn">Copy media URL</button>
+        </div>
+      </div>`;
+    document.getElementById('copyUrlBtn').addEventListener('click', async (e) => {
+      await navigator.clipboard.writeText(mediaUrl);
+      e.target.textContent = 'Copied!';
+      setTimeout(() => e.target.textContent = 'Copy media URL', 1200);
+    });
+    statusEl.textContent = '';
+  } catch (err) {
+    // CORS or network failure — fall back to offering the direct link.
+    const name = filenameFromUrl(sourceUrl || mediaUrl);
+    output.innerHTML = `
+      <div class="result">
+        <h3>Direct download link</h3>
+        <p class="status" style="margin:0 0 0.75rem 0;">
+          Couldn't fetch in-browser (${escapeHtml(err.message)}). Open this link directly — the browser
+          will download the real object, bypassing CORS.
+        </p>
+        <table>
+          <tr><td>Filename</td><td>${escapeHtml(name)}</td></tr>
+          <tr><td>Media URL</td><td><a href="${escapeHtml(mediaUrl)}" target="_blank" rel="noopener">${escapeHtml(mediaUrl)}</a></td></tr>
+        </table>
+        <div class="actions">
+          <a class="btn btn-primary" href="${escapeHtml(mediaUrl)}" target="_blank" rel="noopener" download="${escapeHtml(name)}">Open &amp; download</a>
+          <button class="btn btn-secondary" id="copyUrlBtn">Copy media URL</button>
+        </div>
+      </div>`;
+    document.getElementById('copyUrlBtn').addEventListener('click', async (e) => {
+      await navigator.clipboard.writeText(mediaUrl);
+      e.target.textContent = 'Copied!';
+      setTimeout(() => e.target.textContent = 'Copy media URL', 1200);
+    });
+    statusEl.textContent = '';
+  } finally {
+    fetchBtn.disabled = false;
+  }
+}
+
+fetchBtn.addEventListener('click', () => {
+  output.innerHTML = '';
+  const raw = urlInput.value.trim();
+  if (!raw) { showError('Paste a GitHub URL first.'); return; }
+  let media;
+  try { media = toMediaUrl(raw); }
+  catch (err) { showError(err.message); return; }
+  fetchAndOffer(media, raw);
+});
+
+urlInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') fetchBtn.click();
+});
+
+// ── Pointer handling ──
+
+function parsePointer(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const obj = {};
+  for (const line of lines) {
+    const idx = line.indexOf(' ');
+    if (idx < 0) continue;
+    obj[line.slice(0, idx)] = line.slice(idx + 1);
+  }
+  if (!obj.version || !/git-lfs/.test(obj.version)) {
+    throw new Error('Not a Git LFS pointer (missing or invalid "version" line).');
+  }
+  if (!obj.oid || !obj.size) {
+    throw new Error('Pointer is missing "oid" or "size".');
+  }
+  const [hash, oid] = obj.oid.split(':');
+  return {
+    version: obj.version,
+    hashAlgo: hash || 'sha256',
+    oid: oid || obj.oid,
+    size: parseInt(obj.size, 10),
+  };
+}
+
+function showPointer(ptr) {
+  output.innerHTML = `
+    <div class="result">
+      <h3>Pointer parsed</h3>
+      <table>
+        <tr><td>Version</td><td>${escapeHtml(ptr.version)}</td></tr>
+        <tr><td>Hash</td><td>${escapeHtml(ptr.hashAlgo)}</td></tr>
+        <tr><td>OID</td><td>${escapeHtml(ptr.oid)}</td></tr>
+        <tr><td>Size</td><td>${fmtSize(ptr.size)} (${ptr.size.toLocaleString()} bytes)</td></tr>
+      </table>
+      <p class="status" style="margin-top:0.75rem;">
+        A pointer alone doesn't identify which repo to download from. Paste the GitHub blob URL
+        for this file in the box above and hit Fetch — the tool will grab the real object.
+      </p>
+    </div>`;
+}
+
+function handlePointerText(text) {
+  output.innerHTML = '';
+  try {
+    const ptr = parsePointer(text);
+    showPointer(ptr);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+pointerTxt.addEventListener('input', () => {
+  const t = pointerTxt.value.trim();
+  if (!t) { output.innerHTML = ''; return; }
+  handlePointerText(t);
+});
+
+function readFile(file) {
+  if (file.size > 2048) {
+    showError('That file is too big to be a pointer (> 2 KB). A real LFS pointer is ~130 bytes.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = String(reader.result || '');
+    pointerTxt.value = text;
+    handlePointerText(text);
+  };
+  reader.readAsText(file);
+}
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) readFile(f);
+});
+fileInput.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) readFile(f);
+  e.target.value = '';
+});
+</script>
+</body>
+</html>
