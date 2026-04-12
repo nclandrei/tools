@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sticker Format Converter</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* Direction toggle */
+.direction-toggle {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 1.5rem;
+  gap: 4px;
+}
+.direction-toggle button {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.direction-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+}
+.direction-toggle button:not(.active):hover {
+  color: var(--text);
+  background: var(--surface-alt);
+}
+.platform-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Settings panel */
+.settings {
+  display: none;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.settings.show { display: flex; }
+.settings label { color: var(--text-muted); white-space: nowrap; }
+.settings select {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+.setting-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.setting-group input[type="range"] { width: 120px; }
+.setting-group .val { font-weight: 600; min-width: 3ch; text-align: right; }
+
+/* Spec badges */
+.spec-info {
+  display: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.spec-info.show { display: flex; }
+.spec-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.spec-badge strong { color: var(--text); font-weight: 500; }
+
+/* Drop zone */
+.drop-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+
+/* File list */
+.file-list { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+.file-item {
+  display: flex; align-items: center; gap: 1rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.75rem 1rem;
+  animation: fadeUp 0.25s ease;
+}
+.file-item .thumb {
+  width: 56px; height: 56px; object-fit: contain;
+  border-radius: 6px; flex-shrink: 0;
+}
+.file-item .thumb-placeholder {
+  width: 56px; height: 56px;
+  border-radius: 6px; background: var(--thumb-bg); flex-shrink: 0;
+}
+.thumb-wrap {
+  width: 56px; height: 56px; flex-shrink: 0;
+  border-radius: 6px; overflow: hidden;
+  background-image:
+    linear-gradient(45deg, var(--surface-alt) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--surface-alt) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--surface-alt) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--surface-alt) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.thumb-wrap img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+}
+.file-item .info { flex: 1; min-width: 0; }
+.file-item .name {
+  font-size: 0.88rem; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.file-item .meta { font-size: 0.78rem; color: var(--text-muted); }
+.file-item .meta .done { color: var(--green); }
+.file-item .meta .err { color: var(--red); }
+.file-item .meta .warn { color: var(--amber); }
+.file-item .item-btn {
+  background: none; border: 1px solid var(--border);
+  width: 28px; height: 28px; border-radius: 6px;
+  cursor: pointer; font-size: 1rem; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.file-item .item-btn:hover { border-color: var(--accent); color: var(--accent); }
+.file-item .item-btn.remove:hover { border-color: var(--red); color: var(--red); }
+
+/* Progress */
+.progress-bar {
+  display: none; height: 4px; background: var(--border);
+  border-radius: 2px; margin-bottom: 1rem; overflow: hidden;
+}
+.progress-bar.show { display: block; }
+.progress-bar .fill {
+  height: 100%; background: var(--accent);
+  border-radius: 2px; width: 0%; transition: width 0.2s;
+}
+
+/* Actions */
+.actions { display: none; gap: 0.75rem; flex-wrap: wrap; }
+.actions.show { display: flex; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--text); color: var(--bg);
+  padding: 0.6rem 1.25rem; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 500;
+  opacity: 0; transition: all 0.3s ease;
+  pointer-events: none; z-index: 999;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 500px) {
+  .direction-toggle { flex-direction: column; }
+  .file-item .thumb, .file-item .thumb-placeholder, .thumb-wrap { width: 44px; height: 44px; }
+  .settings { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Sticker Format Converter</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+  <p class="desc">Convert stickers between Apple iMessage (PNG) and WhatsApp (WebP) formats. Handles resizing and format requirements. Everything runs in your browser.</p>
+
+  <div class="direction-toggle" id="dirToggle">
+    <button class="active" data-dir="ios-to-wa" onclick="setDirection('ios-to-wa')">
+      <span class="platform-icon">&#xf8ff;</span> iOS &rarr; WhatsApp
+    </button>
+    <button data-dir="wa-to-ios" onclick="setDirection('wa-to-ios')">
+      WhatsApp &rarr; iOS <span class="platform-icon">&#xf8ff;</span>
+    </button>
+  </div>
+
+  <div class="spec-info show" id="specInfo"></div>
+
+  <div class="drop-zone" id="dropZone" style="position:relative">
+    <span class="icon">&#127912;</span>
+    <p id="dropLabel">Drop PNG sticker files here or click to select</p>
+    <p style="font-size:0.78rem; margin-top:0.4rem; color:var(--text-muted)" id="dropHint">.png</p>
+    <input type="file" id="fileInput" accept=".png,image/png" multiple>
+  </div>
+
+  <div class="settings" id="settings"></div>
+
+  <div class="progress-bar" id="progressBar"><div class="fill" id="progressFill"></div></div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="actions" id="actions">
+    <button class="btn btn-primary" id="convertBtn" onclick="convertAll()">Convert All</button>
+    <button class="btn btn-secondary" id="downloadBtn" style="display:none" onclick="downloadAll()">Download All as ZIP</button>
+    <button class="btn btn-secondary" id="clearBtn" onclick="clearAll()">Clear</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+// ── State ──
+let direction = 'ios-to-wa';
+let items = []; // { id, file, status, blob?, error?, thumbUrl?, outName? }
+let quality = 90;
+let iosSize = 'large'; // small | medium | large
+
+const IOS_SIZES = {
+  small:  { label: 'Small (300×300)', px: 300 },
+  medium: { label: 'Medium (408×408)', px: 408 },
+  large:  { label: 'Large (618×618)', px: 618 },
+};
+
+const WA_SIZE = 512;
+const WA_MAX_KB = 100;
+
+// ── DOM refs ──
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const actionsEl = document.getElementById('actions');
+const convertBtn = document.getElementById('convertBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const settingsEl = document.getElementById('settings');
+const specInfo = document.getElementById('specInfo');
+const progressBar = document.getElementById('progressBar');
+const progressFill = document.getElementById('progressFill');
+const dropLabel = document.getElementById('dropLabel');
+const dropHint = document.getElementById('dropHint');
+const toastEl = document.getElementById('toast');
+
+// ── Direction toggle ──
+function setDirection(dir) {
+  direction = dir;
+  items = [];
+
+  document.querySelectorAll('#dirToggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.dir === dir);
+  });
+
+  if (dir === 'ios-to-wa') {
+    dropLabel.textContent = 'Drop PNG sticker files here or click to select';
+    dropHint.textContent = '.png';
+    fileInput.accept = '.png,image/png';
+  } else {
+    dropLabel.textContent = 'Drop WebP sticker files here or click to select';
+    dropHint.textContent = '.webp';
+    fileInput.accept = '.webp,image/webp';
+  }
+
+  renderSettings();
+  renderSpec();
+  render();
+}
+
+function renderSettings() {
+  if (direction === 'ios-to-wa') {
+    settingsEl.innerHTML = `
+      <div class="setting-group">
+        <label for="qualityRange">WebP quality</label>
+        <input type="range" id="qualityRange" min="10" max="100" value="${quality}">
+        <span class="val" id="qualityVal">${quality}</span>
+      </div>
+    `;
+    document.getElementById('qualityRange').addEventListener('input', e => {
+      quality = parseInt(e.target.value);
+      document.getElementById('qualityVal').textContent = quality;
+    });
+  } else {
+    let opts = Object.entries(IOS_SIZES).map(([k, v]) =>
+      `<option value="${k}"${k === iosSize ? ' selected' : ''}>${v.label}</option>`
+    ).join('');
+    settingsEl.innerHTML = `
+      <div class="setting-group">
+        <label for="sizeSelect">Sticker size</label>
+        <select id="sizeSelect">${opts}</select>
+      </div>
+    `;
+    document.getElementById('sizeSelect').addEventListener('change', e => {
+      iosSize = e.target.value;
+      renderSpec();
+    });
+  }
+}
+
+function renderSpec() {
+  if (direction === 'ios-to-wa') {
+    specInfo.innerHTML = `
+      <span class="spec-badge"><strong>Output:</strong> WebP</span>
+      <span class="spec-badge"><strong>Size:</strong> 512 &times; 512 px</span>
+      <span class="spec-badge"><strong>Max:</strong> 100 KB</span>
+      <span class="spec-badge"><strong>Background:</strong> Transparent</span>
+    `;
+  } else {
+    const sz = IOS_SIZES[iosSize].px;
+    specInfo.innerHTML = `
+      <span class="spec-badge"><strong>Output:</strong> PNG</span>
+      <span class="spec-badge"><strong>Size:</strong> ${sz} &times; ${sz} px</span>
+      <span class="spec-badge"><strong>Background:</strong> Transparent</span>
+    `;
+  }
+  specInfo.classList.add('show');
+}
+
+// ── Drag & drop ──
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+
+function addFiles(fileListObj) {
+  for (const f of fileListObj) {
+    const name = f.name.toLowerCase();
+    const validIos = direction === 'ios-to-wa' && (name.endsWith('.png') || name.endsWith('.apng'));
+    const validWa = direction === 'wa-to-ios' && name.endsWith('.webp');
+    if (!validIos && !validWa) continue;
+
+    const thumbUrl = URL.createObjectURL(f);
+    items.push({ id: crypto.randomUUID(), file: f, status: 'pending', thumbUrl });
+  }
+  render();
+}
+
+// ── Rendering ──
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function render() {
+  const hasItems = items.length > 0;
+  actionsEl.classList.toggle('show', hasItems);
+  settingsEl.classList.toggle('show', hasItems);
+
+  const anyDone = items.some(i => i.status === 'done');
+  downloadBtn.style.display = anyDone ? '' : 'none';
+  convertBtn.disabled = !items.some(i => i.status === 'pending');
+
+  fileList.innerHTML = '';
+  for (const item of items) {
+    const el = document.createElement('div');
+    el.className = 'file-item';
+
+    // Thumbnail with checkerboard background (shows transparency)
+    const wrap = document.createElement('div');
+    wrap.className = 'thumb-wrap';
+    const thumbSrc = item.status === 'done' && item.outUrl ? item.outUrl : item.thumbUrl;
+    if (thumbSrc) {
+      const img = document.createElement('img');
+      img.src = thumbSrc;
+      img.alt = '';
+      wrap.appendChild(img);
+    }
+    el.appendChild(wrap);
+
+    const info = document.createElement('div');
+    info.className = 'info';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'name';
+    nameEl.textContent = item.status === 'done' ? item.outName : item.file.name;
+    info.appendChild(nameEl);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    if (item.status === 'pending') {
+      meta.textContent = formatSize(item.file.size);
+    } else if (item.status === 'done') {
+      const sizeKB = item.blob.size / 1024;
+      const overLimit = direction === 'ios-to-wa' && sizeKB > WA_MAX_KB;
+      const sizeStr = formatSize(item.blob.size);
+      if (overLimit) {
+        meta.innerHTML = `<span class="done">Converted</span> · ${sizeStr} <span class="warn">(over 100 KB — try lower quality)</span>`;
+      } else {
+        meta.innerHTML = `<span class="done">Converted</span> · ${sizeStr}`;
+      }
+    } else {
+      meta.innerHTML = `<span class="err">${escapeHtml(item.error || 'Conversion failed')}</span>`;
+    }
+    info.appendChild(meta);
+    el.appendChild(info);
+
+    if (item.status === 'done') {
+      const dl = document.createElement('button');
+      dl.className = 'item-btn';
+      dl.title = 'Download';
+      dl.innerHTML = '&#8595;';
+      dl.onclick = () => downloadOne(item);
+      el.appendChild(dl);
+    }
+
+    const rm = document.createElement('button');
+    rm.className = 'item-btn remove';
+    rm.title = 'Remove';
+    rm.innerHTML = '&times;';
+    rm.onclick = () => { items = items.filter(i => i.id !== item.id); render(); };
+    el.appendChild(rm);
+
+    fileList.appendChild(el);
+  }
+}
+
+// ── Conversion ──
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = src;
+  });
+}
+
+function fitAndCenter(img, targetSize) {
+  const canvas = document.createElement('canvas');
+  canvas.width = targetSize;
+  canvas.height = targetSize;
+  const ctx = canvas.getContext('2d');
+
+  // Transparent background (default)
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const scale = Math.min(targetSize / w, targetSize / h);
+  const sw = Math.round(w * scale);
+  const sh = Math.round(h * scale);
+  const ox = Math.round((targetSize - sw) / 2);
+  const oy = Math.round((targetSize - sh) / 2);
+
+  ctx.drawImage(img, ox, oy, sw, sh);
+  return canvas;
+}
+
+function canvasToBlob(canvas, mimeType, q) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (!blob) { reject(new Error('Canvas export failed')); return; }
+      resolve(blob);
+    }, mimeType, q);
+  });
+}
+
+async function convertIosToWa(item) {
+  const img = await loadImage(item.thumbUrl);
+  const canvas = fitAndCenter(img, WA_SIZE);
+
+  // Try at requested quality, then iteratively reduce if over 100 KB
+  let q = quality / 100;
+  let blob = await canvasToBlob(canvas, 'image/webp', q);
+
+  // Auto-reduce quality to fit under 100 KB
+  let attempts = 0;
+  while (blob.size > WA_MAX_KB * 1024 && q > 0.1 && attempts < 8) {
+    q = Math.max(0.1, q - 0.1);
+    blob = await canvasToBlob(canvas, 'image/webp', q);
+    attempts++;
+  }
+
+  const baseName = item.file.name.replace(/\.\w+$/, '');
+  item.blob = blob;
+  item.outUrl = URL.createObjectURL(blob);
+  item.outName = baseName + '.webp';
+  item.status = 'done';
+}
+
+async function convertWaToIos(item) {
+  const img = await loadImage(item.thumbUrl);
+  const targetPx = IOS_SIZES[iosSize].px;
+  const canvas = fitAndCenter(img, targetPx);
+
+  const blob = await canvasToBlob(canvas, 'image/png');
+  const baseName = item.file.name.replace(/\.\w+$/, '');
+  item.blob = blob;
+  item.outUrl = URL.createObjectURL(blob);
+  item.outName = baseName + '.png';
+  item.status = 'done';
+}
+
+async function convertAll() {
+  convertBtn.disabled = true;
+  progressBar.classList.add('show');
+  const pending = items.filter(i => i.status === 'pending');
+
+  for (let idx = 0; idx < pending.length; idx++) {
+    progressFill.style.width = ((idx / pending.length) * 100) + '%';
+    try {
+      if (direction === 'ios-to-wa') {
+        await convertIosToWa(pending[idx]);
+      } else {
+        await convertWaToIos(pending[idx]);
+      }
+    } catch (err) {
+      pending[idx].status = 'error';
+      pending[idx].error = err.message;
+    }
+    render();
+  }
+
+  progressFill.style.width = '100%';
+  setTimeout(() => { progressBar.classList.remove('show'); progressFill.style.width = '0%'; }, 600);
+
+  const doneCount = pending.filter(i => i.status === 'done').length;
+  if (doneCount > 0) showToast(`Converted ${doneCount} sticker${doneCount > 1 ? 's' : ''}`);
+}
+
+// ── Downloads ──
+function downloadOne(item) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(item.blob);
+  a.download = item.outName;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function downloadAll() {
+  const doneItems = items.filter(i => i.status === 'done');
+  if (doneItems.length === 0) return;
+
+  if (doneItems.length === 1) {
+    downloadOne(doneItems[0]);
+    return;
+  }
+
+  const zip = new JSZip();
+  const seen = new Set();
+  for (const item of doneItems) {
+    let name = item.outName;
+    let counter = 1;
+    while (seen.has(name)) {
+      const base = item.outName.replace(/\.\w+$/, '');
+      const ext = item.outName.match(/\.\w+$/)?.[0] || '';
+      name = `${base}_${counter}${ext}`;
+      counter++;
+    }
+    seen.add(name);
+    zip.file(name, item.blob);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const prefix = direction === 'ios-to-wa' ? 'whatsapp_stickers' : 'ios_stickers';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(zipBlob);
+  a.download = `${prefix}.zip`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('ZIP downloaded');
+}
+
+function clearAll() {
+  items.forEach(i => { if (i.thumbUrl) URL.revokeObjectURL(i.thumbUrl); if (i.outUrl) URL.revokeObjectURL(i.outUrl); });
+  items = [];
+  render();
+}
+
+// ── Utils ──
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+let toastTimer;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
+}
+
+// ── Init ──
+renderSettings();
+renderSpec();
+</script>
+</body>
+</html>
