@@ -35,37 +35,6 @@
     border-radius: 6px;
   }
 
-  /* Unit tabs */
-  .unit-tabs {
-    display: flex;
-    gap: 0;
-    margin-bottom: 1.5rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    width: fit-content;
-  }
-
-  .unit-tab {
-    padding: 0.5rem 1.25rem;
-    font-size: 0.82rem;
-    font-weight: 500;
-    border: none;
-    background: var(--surface);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .unit-tab:not(:last-child) {
-    border-right: 1px solid var(--border);
-  }
-
-  .unit-tab.active {
-    background: var(--accent);
-    color: #fff;
-  }
-
   /* Gender radios */
   .gender-group {
     display: flex;
@@ -91,23 +60,6 @@
     width: 16px;
     height: 16px;
     cursor: pointer;
-  }
-
-  /* Height row (imperial) */
-  .height-imperial {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .height-imperial .height-part {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    flex: 1;
-  }
-
-  .height-imperial .height-part label {
-    font-size: 0.72rem;
   }
 
   /* Formula info */
@@ -315,13 +267,7 @@
     <a href="/">&larr; All tools</a>
   </header>
 
-  <p class="desc">Calculate your Body Mass Index, Basal Metabolic Rate, and Total Daily Energy Expenditure. Choose between four BMR formulas and metric or imperial units.</p>
-
-  <!-- Unit toggle -->
-  <div class="unit-tabs">
-    <button class="unit-tab active" data-unit="metric">Metric</button>
-    <button class="unit-tab" data-unit="imperial">Imperial</button>
-  </div>
+  <p class="desc">Calculate your Body Mass Index, Basal Metabolic Rate, and Total Daily Energy Expenditure. Choose between four BMR formulas.</p>
 
   <div class="form-grid">
     <!-- Age -->
@@ -340,30 +286,15 @@
     </div>
 
     <!-- Weight -->
-    <div class="form-group" id="weightGroup">
-      <label for="weight" id="weightLabel">Weight (kg)</label>
+    <div class="form-group">
+      <label for="weight">Weight (kg)</label>
       <input type="number" id="weight" value="70" min="20" max="300" step="0.1">
     </div>
 
-    <!-- Height: metric (single field) -->
-    <div class="form-group" id="heightMetricGroup">
+    <!-- Height -->
+    <div class="form-group">
       <label for="height">Height (cm)</label>
       <input type="number" id="height" value="175" min="100" max="250" step="0.1">
-    </div>
-
-    <!-- Height: imperial (ft + in) -->
-    <div class="form-group" id="heightImperialGroup" style="display:none;">
-      <label>Height</label>
-      <div class="height-imperial">
-        <div class="height-part">
-          <label for="heightFt">ft</label>
-          <input type="number" id="heightFt" value="5" min="3" max="8" step="1">
-        </div>
-        <div class="height-part">
-          <label for="heightIn">in</label>
-          <input type="number" id="heightIn" value="9" min="0" max="11" step="0.1">
-        </div>
-      </div>
     </div>
 
     <!-- BMR Formula -->
@@ -459,9 +390,6 @@
 (function () {
   const $ = id => document.getElementById(id);
 
-  // ── State ──
-  let unitSystem = 'metric';
-
   // ── Activity multipliers ──
   const activityMultipliers = {
     'sedentary': 1.2,
@@ -478,28 +406,6 @@
     'katch-mcardle': 'Uses lean body mass. Best if you know your body fat percentage accurately.',
     'cunningham': 'Similar to Katch-McArdle but yields higher estimates. Suited for athletic populations.'
   };
-
-  // ── Unit tab switching ──
-  document.querySelectorAll('.unit-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.unit-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      unitSystem = tab.dataset.unit;
-      updateUnitLabels();
-    });
-  });
-
-  function updateUnitLabels() {
-    if (unitSystem === 'imperial') {
-      $('weightLabel').textContent = 'Weight (lbs)';
-      $('heightMetricGroup').style.display = 'none';
-      $('heightImperialGroup').style.display = '';
-    } else {
-      $('weightLabel').textContent = 'Weight (kg)';
-      $('heightMetricGroup').style.display = '';
-      $('heightImperialGroup').style.display = 'none';
-    }
-  }
 
   // ── Formula selector ──
   $('formula').addEventListener('change', () => {
@@ -523,17 +429,8 @@
     const activity = $('activity').value;
     const bodyFat = parseFloat($('bodyFat').value) || 15;
 
-    let weightKg, heightCm;
-
-    if (unitSystem === 'imperial') {
-      weightKg = (parseFloat($('weight').value) || 154) * 0.453592;
-      const ft = parseFloat($('heightFt').value) || 5;
-      const inch = parseFloat($('heightIn').value) || 9;
-      heightCm = (ft * 12 + inch) * 2.54;
-    } else {
-      weightKg = parseFloat($('weight').value) || 70;
-      heightCm = parseFloat($('height').value) || 175;
-    }
+    const weightKg = parseFloat($('weight').value) || 70;
+    const heightCm = parseFloat($('height').value) || 175;
 
     return { age, gender, weightKg, heightCm, formula, activity, bodyFat };
   }
