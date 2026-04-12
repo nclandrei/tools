@@ -121,10 +121,13 @@
     font-size: 0.8rem;
     line-height: 1.6;
     overflow-x: auto;
-    white-space: pre-wrap;
     word-break: break-all;
     min-height: 3rem;
     position: relative;
+  }
+
+  #output-text {
+    white-space: pre-wrap;
   }
 
   .output-box .copy-btn {
@@ -410,6 +413,8 @@
         if (!text) return;
         // Normalize URL-safe base64
         let b64 = text.replace(/-/g, '+').replace(/_/g, '/');
+        // Strip whitespace (newlines, spaces, tabs) from pasted/multiline base64
+        b64 = b64.replace(/\s/g, '');
         while (b64.length % 4) b64 += '=';
         const bytes = base64ToUint8(b64);
         // Try to decode as text
