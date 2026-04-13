@@ -40,7 +40,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
   }
 
   .inflation-toggle label {
@@ -70,6 +70,7 @@
   .actions {
     display: flex;
     gap: 0.75rem;
+    margin-top: 0.5rem;
     margin-bottom: 2rem;
     flex-wrap: wrap;
   }
@@ -182,7 +183,7 @@
     <a href="/">&larr; All tools</a>
   </header>
 
-  <p class="desc">Calculate compound interest with monthly contributions, inflation adjustment, and year-by-year breakdown.</p>
+  <p class="desc">Project the growth of your savings with weekly contributions, compound interest, and an optional inflation adjustment.</p>
 
   <div class="form-grid">
     <div class="form-group">
@@ -190,23 +191,15 @@
       <input type="number" id="principal" value="10000" min="0" step="100">
     </div>
     <div class="form-group">
-      <label for="contribution">Monthly Contribution ($)</label>
-      <input type="number" id="contribution" value="500" min="0" step="50">
+      <label for="contribution">Weekly Contribution ($)</label>
+      <input type="number" id="contribution" value="100" min="0" step="10">
     </div>
     <div class="form-group">
       <label for="rate">Annual Interest Rate (%)</label>
       <input type="number" id="rate" value="7" min="0" max="100" step="0.1">
     </div>
     <div class="form-group">
-      <label for="compounding">Compounding Frequency</label>
-      <select id="compounding">
-        <option value="12">Monthly</option>
-        <option value="4">Quarterly</option>
-        <option value="1">Annually</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label for="years">Time Period (Years)</label>
+      <label for="years">Duration (Years)</label>
       <input type="number" id="years" value="20" min="1" max="100" step="1">
     </div>
   </div>
@@ -286,6 +279,9 @@
   const fmt = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
   const fmtPct = n => n.toFixed(2) + '%';
 
+  // Weekly cadence: contributions are weekly, and we compound weekly too.
+  const WEEKS_PER_YEAR = 52;
+
   let chart = null;
   let tableData = [];
 
@@ -304,17 +300,15 @@
 
   function calculate() {
     const principal = parseFloat($('principal').value) || 0;
-    const monthly = parseFloat($('contribution').value) || 0;
+    const weekly = parseFloat($('contribution').value) || 0;
     const annualRate = (parseFloat($('rate').value) || 0) / 100;
-    const n = parseInt($('compounding').value); // compounding periods per year
     const years = parseInt($('years').value) || 1;
     const useInflation = $('inflationToggle').checked;
     const inflationRate = useInflation ? (parseFloat($('inflation').value) || 0) / 100 : 0;
 
-    const ratePerPeriod = annualRate / n;
-    const periodsPerYear = n;
+    const weeklyRate = annualRate / WEEKS_PER_YEAR;
 
-    // Build year-by-year data
+    // Build year-by-year data, simulated week-by-week.
     tableData = [];
     let balance = principal;
     let totalContrib = principal;
@@ -329,16 +323,15 @@
     for (let year = 1; year <= years; year++) {
       const startBalance = balance;
       let yearInterest = 0;
-      const yearContrib = monthly * 12;
+      let yearContrib = 0;
 
-      // Calculate compound growth within each period
-      for (let p = 0; p < periodsPerYear; p++) {
-        // Add monthly contributions for the months in this period
-        const monthsInPeriod = 12 / periodsPerYear;
-        balance += monthly * monthsInPeriod;
+      for (let w = 0; w < WEEKS_PER_YEAR; w++) {
+        // Add the weekly contribution at the start of the week.
+        balance += weekly;
+        yearContrib += weekly;
 
-        // Apply interest for this compounding period
-        const interest = balance * ratePerPeriod;
+        // Apply interest for the week.
+        const interest = balance * weeklyRate;
         balance += interest;
         yearInterest += interest;
       }
@@ -374,7 +367,7 @@
     if (useInflation) {
       const adjustedFinal = finalBalance / Math.pow(1 + inflationRate, years);
       const powerLost = finalBalance - adjustedFinal;
-      // Real return: approximate using Fisher equation
+      // Real return: Fisher equation
       const realRate = ((1 + annualRate) / (1 + inflationRate) - 1) * 100;
 
       $('adjustedBalance').textContent = fmt(adjustedFinal);
@@ -436,7 +429,7 @@
         label: 'Total Balance',
         data: balanceData,
         borderColor: accent,
-        backgroundColor: accent + '18',
+        backgroundColor: accent + '22',
         fill: true,
         tension: 0.3,
         pointRadius: 0,
@@ -520,6 +513,25 @@
       }
     });
   }
+
+  // Re-render chart when theme changes so colors track the new palette.
+  new MutationObserver(() => {
+    if (chart && tableData.length) {
+      const useInflation = $('inflationToggle').checked;
+      const labels = ['0', ...tableData.map(r => String(r.year))];
+      const balanceData = [tableData[0].startBalance, ...tableData.map(r => r.endBalance)];
+      let running = tableData[0].startBalance;
+      const contribData = [running];
+      for (const r of tableData) {
+        running += r.contributions;
+        contribData.push(running);
+      }
+      const adjustedData = useInflation
+        ? [tableData[0].startBalance, ...tableData.map(r => r.adjustedBalance)]
+        : [];
+      renderChart(labels, balanceData, contribData, adjustedData, useInflation);
+    }
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   // CSV download
   $('csvBtn').addEventListener('click', function () {
