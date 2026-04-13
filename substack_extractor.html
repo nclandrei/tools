@@ -18,20 +18,12 @@
 
   /* HEADER */
   header {
-    padding: 48px 0 32px;
+    padding: 56px 0 40px;
     border-bottom: 1px solid var(--border);
   }
 
-  .header-top {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-
   header h1 {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1;
@@ -40,34 +32,26 @@
   h1 .dot { color: var(--accent); }
 
   .subtitle {
-    font-size: 0.82rem;
+    font-size: 0.88rem;
     color: var(--text-muted);
-    margin-top: 6px;
+    margin-top: 12px;
     font-weight: 400;
   }
 
-  .badge {
-    font-family: monospace;
-    font-size: 0.65rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 4px 10px;
-    border-radius: 100px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    white-space: nowrap;
+  header .back-link {
+    display: inline-block;
+    margin-top: 20px;
+    font-size: 0.82rem;
   }
 
   /* CONTROLS */
   .controls {
-    padding: 28px 0;
+    padding: 40px 0;
   }
 
   .search-row {
     display: flex;
-    gap: 10px;
+    gap: 14px;
     align-items: flex-start;
   }
 
@@ -83,9 +67,9 @@
   .input-wrap input::placeholder { color: var(--text-muted); }
 
   .hint {
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
-    margin-top: 6px;
+    margin-top: 10px;
     font-family: monospace;
   }
 
@@ -760,9 +744,10 @@
 
   /* RESPONSIVE */
   @media (max-width: 640px) {
-    header { padding: 32px 0 24px; }
-    header h1 { font-size: 1.3rem; }
-    .search-row { flex-direction: column; }
+    header { padding: 40px 0 32px; }
+    header h1 { font-size: 1.5rem; }
+    .controls { padding: 32px 0; }
+    .search-row { flex-direction: column; gap: 16px; }
     .pub-card { flex-direction: column; padding: 18px; }
     .pub-logo { width: 64px; height: 64px; }
     .posts-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
@@ -776,14 +761,9 @@
 
 <div class="container">
   <header>
-    <a href="/">&larr; all tools</a>
-    <div class="header-top">
-      <div>
-        <h1>substack<span class="dot">.</span></h1>
-        <p class="subtitle">Extract metadata, posts, and media from any Substack publication or article</p>
-      </div>
-      <span class="badge">No API keys &middot; Client-side</span>
-    </div>
+    <h1>substack extractor<span class="dot">.</span></h1>
+    <p class="subtitle">Extract metadata, posts, and media from any Substack publication or article</p>
+    <a class="back-link" href="/">&larr; all tools</a>
   </header>
 
   <div class="controls">
