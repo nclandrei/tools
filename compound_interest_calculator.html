@@ -186,12 +186,26 @@
   <p class="desc">Project the growth of your savings with weekly contributions, compound interest, and an optional inflation adjustment.</p>
 
   <div class="form-grid">
+    <div class="form-group full-width">
+      <label for="currency">Currency</label>
+      <select id="currency">
+        <option value="EUR" selected>EUR — Euro (€)</option>
+        <option value="USD">USD — US Dollar ($)</option>
+        <option value="GBP">GBP — British Pound (£)</option>
+        <option value="RON">RON — Romanian Leu (lei)</option>
+        <option value="CHF">CHF — Swiss Franc</option>
+        <option value="JPY">JPY — Japanese Yen (¥)</option>
+        <option value="CAD">CAD — Canadian Dollar</option>
+        <option value="AUD">AUD — Australian Dollar</option>
+        <option value="PLN">PLN — Polish Złoty</option>
+      </select>
+    </div>
     <div class="form-group">
-      <label for="principal">Initial Principal ($)</label>
+      <label for="principal">Initial Principal (<span class="cur-sym">€</span>)</label>
       <input type="number" id="principal" value="10000" min="0" step="100">
     </div>
     <div class="form-group">
-      <label for="contribution">Weekly Contribution ($)</label>
+      <label for="contribution">Weekly Contribution (<span class="cur-sym">€</span>)</label>
       <input type="number" id="contribution" value="100" min="0" step="10">
     </div>
     <div class="form-group">
@@ -276,11 +290,35 @@
 <script>
 (function () {
   const $ = id => document.getElementById(id);
-  const fmt = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
   const fmtPct = n => n.toFixed(2) + '%';
 
   // Weekly cadence: contributions are weekly, and we compound weekly too.
   const WEEKS_PER_YEAR = 52;
+
+  // Restore previously chosen currency (defaults to EUR).
+  const savedCurrency = localStorage.getItem('cic_currency');
+  if (savedCurrency) $('currency').value = savedCurrency;
+
+  let activeCurrency = $('currency').value || 'EUR';
+
+  function currencySymbol(code) {
+    try {
+      const parts = new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).formatToParts(0);
+      const sym = parts.find(p => p.type === 'currency');
+      return sym ? sym.value : code;
+    } catch (e) {
+      return code;
+    }
+  }
+
+  function fmt(n) {
+    return Number(n).toLocaleString('en-US', { style: 'currency', currency: activeCurrency });
+  }
+
+  function updateCurrencyLabels() {
+    const sym = currencySymbol(activeCurrency);
+    document.querySelectorAll('.cur-sym').forEach(el => { el.textContent = sym; });
+  }
 
   let chart = null;
   let tableData = [];
@@ -289,6 +327,17 @@
   $('inflationToggle').addEventListener('change', function () {
     $('inflationRow').classList.toggle('visible', this.checked);
   });
+
+  // Currency change: update labels + re-render with new formatting.
+  $('currency').addEventListener('change', function () {
+    activeCurrency = this.value;
+    localStorage.setItem('cic_currency', activeCurrency);
+    updateCurrencyLabels();
+    calculate();
+  });
+
+  // Initial label sync (runs before first calculate()).
+  updateCurrencyLabels();
 
   // Calculate on button click
   $('calculateBtn').addEventListener('click', calculate);
@@ -497,14 +546,15 @@
             grid: { color: border }
           },
           y: {
-            title: { display: true, text: 'Balance ($)', color: textMuted, font: { family: 'Inter', size: 12 } },
+            title: { display: true, text: 'Balance (' + currencySymbol(activeCurrency) + ')', color: textMuted, font: { family: 'Inter', size: 12 } },
             ticks: {
               color: textMuted,
               font: { family: 'Inter', size: 11 },
               callback: function (value) {
-                if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
-                if (value >= 1000) return '$' + (value / 1000).toFixed(0) + 'K';
-                return '$' + value;
+                const sym = currencySymbol(activeCurrency);
+                if (value >= 1000000) return sym + (value / 1000000).toFixed(1) + 'M';
+                if (value >= 1000) return sym + (value / 1000).toFixed(0) + 'K';
+                return sym + value;
               }
             },
             grid: { color: border }
@@ -538,8 +588,9 @@
     if (!tableData.length) return;
     const useInflation = $('inflationToggle').checked;
 
-    let csv = 'Year,Starting Balance,Contributions,Interest Earned,Ending Balance';
-    if (useInflation) csv += ',Inflation-Adjusted Balance';
+    const cur = activeCurrency;
+    let csv = 'Year,Starting Balance (' + cur + '),Contributions (' + cur + '),Interest Earned (' + cur + '),Ending Balance (' + cur + ')';
+    if (useInflation) csv += ',Inflation-Adjusted Balance (' + cur + ')';
     csv += '\n';
 
     for (const row of tableData) {
