@@ -2,6 +2,14 @@ const ALLOWED_DOMAINS = [
   'sumodb.sumogames.de',
   'www.youtube.com',
   'youtube.com',
+  'substack.com',
+  'www.substack.com',
+];
+
+// Patterns for whole groups of allowed domains. Used by the substack tool to
+// reach `<publication>.substack.com` subdomains without enumerating every one.
+const ALLOWED_DOMAIN_PATTERNS = [
+  /^[a-z0-9][a-z0-9-]{0,62}\.substack\.com$/i,
 ];
 
 // Per-domain User-Agent overrides. YouTube serves a stripped-down page
@@ -11,6 +19,11 @@ const UA_OVERRIDES = {
   'www.youtube.com': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   'youtube.com': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
 };
+
+function isAllowedHost(hostname) {
+  if (ALLOWED_DOMAINS.includes(hostname)) return true;
+  return ALLOWED_DOMAIN_PATTERNS.some((re) => re.test(hostname));
+}
 
 export async function onRequest(context) {
   const { request } = context;
@@ -43,7 +56,7 @@ export async function onRequest(context) {
     return Response.json({ error: 'Only HTTPS URLs are allowed' }, { status: 403 });
   }
 
-  if (!ALLOWED_DOMAINS.includes(parsed.hostname)) {
+  if (!isAllowedHost(parsed.hostname)) {
     return Response.json({ error: `Domain "${parsed.hostname}" is not allowed` }, { status: 403 });
   }
 

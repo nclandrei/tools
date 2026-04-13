@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Substack Extractor</title>
+
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+
+<style>
+  .container {
+    max-width: 1200px;
+    padding: 0 24px;
+  }
+
+  /* HEADER */
+  header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  h1 .dot { color: var(--accent); }
+
+  .subtitle {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-weight: 400;
+  }
+
+  .badge {
+    font-family: monospace;
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 100px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* CONTROLS */
+  .controls {
+    padding: 28px 0;
+  }
+
+  .search-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .input-wrap { flex: 1; position: relative; }
+
+  .input-wrap input {
+    width: 100%;
+    font-family: monospace;
+    font-size: 0.88rem;
+    padding: 13px 16px;
+  }
+
+  .input-wrap input::placeholder { color: var(--text-muted); }
+
+  .hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-family: monospace;
+  }
+
+  .fetch-btn {
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 13px 28px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .fetch-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .fetch-btn:active { transform: translateY(0); }
+  .fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
+
+  /* STATUS BAR */
+  .status-bar {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .status-bar.visible { display: flex; }
+
+  .status-info { display: flex; align-items: center; gap: 12px; }
+  .status-text { font-size: 0.82rem; color: var(--text-muted); }
+  .status-text strong { color: var(--text); font-weight: 600; }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* PUBLICATION HEADER */
+  .pub-card {
+    display: none;
+    margin-top: 24px;
+    padding: 24px;
+    border-radius: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    gap: 20px;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .pub-card.visible { display: flex; }
+
+  .pub-logo {
+    width: 84px;
+    height: 84px;
+    border-radius: 12px;
+    object-fit: cover;
+    background: var(--surface-alt);
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+
+  .pub-info { flex: 1; min-width: 0; }
+
+  .pub-name {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+
+  .pub-domain {
+    font-family: monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    word-break: break-all;
+  }
+
+  .pub-domain a {
+    color: var(--text-muted);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--border);
+  }
+
+  .pub-domain a:hover { color: var(--accent); border-color: var(--accent); }
+
+  .pub-desc {
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+
+  .pub-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .pub-meta-pill {
+    font-family: monospace;
+    font-size: 0.68rem;
+    padding: 4px 10px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .pub-meta-pill strong { color: var(--text); font-weight: 600; }
+
+  /* TABS */
+  .tabs {
+    display: none;
+    margin-top: 28px;
+    border-bottom: 1px solid var(--border);
+    gap: 4px;
+  }
+
+  .tabs.visible { display: flex; }
+
+  .tab-btn {
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 12px 18px;
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tab-btn:hover { color: var(--text); }
+
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-count {
+    font-family: monospace;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    background: var(--surface-alt);
+    border-radius: 100px;
+    color: var(--text-muted);
+  }
+
+  .tab-btn.active .tab-count {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  /* TAB PANELS */
+  .tab-panel { display: none; padding: 28px 0 60px; }
+  .tab-panel.active { display: block; }
+
+  /* POSTS GRID */
+  .posts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .post-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .post-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+
+  [data-theme="dark"] .post-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+
+  .post-cover {
+    aspect-ratio: 16 / 9;
+    background: var(--surface-alt);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .post-cover img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .post-cover .placeholder {
+    width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    opacity: 0.4;
+  }
+
+  .post-audience {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-family: monospace;
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .post-audience.free {
+    background: rgba(22, 163, 74, 0.85);
+    color: #fff;
+  }
+
+  .post-audience.paid {
+    background: rgba(217, 119, 6, 0.85);
+    color: #fff;
+  }
+
+  .post-type {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-family: monospace;
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.65);
+    color: rgba(255, 255, 255, 0.95);
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  .post-body {
+    padding: 14px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 6px;
+  }
+
+  .post-title {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .post-subtitle {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .post-meta {
+    margin-top: auto;
+    padding-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-family: monospace;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+  }
+
+  .post-meta span { display: inline-flex; align-items: center; gap: 4px; }
+  .post-meta svg { width: 11px; height: 11px; }
+
+  /* MEDIA TAB */
+  .media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  .media-tile {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    aspect-ratio: 1;
+    cursor: pointer;
+    transition: all 0.2s;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .media-tile:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+  }
+
+  .media-tile img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .media-tile .media-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.2s;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 12px;
+    gap: 6px;
+  }
+
+  .media-tile:hover .media-overlay { opacity: 1; }
+
+  .media-actions { display: flex; gap: 6px; }
+
+  .media-btn {
+    font-family: monospace;
+    font-size: 0.62rem;
+    font-weight: 500;
+    padding: 4px 9px;
+    background: rgba(255,255,255,0.18);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 5px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .media-btn:hover { background: rgba(255,255,255,0.28); }
+
+  .media-type-tag {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-family: monospace;
+    font-size: 0.58rem;
+    font-weight: 600;
+    padding: 3px 7px;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .toolbar-info {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  .toolbar-info strong { color: var(--text); font-weight: 600; }
+
+  .toolbar-actions { display: flex; gap: 8px; }
+
+  .small-btn {
+    font-family: monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 7px 14px;
+    background: var(--surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .small-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* JSON viewer */
+  .json-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .json-pre {
+    padding: 18px 20px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.55;
+    color: var(--text);
+    overflow: auto;
+    max-height: 70vh;
+    white-space: pre;
+    margin: 0;
+  }
+
+  /* DRAWER (post detail) */
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    z-index: 999;
+  }
+
+  .drawer-overlay.open { display: block; }
+
+  .drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(720px, 100%);
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    z-index: 1000;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .drawer.open { transform: translateX(0); }
+
+  .drawer-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .drawer-title {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .drawer-close {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.15s;
+  }
+
+  .drawer-close:hover { color: var(--text); border-color: var(--border-hover); }
+
+  .drawer-content {
+    overflow-y: auto;
+    padding: 28px 32px 60px;
+    flex: 1;
+  }
+
+  .drawer-content h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+
+  .drawer-content .post-detail-subtitle {
+    font-size: 1rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin-bottom: 18px;
+  }
+
+  .drawer-content .post-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .drawer-content .post-detail-cover {
+    width: 100%;
+    border-radius: 10px;
+    margin-bottom: 22px;
+    border: 1px solid var(--border);
+  }
+
+  .drawer-content .post-body-html {
+    font-size: 0.92rem;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .drawer-content .post-body-html p { margin: 0 0 1em; }
+  .drawer-content .post-body-html h1,
+  .drawer-content .post-body-html h2,
+  .drawer-content .post-body-html h3,
+  .drawer-content .post-body-html h4 {
+    margin: 1.4em 0 0.4em;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text);
+  }
+  .drawer-content .post-body-html h1 { font-size: 1.4rem; }
+  .drawer-content .post-body-html h2 { font-size: 1.2rem; }
+  .drawer-content .post-body-html h3 { font-size: 1.05rem; }
+  .drawer-content .post-body-html img,
+  .drawer-content .post-body-html video {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 0.8em 0;
+    border: 1px solid var(--border);
+  }
+  .drawer-content .post-body-html figure { margin: 1em 0; }
+  .drawer-content .post-body-html figcaption {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 6px;
+  }
+  .drawer-content .post-body-html a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid var(--accent-dim);
+  }
+  .drawer-content .post-body-html a:hover { border-bottom-color: var(--accent); }
+  .drawer-content .post-body-html blockquote {
+    border-left: 3px solid var(--accent);
+    padding: 4px 0 4px 16px;
+    margin: 1em 0;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .drawer-content .post-body-html ul,
+  .drawer-content .post-body-html ol {
+    margin: 0.6em 0 1em 1.4em;
+  }
+  .drawer-content .post-body-html li { margin-bottom: 0.4em; }
+  .drawer-content .post-body-html iframe {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 0.8em 0;
+  }
+  .drawer-content .post-body-html pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    margin: 1em 0;
+  }
+  .drawer-content .post-body-html code {
+    background: var(--surface-alt);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 0.85em;
+  }
+  .drawer-content .post-body-html pre code {
+    background: transparent;
+    padding: 0;
+  }
+  .drawer-content .post-body-html hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2em 0;
+  }
+
+  .post-paywall-notice {
+    margin-top: 22px;
+    padding: 14px 16px;
+    background: var(--amber-dim);
+    border: 1px solid var(--amber);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    color: var(--text);
+  }
+
+  /* ERROR / EMPTY */
+  .error-msg, .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .error-msg .icon, .empty-state .icon {
+    font-size: 2.4rem;
+    margin-bottom: 14px;
+    opacity: 0.4;
+  }
+
+  .error-msg strong { color: var(--red); }
+
+  .empty-state p {
+    max-width: 420px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 640px) {
+    header { padding: 32px 0 24px; }
+    header h1 { font-size: 1.3rem; }
+    .search-row { flex-direction: column; }
+    .pub-card { flex-direction: column; padding: 18px; }
+    .pub-logo { width: 64px; height: 64px; }
+    .posts-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .media-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .drawer-content { padding: 22px 20px 60px; }
+    .tabs { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <a href="/">&larr; all tools</a>
+    <div class="header-top">
+      <div>
+        <h1>substack<span class="dot">.</span></h1>
+        <p class="subtitle">Extract metadata, posts, and media from any Substack publication or article</p>
+      </div>
+      <span class="badge">No API keys &middot; Client-side</span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="search-row">
+      <div class="input-wrap">
+        <input type="text" id="url-input" placeholder="https://example.substack.com or https://example.substack.com/p/post-slug" spellcheck="false" autocomplete="off">
+        <p class="hint">Publication URL, article URL, or just the subdomain (e.g. <strong>astralcodexten</strong>)</p>
+      </div>
+      <button class="fetch-btn" id="fetch-btn" onclick="startExtract()">Extract</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <div class="status-info">
+      <div class="spinner" id="spinner"></div>
+      <span class="status-text" id="status-text"></span>
+    </div>
+  </div>
+
+  <div class="pub-card" id="pub-card"></div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="posts" onclick="switchTab('posts')">
+      Posts <span class="tab-count" id="count-posts">0</span>
+    </button>
+    <button class="tab-btn" data-tab="media" onclick="switchTab('media')">
+      Media <span class="tab-count" id="count-media">0</span>
+    </button>
+    <button class="tab-btn" data-tab="raw" onclick="switchTab('raw')">
+      Raw JSON
+    </button>
+  </div>
+
+  <div class="tab-panel active" id="panel-posts"></div>
+  <div class="tab-panel" id="panel-media"></div>
+  <div class="tab-panel" id="panel-raw"></div>
+</div>
+
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span class="drawer-title">Post detail</span>
+    <button class="drawer-close" onclick="closeDrawer()" aria-label="Close">&times;</button>
+  </div>
+  <div class="drawer-content" id="drawer-content"></div>
+</div>
+
+<script>
+// ── State ──
+let state = {
+  subdomain: null,
+  baseUrl: null,         // e.g. https://example.substack.com
+  publication: null,     // pub info object
+  posts: [],             // array of post metadata
+  media: [],             // array of {type, url, postSlug, postTitle, alt}
+  rss: null,             // parsed RSS channel info
+  focusedSlug: null,     // when an article URL is provided
+  raw: {},               // raw API responses for the JSON tab
+  isFetching: false,
+  activeTab: 'posts',
+};
+
+// ── DOM refs ──
+const $input = document.getElementById('url-input');
+const $fetchBtn = document.getElementById('fetch-btn');
+const $statusBar = document.getElementById('status-bar');
+const $statusText = document.getElementById('status-text');
+const $spinner = document.getElementById('spinner');
+const $pubCard = document.getElementById('pub-card');
+const $tabs = document.getElementById('tabs');
+const $panelPosts = document.getElementById('panel-posts');
+const $panelMedia = document.getElementById('panel-media');
+const $panelRaw = document.getElementById('panel-raw');
+const $countPosts = document.getElementById('count-posts');
+const $countMedia = document.getElementById('count-media');
+const $drawer = document.getElementById('drawer');
+const $drawerOverlay = document.getElementById('drawer-overlay');
+const $drawerContent = document.getElementById('drawer-content');
+
+// ── CORS proxy ──
+// Substack's API has no CORS headers, so we route through the same self-hosted
+// Cloudflare Pages function used by other tools, with public proxies as fall-back.
+const PROXIES = [
+  (u) => `/api/proxy?url=${encodeURIComponent(u)}`,
+  (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+];
+
+async function pFetch(url, { json = true } = {}) {
+  let lastErr;
+  for (const wrap of PROXIES) {
+    try {
+      const res = await fetch(wrap(url), { headers: json ? { Accept: 'application/json, */*' } : {} });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      if (!text) throw new Error('Empty response');
+      return json ? JSON.parse(text) : text;
+    } catch (err) { lastErr = err; }
+  }
+  throw lastErr || new Error('All proxies failed');
+}
+
+// ── URL / handle parsing ──
+function parseInput(raw) {
+  const val = raw.trim();
+  if (!val) return null;
+
+  // Full URL
+  const urlMatch = val.match(/^https?:\/\/([^\/?#]+)(\/[^?#]*)?/i);
+  if (urlMatch) {
+    const host = urlMatch[1].toLowerCase();
+    const path = urlMatch[2] || '/';
+    const subMatch = host.match(/^([a-z0-9][a-z0-9-]*)\.substack\.com$/);
+    if (!subMatch) {
+      throw new Error('Only *.substack.com URLs are supported. Custom domains are not currently allowed by the proxy.');
+    }
+    const subdomain = subMatch[1];
+    const slugMatch = path.match(/^\/p\/([^\/?#]+)/);
+    return { subdomain, slug: slugMatch ? slugMatch[1] : null };
+  }
+
+  // Bare subdomain like "astralcodexten" or "astralcodexten.substack.com"
+  const bare = val.replace(/^@/, '').toLowerCase();
+  const subOnlyMatch = bare.match(/^([a-z0-9][a-z0-9-]*)(?:\.substack\.com)?$/);
+  if (subOnlyMatch) return { subdomain: subOnlyMatch[1], slug: null };
+
+  throw new Error('Could not parse input. Provide a substack.com URL or a publication subdomain.');
+}
+
+// ── Main orchestrator ──
+$input.addEventListener('keydown', (e) => { if (e.key === 'Enter') startExtract(); });
+
+async function startExtract() {
+  const raw = $input.value;
+  let parsed;
+  try { parsed = parseInput(raw); }
+  catch (err) { return showError(err.message); }
+  if (!parsed) return;
+
+  resetState();
+  state.subdomain = parsed.subdomain;
+  state.baseUrl = `https://${parsed.subdomain}.substack.com`;
+  state.focusedSlug = parsed.slug;
+
+  setLoading(true);
+  setStatus(`Resolving <strong>${parsed.subdomain}.substack.com</strong>…`);
+
+  try {
+    // Pull publication info + RSS feed in parallel — both small payloads.
+    const [pub, rss] = await Promise.all([fetchPublication(), fetchRss().catch(() => null)]);
+    state.publication = pub;
+    state.rss = rss;
+    state.raw.publication = pub;
+    state.raw.rss_channel = rss;
+
+    renderPubCard();
+
+    if (parsed.slug) {
+      setStatus(`Fetching post <strong>${parsed.slug}</strong>…`);
+      const post = await fetchSinglePost(parsed.slug);
+      state.posts = [post];
+      state.raw.post = post;
+      extractMediaFromPosts([post]);
+    } else {
+      await fetchAllPosts();
+    }
+
+    finalize();
+  } catch (err) {
+    showError(err.message || String(err));
+  } finally {
+    setLoading(false);
+  }
+}
+
+function resetState() {
+  state = {
+    subdomain: null, baseUrl: null, publication: null, posts: [], media: [],
+    rss: null, focusedSlug: null, raw: {}, isFetching: false, activeTab: 'posts',
+  };
+  $pubCard.classList.remove('visible');
+  $pubCard.innerHTML = '';
+  $tabs.classList.remove('visible');
+  $panelPosts.innerHTML = '';
+  $panelMedia.innerHTML = '';
+  $panelRaw.innerHTML = '';
+  switchTab('posts');
+}
+
+// ── API calls ──
+async function fetchPublication() {
+  // Substack exposes pub info on each subdomain at this endpoint.
+  const url = `${state.baseUrl}/api/v1/publication/by-subdomain/${state.subdomain}`;
+  try { return await pFetch(url); }
+  catch {
+    // Fall back to publication.public endpoint if available.
+    return await pFetch(`${state.baseUrl}/api/v1/publication`);
+  }
+}
+
+async function fetchRss() {
+  const text = await pFetch(`${state.baseUrl}/feed`, { json: false });
+  const xml = new DOMParser().parseFromString(text, 'application/xml');
+  if (xml.querySelector('parsererror')) return null;
+
+  const channel = xml.querySelector('channel');
+  if (!channel) return null;
+
+  const get = (sel) => channel.querySelector(`:scope > ${sel}`)?.textContent?.trim() || '';
+  const items = [...channel.querySelectorAll(':scope > item')].map((item) => {
+    const enc = item.getElementsByTagNameNS('http://purl.org/rss/1.0/modules/content/', 'encoded')[0];
+    const creator = item.getElementsByTagNameNS('http://purl.org/dc/elements/1.1/', 'creator')[0];
+    return {
+      title: item.querySelector('title')?.textContent || '',
+      link: item.querySelector('link')?.textContent || '',
+      guid: item.querySelector('guid')?.textContent || '',
+      pubDate: item.querySelector('pubDate')?.textContent || '',
+      creator: creator?.textContent || '',
+      description: item.querySelector('description')?.textContent || '',
+      contentEncoded: enc?.textContent || '',
+    };
+  });
+
+  return {
+    title: get('title'),
+    description: get('description'),
+    link: get('link'),
+    language: get('language'),
+    image: channel.querySelector(':scope > image > url')?.textContent?.trim() || '',
+    lastBuildDate: get('lastBuildDate'),
+    items,
+  };
+}
+
+async function fetchAllPosts() {
+  const all = [];
+  let offset = 0;
+  const limit = 50;
+  const maxPages = 12; // safety cap ~600 posts
+
+  for (let i = 0; i < maxPages; i++) {
+    setStatus(`Fetching posts… <strong>${all.length}</strong> so far`);
+    const url = `${state.baseUrl}/api/v1/archive?sort=new&limit=${limit}&offset=${offset}`;
+    let page;
+    try { page = await pFetch(url); }
+    catch (err) { if (all.length === 0) throw err; break; }
+
+    if (!Array.isArray(page) || page.length === 0) break;
+    all.push(...page);
+    if (page.length < limit) break;
+    offset += page.length;
+    // Live update so the user sees results streaming in
+    state.posts = all.slice();
+    renderPosts();
+    updateCounts();
+    await new Promise((r) => setTimeout(r, 120));
+  }
+
+  state.posts = all;
+  state.raw.posts = all;
+  extractMediaFromPosts(all);
+}
+
+async function fetchSinglePost(slug) {
+  return await pFetch(`${state.baseUrl}/api/v1/posts/${encodeURIComponent(slug)}`);
+}
+
+// ── Media extraction ──
+function extractMediaFromPosts(posts) {
+  const seen = new Set();
+  const media = [];
+
+  // First pass: cover images from the archive listing.
+  for (const p of posts) {
+    if (p.cover_image && !seen.has(p.cover_image)) {
+      seen.add(p.cover_image);
+      media.push({
+        type: 'image',
+        url: p.cover_image,
+        thumb: p.cover_image,
+        postSlug: p.slug,
+        postTitle: p.title,
+        alt: p.title || '',
+        source: 'cover',
+      });
+    }
+  }
+
+  // Second pass: parse content:encoded from the RSS feed for inline media.
+  if (state.rss?.items) {
+    for (const item of state.rss.items) {
+      if (!item.contentEncoded) continue;
+      const doc = new DOMParser().parseFromString(item.contentEncoded, 'text/html');
+
+      doc.querySelectorAll('img').forEach((img) => {
+        const src = img.getAttribute('src') || img.getAttribute('data-src');
+        if (!src || seen.has(src)) return;
+        seen.add(src);
+        media.push({
+          type: 'image',
+          url: src,
+          thumb: src,
+          postSlug: slugFromLink(item.link),
+          postTitle: item.title,
+          alt: img.getAttribute('alt') || '',
+          source: 'inline',
+        });
+      });
+
+      doc.querySelectorAll('video').forEach((video) => {
+        const src = video.getAttribute('src') || video.querySelector('source')?.getAttribute('src');
+        if (!src || seen.has(src)) return;
+        seen.add(src);
+        media.push({
+          type: 'video',
+          url: src,
+          thumb: video.getAttribute('poster') || '',
+          postSlug: slugFromLink(item.link),
+          postTitle: item.title,
+          alt: '',
+          source: 'inline',
+        });
+      });
+
+      doc.querySelectorAll('iframe').forEach((iframe) => {
+        const src = iframe.getAttribute('src');
+        if (!src || seen.has(src)) return;
+        seen.add(src);
+        media.push({
+          type: 'embed',
+          url: src,
+          thumb: '',
+          postSlug: slugFromLink(item.link),
+          postTitle: item.title,
+          alt: iframe.getAttribute('title') || '',
+          source: 'embed',
+        });
+      });
+    }
+  }
+
+  state.media = media;
+}
+
+function slugFromLink(link) {
+  const m = (link || '').match(/\/p\/([^\/?#]+)/);
+  return m ? m[1] : '';
+}
+
+// ── Rendering: publication card ──
+function renderPubCard() {
+  const p = state.publication || {};
+  const rss = state.rss || {};
+  const name = p.name || rss.title || state.subdomain;
+  const desc = p.hero_text || p.description || rss.description || '';
+  const logo = p.logo_url || rss.image || '';
+  const customDomain = p.custom_domain;
+  const language = (p.language || rss.language || '').toUpperCase();
+
+  $pubCard.innerHTML = `
+    ${logo ? `<img class="pub-logo" src="${escAttr(logo)}" alt="">` : '<div class="pub-logo"></div>'}
+    <div class="pub-info">
+      <div class="pub-name">${escHtml(name)}</div>
+      <div class="pub-domain">
+        <a href="${escAttr(state.baseUrl)}" target="_blank" rel="noopener">${escHtml(state.subdomain)}.substack.com</a>
+        ${customDomain ? ` &middot; <a href="https://${escAttr(customDomain)}" target="_blank" rel="noopener">${escHtml(customDomain)}</a>` : ''}
+      </div>
+      ${desc ? `<div class="pub-desc">${escHtml(desc)}</div>` : ''}
+      <div class="pub-meta">
+        ${p.id ? `<span class="pub-meta-pill">ID <strong>${escHtml(String(p.id))}</strong></span>` : ''}
+        ${language ? `<span class="pub-meta-pill">Lang <strong>${escHtml(language)}</strong></span>` : ''}
+        ${p.author_id ? `<span class="pub-meta-pill">Author ID <strong>${escHtml(String(p.author_id))}</strong></span>` : ''}
+        ${rss.lastBuildDate ? `<span class="pub-meta-pill">Updated <strong>${escHtml(formatDate(rss.lastBuildDate))}</strong></span>` : ''}
+      </div>
+    </div>
+  `;
+  $pubCard.classList.add('visible');
+  $tabs.classList.add('visible');
+}
+
+// ── Rendering: posts grid ──
+function renderPosts() {
+  if (!state.posts.length) {
+    $panelPosts.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">&#9776;</div>
+        <p>No posts found for this publication.</p>
+      </div>`;
+    return;
+  }
+
+  const toolbar = `
+    <div class="toolbar">
+      <div class="toolbar-info">
+        <strong>${state.posts.length}</strong> post${state.posts.length !== 1 ? 's' : ''}
+        ${state.focusedSlug ? ' (single article view)' : ''}
+      </div>
+      <div class="toolbar-actions">
+        <button class="small-btn" onclick="copyPostsJson()">Copy JSON</button>
+        <button class="small-btn" onclick="downloadPostsJson()">Download JSON</button>
+      </div>
+    </div>`;
+
+  const grid = state.posts.map((p, i) => {
+    const audClass = p.audience === 'everyone' ? 'free' : 'paid';
+    const audLabel = p.audience === 'everyone' ? 'Free' : (p.audience || 'paid').replace('only_', '').replace('_', ' ');
+    const date = formatDate(p.post_date);
+    const cover = p.cover_image ? `<img loading="lazy" src="${escAttr(p.cover_image)}" alt="">` : `<div class="placeholder">&#10070;</div>`;
+    const reactions = p.reaction_count ?? p.reactions?.['❤'] ?? 0;
+    const comments = p.comment_count ?? 0;
+    const wc = p.wordcount ? `${Math.round(p.wordcount / 100) / 10}k words` : '';
+    const typeLabel = p.type && p.type !== 'newsletter' ? `<span class="post-type">${escHtml(p.type)}</span>` : '';
+
+    return `
+      <div class="post-card" style="animation-delay:${(i % 16) * 30}ms" onclick="openPost('${escAttr(p.slug)}')">
+        <div class="post-cover">
+          ${cover}
+          <span class="post-audience ${audClass}">${escHtml(audLabel)}</span>
+          ${typeLabel}
+        </div>
+        <div class="post-body">
+          <div class="post-title">${escHtml(p.title || '(untitled)')}</div>
+          ${p.subtitle ? `<div class="post-subtitle">${escHtml(p.subtitle)}</div>` : ''}
+          <div class="post-meta">
+            ${date ? `<span>&#128197; ${escHtml(date)}</span>` : ''}
+            ${reactions ? `<span>&#9829; ${reactions}</span>` : ''}
+            ${comments ? `<span>&#128172; ${comments}</span>` : ''}
+            ${wc ? `<span>&#9998; ${escHtml(wc)}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  $panelPosts.innerHTML = toolbar + `<div class="posts-grid">${grid}</div>`;
+}
+
+// ── Rendering: media gallery ──
+function renderMedia() {
+  if (!state.media.length) {
+    $panelMedia.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">&#128247;</div>
+        <p>No media found. The RSS feed only includes the most recent posts &mdash; embedded media from older posts may be missing.</p>
+      </div>`;
+    return;
+  }
+
+  const toolbar = `
+    <div class="toolbar">
+      <div class="toolbar-info">
+        <strong>${state.media.length}</strong> item${state.media.length !== 1 ? 's' : ''} extracted from
+        cover images and recent post bodies
+      </div>
+      <div class="toolbar-actions">
+        <button class="small-btn" onclick="copyAllMediaUrls()">Copy URLs</button>
+      </div>
+    </div>`;
+
+  const grid = state.media.map((m, i) => {
+    const thumb = m.thumb || (m.type === 'image' ? m.url : '');
+    const tile = thumb
+      ? `<img loading="lazy" src="${escAttr(thumb)}" alt="${escAttr(m.alt)}">`
+      : `<div class="placeholder" style="display:flex;align-items:center;justify-content:center;height:100%;font-family:monospace;font-size:0.7rem;color:var(--text-muted);padding:10px;text-align:center;word-break:break-all">${escHtml(m.url.slice(0, 60))}…</div>`;
+
+    return `
+      <div class="media-tile" style="animation-delay:${(i % 16) * 25}ms" onclick="window.open('${escAttr(m.url)}','_blank')">
+        ${tile}
+        ${m.type !== 'image' ? `<span class="media-type-tag">${escHtml(m.type)}</span>` : ''}
+        <div class="media-overlay">
+          <div class="media-actions">
+            <a class="media-btn" href="${escAttr(m.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open</a>
+            ${m.postSlug ? `<button class="media-btn" onclick="event.stopPropagation();openPost('${escAttr(m.postSlug)}')">Post</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  $panelMedia.innerHTML = toolbar + `<div class="media-grid">${grid}</div>`;
+}
+
+// ── Rendering: raw JSON ──
+function renderRaw() {
+  const payload = {
+    publication: state.publication,
+    rss: state.rss,
+    posts: state.posts,
+    media: state.media,
+  };
+  const json = JSON.stringify(payload, null, 2);
+  $panelRaw.innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-info">Raw response from <strong>${escHtml(state.subdomain)}.substack.com</strong></div>
+      <div class="toolbar-actions">
+        <button class="small-btn" onclick="copyRawJson()">Copy JSON</button>
+        <button class="small-btn" onclick="downloadPostsJson()">Download</button>
+      </div>
+    </div>
+    <div class="json-wrap"><pre class="json-pre" id="json-pre">${escHtml(json)}</pre></div>`;
+}
+
+function updateCounts() {
+  $countPosts.textContent = state.posts.length;
+  $countMedia.textContent = state.media.length;
+}
+
+function switchTab(tab) {
+  state.activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  $panelPosts.classList.toggle('active', tab === 'posts');
+  $panelMedia.classList.toggle('active', tab === 'media');
+  $panelRaw.classList.toggle('active', tab === 'raw');
+  if (tab === 'media') renderMedia();
+  if (tab === 'raw') renderRaw();
+}
+
+// ── Drawer / single post detail ──
+async function openPost(slug) {
+  $drawerOverlay.classList.add('open');
+  $drawer.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  $drawerContent.innerHTML = `<div class="empty-state"><div class="spinner" style="margin:0 auto 14px"></div><p>Loading post…</p></div>`;
+
+  // Try state.posts first; if it has body_html we can short-circuit.
+  let post = state.posts.find((p) => p.slug === slug);
+  if (!post || !post.body_html) {
+    try { post = await fetchSinglePost(slug); }
+    catch (err) {
+      $drawerContent.innerHTML = `<div class="error-msg"><div class="icon">&#9888;</div><p><strong>Error:</strong> ${escHtml(err.message)}</p></div>`;
+      return;
+    }
+  }
+
+  const date = formatDate(post.post_date);
+  const audClass = post.audience === 'everyone' ? 'free' : 'paid';
+  const audLabel = post.audience === 'everyone' ? 'Free' : (post.audience || 'paid').replace('only_', '').replace('_', ' ');
+  const bylines = (post.publishedBylines || []).map((b) => b.name).filter(Boolean).join(', ');
+  const reactions = post.reaction_count ?? 0;
+  const comments = post.comment_count ?? 0;
+  const wordcount = post.wordcount ? `${post.wordcount.toLocaleString()} words` : '';
+
+  const paywallNotice = (post.audience && post.audience !== 'everyone' && (!post.body_html || post.body_html.length < 600))
+    ? `<div class="post-paywall-notice">This is a paid post &mdash; only the public preview is available without a subscription.</div>`
+    : '';
+
+  $drawerContent.innerHTML = `
+    <h1>${escHtml(post.title || '(untitled)')}</h1>
+    ${post.subtitle ? `<p class="post-detail-subtitle">${escHtml(post.subtitle)}</p>` : ''}
+    <div class="post-detail-meta">
+      <span class="pub-meta-pill ${audClass === 'paid' ? '' : ''}">${escHtml(audLabel)}</span>
+      ${date ? `<span class="pub-meta-pill">${escHtml(date)}</span>` : ''}
+      ${bylines ? `<span class="pub-meta-pill">${escHtml(bylines)}</span>` : ''}
+      ${reactions ? `<span class="pub-meta-pill">&#9829; <strong>${reactions}</strong></span>` : ''}
+      ${comments ? `<span class="pub-meta-pill">&#128172; <strong>${comments}</strong></span>` : ''}
+      ${wordcount ? `<span class="pub-meta-pill">${escHtml(wordcount)}</span>` : ''}
+      <a class="pub-meta-pill" href="${escAttr(post.canonical_url || `${state.baseUrl}/p/${post.slug}`)}" target="_blank" rel="noopener" style="text-decoration:none">Open on Substack &nearr;</a>
+    </div>
+    ${post.cover_image ? `<img class="post-detail-cover" src="${escAttr(post.cover_image)}" alt="">` : ''}
+    <div class="post-body-html">${sanitiseHtml(post.body_html || '<p><em>No body content available.</em></p>')}</div>
+    ${paywallNotice}
+  `;
+}
+
+function closeDrawer() {
+  $drawer.classList.remove('open');
+  $drawerOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $drawer.classList.contains('open')) closeDrawer();
+});
+
+// ── Helpers ──
+function setLoading(loading) {
+  state.isFetching = loading;
+  $fetchBtn.disabled = loading;
+  $fetchBtn.textContent = loading ? 'Extracting…' : 'Extract';
+  $statusBar.classList.toggle('visible', loading || state.posts.length > 0);
+  $spinner.style.display = loading ? 'block' : 'none';
+}
+
+function setStatus(html) { $statusText.innerHTML = html; }
+
+function finalize() {
+  renderPosts();
+  renderMedia();
+  updateCounts();
+  setStatus(`Found <strong>${state.posts.length}</strong> post${state.posts.length !== 1 ? 's' : ''} and <strong>${state.media.length}</strong> media item${state.media.length !== 1 ? 's' : ''}`);
+  if (state.focusedSlug) openPost(state.focusedSlug);
+}
+
+function showError(msg) {
+  $statusBar.classList.add('visible');
+  setStatus('');
+  $panelPosts.innerHTML = `
+    <div class="error-msg">
+      <div class="icon">&#9888;</div>
+      <p><strong>Error:</strong> ${escHtml(msg)}</p>
+    </div>`;
+  $tabs.classList.add('visible');
+}
+
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function escAttr(s) { return escHtml(s); }
+
+function formatDate(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Drop scripts and on* handlers from rendered post bodies.
+function sanitiseHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script, style').forEach((el) => el.remove());
+  doc.querySelectorAll('*').forEach((el) => {
+    [...el.attributes].forEach((attr) => {
+      if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+      if (attr.name === 'href' && /^javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+    });
+  });
+  return doc.body.innerHTML;
+}
+
+function copyPostsJson() {
+  const json = JSON.stringify(state.posts, null, 2);
+  navigator.clipboard.writeText(json).then(() => flashBtn(event.target, 'Copied!'));
+}
+
+function copyRawJson() {
+  const json = document.getElementById('json-pre')?.textContent || '';
+  navigator.clipboard.writeText(json).then(() => flashBtn(event.target, 'Copied!'));
+}
+
+function downloadPostsJson() {
+  const payload = { publication: state.publication, rss: state.rss, posts: state.posts, media: state.media };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${state.subdomain}-substack.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function copyAllMediaUrls() {
+  const urls = state.media.map((m) => m.url).join('\n');
+  navigator.clipboard.writeText(urls).then(() => flashBtn(event.target, 'Copied!'));
+}
+
+function flashBtn(btn, text) {
+  if (!btn) return;
+  const original = btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = original; }, 1400);
+}
+</script>
+</body>
+</html>
