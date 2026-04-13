@@ -183,7 +183,7 @@
     <a href="/">&larr; All tools</a>
   </header>
 
-  <p class="desc">Project the growth of your savings with weekly contributions, compound interest, and an optional inflation adjustment.</p>
+  <p class="desc">Project the growth of your savings with monthly or weekly contributions, compound interest, and an optional inflation adjustment.</p>
 
   <div class="form-grid">
     <div class="form-group full-width">
@@ -200,13 +200,20 @@
         <option value="PLN">PLN — Polish Złoty</option>
       </select>
     </div>
+    <div class="form-group full-width">
+      <label for="frequency">Contribution Frequency</label>
+      <select id="frequency">
+        <option value="monthly" selected>Monthly</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </div>
     <div class="form-group">
       <label for="principal">Initial Principal (<span class="cur-sym">€</span>)</label>
       <input type="number" id="principal" value="10000" min="0" step="100">
     </div>
     <div class="form-group">
-      <label for="contribution">Weekly Contribution (<span class="cur-sym">€</span>)</label>
-      <input type="number" id="contribution" value="100" min="0" step="10">
+      <label for="contribution"><span id="contribLabel">Monthly Contribution</span> (<span class="cur-sym">€</span>)</label>
+      <input type="number" id="contribution" value="500" min="0" step="10">
     </div>
     <div class="form-group">
       <label for="rate">Annual Interest Rate (%)</label>
@@ -292,12 +299,20 @@
   const $ = id => document.getElementById(id);
   const fmtPct = n => n.toFixed(2) + '%';
 
-  // Weekly cadence: contributions are weekly, and we compound weekly too.
-  const WEEKS_PER_YEAR = 52;
+  // Contributions can be monthly (12/year) or weekly (52/year). We compound
+  // at the same cadence as the chosen contribution frequency.
+  const PERIODS_PER_YEAR = { monthly: 12, weekly: 52 };
+  const FREQ_LABEL = { monthly: 'Monthly Contribution', weekly: 'Weekly Contribution' };
 
   // Restore previously chosen currency (defaults to EUR).
   const savedCurrency = localStorage.getItem('cic_currency');
   if (savedCurrency) $('currency').value = savedCurrency;
+
+  // Restore previously chosen contribution frequency (defaults to monthly).
+  const savedFrequency = localStorage.getItem('cic_frequency');
+  if (savedFrequency && PERIODS_PER_YEAR[savedFrequency]) {
+    $('frequency').value = savedFrequency;
+  }
 
   let activeCurrency = $('currency').value || 'EUR';
 
@@ -320,6 +335,11 @@
     document.querySelectorAll('.cur-sym').forEach(el => { el.textContent = sym; });
   }
 
+  function updateFrequencyLabel() {
+    const freq = $('frequency').value;
+    $('contribLabel').textContent = FREQ_LABEL[freq] || FREQ_LABEL.monthly;
+  }
+
   let chart = null;
   let tableData = [];
 
@@ -336,8 +356,16 @@
     calculate();
   });
 
+  // Frequency change: update label + recalculate.
+  $('frequency').addEventListener('change', function () {
+    localStorage.setItem('cic_frequency', this.value);
+    updateFrequencyLabel();
+    calculate();
+  });
+
   // Initial label sync (runs before first calculate()).
   updateCurrencyLabels();
+  updateFrequencyLabel();
 
   // Calculate on button click
   $('calculateBtn').addEventListener('click', calculate);
@@ -349,15 +377,17 @@
 
   function calculate() {
     const principal = parseFloat($('principal').value) || 0;
-    const weekly = parseFloat($('contribution').value) || 0;
+    const contribution = parseFloat($('contribution').value) || 0;
     const annualRate = (parseFloat($('rate').value) || 0) / 100;
     const years = parseInt($('years').value) || 1;
     const useInflation = $('inflationToggle').checked;
     const inflationRate = useInflation ? (parseFloat($('inflation').value) || 0) / 100 : 0;
 
-    const weeklyRate = annualRate / WEEKS_PER_YEAR;
+    const frequency = $('frequency').value;
+    const periodsPerYear = PERIODS_PER_YEAR[frequency] || PERIODS_PER_YEAR.monthly;
+    const periodRate = annualRate / periodsPerYear;
 
-    // Build year-by-year data, simulated week-by-week.
+    // Build year-by-year data, simulated period-by-period.
     tableData = [];
     let balance = principal;
     let totalContrib = principal;
@@ -374,13 +404,13 @@
       let yearInterest = 0;
       let yearContrib = 0;
 
-      for (let w = 0; w < WEEKS_PER_YEAR; w++) {
-        // Add the weekly contribution at the start of the week.
-        balance += weekly;
-        yearContrib += weekly;
+      for (let p = 0; p < periodsPerYear; p++) {
+        // Add the contribution at the start of the period.
+        balance += contribution;
+        yearContrib += contribution;
 
-        // Apply interest for the week.
-        const interest = balance * weeklyRate;
+        // Apply interest for the period.
+        const interest = balance * periodRate;
         balance += interest;
         yearInterest += interest;
       }
