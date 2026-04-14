@@ -58,6 +58,13 @@
   .option-group {
     flex: 1;
     min-width: 120px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .option-group select,
+  .option-group input {
+    margin-top: auto;
   }
 
   select, input[type="number"], input[type="color"] {
@@ -343,8 +350,21 @@ document.getElementById('copy-png').addEventListener('click', async () => {
   if (!currentQR) return;
   const btn = document.getElementById('copy-png');
   try {
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
+      throw new Error('Clipboard API unavailable');
+    }
+    // Safari requires ClipboardItem to be constructed synchronously inside
+    // the user-gesture task; pass a Promise for the blob rather than awaiting
+    // toBlob first (which would drop transient user activation).
+    const item = new ClipboardItem({
+      'image/png': new Promise((resolve, reject) => {
+        canvas.toBlob(
+          blob => blob ? resolve(blob) : reject(new Error('toBlob returned null')),
+          'image/png'
+        );
+      })
+    });
+    await navigator.clipboard.write([item]);
     btn.textContent = 'Copied!';
     setTimeout(() => btn.textContent = 'Copy to Clipboard', 1500);
   } catch {
