@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bird Call Quiz — Tools</title>
+<meta name="description" content="Practice identifying bird songs and calls using the Xeno-Canto library.">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 780px; }
+  .hidden { display: none !important; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .card h3 {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  /* ── Setup card (API key onboarding) ── */
+  .setup-steps { font-size: 0.88rem; color: var(--text-muted); margin: 0.75rem 0 1rem; padding-left: 1.1rem; }
+  .setup-steps li { margin-bottom: 0.35rem; }
+  .setup-steps a { color: var(--accent); text-decoration: none; }
+  .setup-steps a:hover { text-decoration: underline; }
+  .setup-form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .setup-form input {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9rem;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+  }
+  .setup-note { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.75rem; }
+
+  /* ── Settings row ── */
+  .settings {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+  .settings label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+  .settings select {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.88rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .settings-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .settings-actions .info {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 0.25rem 0.4rem;
+    font-family: inherit;
+  }
+  .link-btn:hover { color: var(--accent); }
+
+  /* ── Quiz card ── */
+  .quiz-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .quiz-round { font-size: 0.85rem; font-weight: 500; }
+  .quiz-score { font-size: 0.85rem; color: var(--text-muted); }
+  .quiz-streak { color: var(--amber); }
+
+  .player {
+    background: var(--surface-alt);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+  .player audio {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  .player-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .player-meta a { color: var(--text-muted); text-decoration: underline; }
+  .player-meta a:hover { color: var(--accent); }
+
+  .choices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+  .choice {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.92rem;
+    color: var(--text);
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .choice:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .choice:disabled { cursor: default; }
+  .choice.correct {
+    border-color: var(--green);
+    background: var(--green-dim);
+    color: var(--green);
+    font-weight: 500;
+  }
+  .choice.wrong {
+    border-color: var(--red);
+    background: var(--red-dim);
+    color: var(--red);
+  }
+  .choice .sci {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.15rem;
+  }
+  .choice.correct .sci, .choice.wrong .sci { color: inherit; opacity: 0.75; }
+
+  .quiz-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .loading, .quiz-status {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 2rem 1rem;
+  }
+  .quiz-status.error { color: var(--red); }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: -2px;
+    margin-right: 0.5rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Stats card ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .stat {
+    background: var(--surface-alt);
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+    text-align: center;
+  }
+  .stat-value { display: block; font-size: 1.2rem; font-weight: 600; }
+  .stat-label {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 0.15rem;
+  }
+
+  details.species-stats { margin-top: 0.75rem; }
+  details.species-stats summary {
+    cursor: pointer;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    padding: 0.4rem 0;
+  }
+  details.species-stats summary:hover { color: var(--accent); }
+  .species-table {
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .species-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .species-row:last-child { border-bottom: none; }
+  .species-row .name { color: var(--text); }
+  .species-row .acc { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 600px) {
+    .settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .choices { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Bird Call Quiz</h1>
+        <a href="/">&larr; All tools</a>
+      </div>
+    </header>
+    <p class="desc">Train your ear with recordings from Xeno-Canto's library of ~1M wildlife sounds. Pick a region, listen, guess the species.</p>
+
+    <!-- ── Setup: API key onboarding ── -->
+    <div id="setup" class="card hidden">
+      <h3>One-time setup</h3>
+      <p style="font-size: 0.88rem;">This tool streams recordings from <a href="https://xeno-canto.org" target="_blank" rel="noopener" style="color: var(--accent);">Xeno-Canto</a>, the world's largest open library of wildlife sounds. Their API v3 needs a personal key &mdash; free, takes about a minute.</p>
+      <ol class="setup-steps">
+        <li>Create a free account at <a href="https://xeno-canto.org/account/register" target="_blank" rel="noopener">xeno-canto.org/account/register</a></li>
+        <li>Verify your email, then open <a href="https://xeno-canto.org/account" target="_blank" rel="noopener">your account page</a></li>
+        <li>Copy your API key and paste it below</li>
+      </ol>
+      <form class="setup-form" id="setup-form">
+        <input type="password" id="apikey-input" placeholder="Paste your Xeno-Canto API key" autocomplete="off" spellcheck="false" required>
+        <button type="submit" class="btn btn-primary">Save key</button>
+      </form>
+      <p class="setup-note">Your key is stored only in this browser's localStorage. It never leaves your device except to call Xeno-Canto directly.</p>
+      <p id="setup-error" class="setup-note hidden" style="color: var(--red);"></p>
+    </div>
+
+    <!-- ── Main app ── -->
+    <div id="app" class="hidden">
+      <div class="settings">
+        <label>
+          Region
+          <select id="sel-region"></select>
+        </label>
+        <label>
+          Quality
+          <select id="sel-quality">
+            <option value="A">A only (best)</option>
+            <option value="AB" selected>A or B</option>
+            <option value="any">Any quality</option>
+          </select>
+        </label>
+        <label>
+          Sound type
+          <select id="sel-type">
+            <option value="song" selected>Songs</option>
+            <option value="call">Calls</option>
+            <option value="any">Any type</option>
+          </select>
+        </label>
+        <label>
+          Difficulty
+          <select id="sel-difficulty">
+            <option value="15">Beginner (top 15 species)</option>
+            <option value="30" selected>Intermediate (top 30)</option>
+            <option value="60">Advanced (top 60)</option>
+            <option value="0">Expert (all species)</option>
+          </select>
+        </label>
+      </div>
+      <div class="settings-actions">
+        <button id="btn-start" class="btn btn-primary">Start quiz</button>
+        <span class="info" id="pool-info"></span>
+        <span style="flex: 1;"></span>
+        <button class="link-btn" id="btn-forget-key">Change API key</button>
+      </div>
+
+      <!-- Quiz card -->
+      <div id="quiz" class="card hidden">
+        <div class="quiz-header">
+          <div>
+            <span class="quiz-round" id="quiz-round">Round 1</span>
+            <span class="quiz-score" id="quiz-score"></span>
+          </div>
+          <span class="quiz-score" id="quiz-streak"></span>
+        </div>
+        <div id="quiz-body">
+          <div class="player">
+            <audio id="audio" controls preload="auto"></audio>
+            <div class="player-meta" id="player-meta"></div>
+          </div>
+          <div class="choices" id="choices"></div>
+          <div class="quiz-actions">
+            <button class="btn btn-secondary" id="btn-replay">Replay</button>
+            <button class="btn btn-secondary" id="btn-skip">Skip / Reveal</button>
+            <button class="btn btn-primary hidden" id="btn-next">Next round</button>
+          </div>
+        </div>
+        <div id="quiz-status" class="quiz-status hidden"></div>
+      </div>
+
+      <!-- Stats card -->
+      <div class="card">
+        <h3>Stats</h3>
+        <div class="stats-grid">
+          <div class="stat"><span class="stat-value" id="st-session">0 / 0</span><span class="stat-label">This session</span></div>
+          <div class="stat"><span class="stat-value" id="st-streak">0</span><span class="stat-label">Best streak</span></div>
+          <div class="stat"><span class="stat-value" id="st-total">0</span><span class="stat-label">Total rounds</span></div>
+          <div class="stat"><span class="stat-value" id="st-accuracy">&mdash;</span><span class="stat-label">Lifetime accuracy</span></div>
+        </div>
+        <details class="species-stats">
+          <summary>Per-species accuracy</summary>
+          <div class="species-table" id="species-table"></div>
+        </details>
+        <div style="margin-top: 0.75rem; text-align: right;">
+          <button class="link-btn" id="btn-reset-stats">Reset all stats</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // ─────────────────────────────────────────────────────────
+    // Constants & storage
+    // ─────────────────────────────────────────────────────────
+    const LS_KEY = 'bcq_apikey';
+    const LS_STATS = 'bcq_stats';
+    const LS_SETTINGS = 'bcq_settings';
+    const API = 'https://xeno-canto.org/api/3/recordings';
+    const MAX_PAGES = 3;          // up to 1500 recordings per pool load
+    const PER_PAGE = 500;
+
+    // Region list for the dropdown. Value is the exact string xeno-canto
+    // matches with `cnt:"..."` (starts-with match, so we quote to be exact).
+    const REGIONS = [
+      { label: '🌍 Worldwide', value: '' },
+      { group: 'Europe', items: [
+        'United Kingdom', 'Ireland', 'France', 'Spain', 'Portugal', 'Italy',
+        'Germany', 'Netherlands', 'Belgium', 'Switzerland', 'Austria',
+        'Poland', 'Czech Republic', 'Hungary', 'Romania', 'Greece',
+        'Sweden', 'Norway', 'Finland', 'Denmark', 'Iceland',
+      ]},
+      { group: 'North America', items: [
+        'United States', 'Canada', 'Mexico', 'Costa Rica', 'Panama',
+        'Belize', 'Guatemala', 'Cuba',
+      ]},
+      { group: 'South America', items: [
+        'Colombia', 'Ecuador', 'Peru', 'Brazil', 'Bolivia',
+        'Argentina', 'Chile', 'Venezuela', 'Uruguay',
+      ]},
+      { group: 'Africa', items: [
+        'Kenya', 'Tanzania', 'Uganda', 'South Africa', 'Namibia',
+        'Madagascar', 'Morocco', 'Egypt', 'Ghana', 'Ethiopia',
+      ]},
+      { group: 'Asia', items: [
+        'India', 'Nepal', 'Sri Lanka', 'Thailand', 'Malaysia',
+        'Indonesia', 'Philippines', 'Vietnam', 'China', 'Japan',
+        'Israel', 'Turkey',
+      ]},
+      { group: 'Oceania', items: [
+        'Australia', 'New Zealand', 'Papua New Guinea',
+      ]},
+    ];
+
+    // ─────────────────────────────────────────────────────────
+    // State
+    // ─────────────────────────────────────────────────────────
+    const state = {
+      apiKey: localStorage.getItem(LS_KEY) || '',
+      pool: null,            // { species: [...], totalRecordings }
+      round: null,           // { target, recording, choices }
+      answered: false,
+      session: { rounds: 0, correct: 0, streak: 0, bestStreak: 0 },
+    };
+
+    function defaultStats() {
+      return { totalRounds: 0, totalCorrect: 0, bestStreak: 0, species: {} };
+    }
+    function loadStats() {
+      try { return JSON.parse(localStorage.getItem(LS_STATS)) || defaultStats(); }
+      catch { return defaultStats(); }
+    }
+    function saveStats() {
+      localStorage.setItem(LS_STATS, JSON.stringify(stats));
+    }
+    function loadSettings() {
+      try { return JSON.parse(localStorage.getItem(LS_SETTINGS)) || {}; }
+      catch { return {}; }
+    }
+    function saveSettings(s) {
+      localStorage.setItem(LS_SETTINGS, JSON.stringify(s));
+    }
+    let stats = loadStats();
+
+    // ─────────────────────────────────────────────────────────
+    // Tiny helpers
+    // ─────────────────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+    const pickRandom = arr => arr[Math.floor(Math.random() * arr.length)];
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Xeno-Canto API
+    // ─────────────────────────────────────────────────────────
+    function buildQueryString(settings) {
+      // Tags joined by spaces (encoded as + in URL). We always restrict to birds.
+      const parts = ['grp:birds'];
+      if (settings.country) parts.push(`cnt:"${settings.country}"`);
+      if (settings.quality === 'A') parts.push('q:A');
+      else if (settings.quality === 'AB') parts.push('q:">C"');  // B or A
+      if (settings.type === 'song') parts.push('type:song');
+      else if (settings.type === 'call') parts.push('type:call');
+      return parts.join(' ');
+    }
+
+    async function fetchPage(query, page) {
+      const url = `${API}?query=${encodeURIComponent(query)}`
+                + `&key=${encodeURIComponent(state.apiKey)}`
+                + `&per_page=${PER_PAGE}&page=${page}`;
+      const resp = await fetch(url);
+      let data;
+      try { data = await resp.json(); }
+      catch { throw new Error(`HTTP ${resp.status} — invalid response from Xeno-Canto`); }
+      if (data.error) {
+        const msg = data.message || data.error;
+        const err = new Error(msg);
+        err.code = data.error;
+        throw err;
+      }
+      return data;
+    }
+
+    async function loadPool(settings) {
+      const query = buildQueryString(settings);
+      const recordings = [];
+      const first = await fetchPage(query, 1);
+      recordings.push(...(first.recordings || []));
+      const totalPages = Math.min(first.numPages || 1, MAX_PAGES);
+      for (let p = 2; p <= totalPages; p++) {
+        if (recordings.length >= 1500) break;
+        const data = await fetchPage(query, p);
+        recordings.push(...(data.recordings || []));
+      }
+      // Keep only usable entries: has audio file, scientific name, english name.
+      const valid = recordings.filter(r =>
+        r.file && r.gen && r.sp && r.en && r.en.trim() && !r.en.includes('Identity unknown')
+      );
+      // Group by species (scientific name).
+      const bySpecies = new Map();
+      for (const r of valid) {
+        const key = `${r.gen} ${r.sp}`.toLowerCase();
+        if (!bySpecies.has(key)) {
+          bySpecies.set(key, {
+            sciName: `${r.gen} ${r.sp}`,
+            en: r.en,
+            recordings: [],
+          });
+        }
+        bySpecies.get(key).recordings.push(r);
+      }
+      // Sort species by recording count desc (most common first), then name.
+      const species = [...bySpecies.values()].sort((a, b) => {
+        if (b.recordings.length !== a.recordings.length) {
+          return b.recordings.length - a.recordings.length;
+        }
+        return a.en.localeCompare(b.en);
+      });
+      const poolSize = parseInt(settings.difficulty, 10);
+      const top = poolSize > 0 ? species.slice(0, poolSize) : species;
+      if (top.length < 4) {
+        throw new Error(`Only ${top.length} species match these filters. Try a broader region or quality.`);
+      }
+      return {
+        species: top,
+        totalRecordings: top.reduce((s, sp) => s + sp.recordings.length, 0),
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Round logic
+    // ─────────────────────────────────────────────────────────
+    function newRound() {
+      const { species } = state.pool;
+      const target = pickRandom(species);
+      const recording = pickRandom(target.recordings);
+      // Pick 3 distractors (different species from target).
+      const pool = species.filter(s => s.sciName !== target.sciName);
+      const distractors = [];
+      const poolCopy = pool.slice();
+      while (distractors.length < 3 && poolCopy.length) {
+        const idx = Math.floor(Math.random() * poolCopy.length);
+        distractors.push(poolCopy.splice(idx, 1)[0]);
+      }
+      state.round = {
+        target,
+        recording,
+        choices: shuffle([target, ...distractors]),
+      };
+      state.answered = false;
+      renderRound();
+    }
+
+    function answerRound(chosenSciName) {
+      if (state.answered) return;
+      state.answered = true;
+      const { target } = state.round;
+      const correct = chosenSciName === target.sciName;
+      // Session stats
+      state.session.rounds += 1;
+      if (correct) {
+        state.session.correct += 1;
+        state.session.streak += 1;
+        if (state.session.streak > state.session.bestStreak) {
+          state.session.bestStreak = state.session.streak;
+        }
+      } else {
+        state.session.streak = 0;
+      }
+      // Lifetime stats
+      stats.totalRounds += 1;
+      if (correct) stats.totalCorrect += 1;
+      if (state.session.bestStreak > stats.bestStreak) {
+        stats.bestStreak = state.session.bestStreak;
+      }
+      const sp = stats.species[target.sciName] || { en: target.en, attempts: 0, correct: 0 };
+      sp.en = target.en;
+      sp.attempts += 1;
+      if (correct) sp.correct += 1;
+      stats.species[target.sciName] = sp;
+      saveStats();
+      renderRoundAnswered(chosenSciName);
+      renderStats();
+    }
+
+    function revealRound() {
+      if (state.answered) return;
+      // Skipping counts as an attempted-and-wrong round for that species,
+      // so it will appear in stats until you get it right.
+      state.answered = true;
+      state.session.rounds += 1;
+      state.session.streak = 0;
+      stats.totalRounds += 1;
+      const { target } = state.round;
+      const sp = stats.species[target.sciName] || { en: target.en, attempts: 0, correct: 0 };
+      sp.en = target.en;
+      sp.attempts += 1;
+      stats.species[target.sciName] = sp;
+      saveStats();
+      renderRoundAnswered(null);
+      renderStats();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Rendering
+    // ─────────────────────────────────────────────────────────
+    function renderRegions() {
+      const sel = $('sel-region');
+      sel.innerHTML = '';
+      const worldOpt = document.createElement('option');
+      worldOpt.value = '';
+      worldOpt.textContent = 'Worldwide';
+      sel.appendChild(worldOpt);
+      for (const entry of REGIONS) {
+        if (entry.group) {
+          const og = document.createElement('optgroup');
+          og.label = entry.group;
+          for (const country of entry.items) {
+            const opt = document.createElement('option');
+            opt.value = country;
+            opt.textContent = country;
+            og.appendChild(opt);
+          }
+          sel.appendChild(og);
+        }
+      }
+    }
+
+    function renderRound() {
+      const { recording, choices, target } = state.round;
+      $('quiz-status').classList.add('hidden');
+      $('quiz-body').style.display = '';
+      // Header
+      $('quiz-round').textContent = `Round ${state.session.rounds + 1}`;
+      const pct = state.session.rounds
+        ? Math.round((state.session.correct / state.session.rounds) * 100)
+        : 0;
+      $('quiz-score').textContent = state.session.rounds
+        ? ` · ${state.session.correct} / ${state.session.rounds} (${pct}%)`
+        : '';
+      $('quiz-streak').innerHTML = state.session.streak > 1
+        ? `<span class="quiz-streak">🔥 ${state.session.streak} streak</span>`
+        : '';
+      // Audio
+      const audio = $('audio');
+      audio.src = recording.file;
+      audio.load();
+      audio.onerror = () => {
+        $('player-meta').innerHTML =
+          `<span style="color: var(--red);">Couldn't load this recording. Skip to the next one.</span>`;
+      };
+      audio.play().catch(() => { /* autoplay blocked — user can click play */ });
+      // Hide meta/credit until answer (so the URL doesn't spoil the species).
+      $('player-meta').innerHTML = `<em>Recording hidden until you answer</em>`;
+      // Choices
+      const box = $('choices');
+      box.innerHTML = '';
+      for (const choice of choices) {
+        const btn = document.createElement('button');
+        btn.className = 'choice';
+        btn.dataset.sci = choice.sciName;
+        btn.innerHTML = `${escapeHtml(choice.en)}<span class="sci">${escapeHtml(choice.sciName)}</span>`;
+        btn.addEventListener('click', () => answerRound(choice.sciName));
+        box.appendChild(btn);
+      }
+      // Actions
+      $('btn-next').classList.add('hidden');
+      $('btn-skip').classList.remove('hidden');
+    }
+
+    function renderRoundAnswered(chosenSciName) {
+      const { target, recording } = state.round;
+      // Highlight choices
+      for (const btn of document.querySelectorAll('.choice')) {
+        btn.disabled = true;
+        const sci = btn.dataset.sci;
+        if (sci === target.sciName) btn.classList.add('correct');
+        else if (sci === chosenSciName) btn.classList.add('wrong');
+      }
+      // Show recording credit now that it's no longer a spoiler.
+      const parts = [];
+      if (recording.rec) parts.push(`Recorded by ${escapeHtml(recording.rec)}`);
+      if (recording.loc) parts.push(escapeHtml(recording.loc));
+      if (recording.cnt) parts.push(escapeHtml(recording.cnt));
+      if (recording.date) parts.push(escapeHtml(recording.date));
+      const credit = parts.join(' · ');
+      const xcUrl = `https://xeno-canto.org/${recording.id}`;
+      $('player-meta').innerHTML =
+        `<a href="${xcUrl}" target="_blank" rel="noopener">XC${escapeHtml(recording.id)}</a>` +
+        (credit ? ` · ${credit}` : '') +
+        (recording.type ? ` <br>Sound type: ${escapeHtml(recording.type)}` : '');
+      // Actions
+      $('btn-next').classList.remove('hidden');
+      $('btn-skip').classList.add('hidden');
+    }
+
+    function renderStats() {
+      $('st-session').textContent = `${state.session.correct} / ${state.session.rounds}`;
+      $('st-streak').textContent = stats.bestStreak;
+      $('st-total').textContent = stats.totalRounds;
+      $('st-accuracy').textContent = stats.totalRounds
+        ? `${Math.round((stats.totalCorrect / stats.totalRounds) * 100)}%`
+        : '—';
+      const rows = Object.entries(stats.species)
+        .map(([sciName, sp]) => ({ sciName, ...sp }))
+        .sort((a, b) => {
+          const pa = a.attempts ? a.correct / a.attempts : 0;
+          const pb = b.attempts ? b.correct / b.attempts : 0;
+          return pa - pb;  // worst first
+        });
+      const table = $('species-table');
+      if (!rows.length) {
+        table.innerHTML = '<p style="font-size: 0.82rem; color: var(--text-muted); padding: 0.5rem 0;">No attempts yet.</p>';
+        return;
+      }
+      table.innerHTML = rows.map(r => {
+        const pct = r.attempts ? Math.round((r.correct / r.attempts) * 100) : 0;
+        return `<div class="species-row"><span class="name">${escapeHtml(r.en)}</span><span class="acc">${r.correct}/${r.attempts} · ${pct}%</span></div>`;
+      }).join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Flow / wiring
+    // ─────────────────────────────────────────────────────────
+    function showSetup(errorMsg) {
+      $('setup').classList.remove('hidden');
+      $('app').classList.add('hidden');
+      $('apikey-input').focus();
+      const err = $('setup-error');
+      if (errorMsg) { err.textContent = errorMsg; err.classList.remove('hidden'); }
+      else { err.classList.add('hidden'); }
+    }
+
+    function showApp() {
+      $('setup').classList.add('hidden');
+      $('app').classList.remove('hidden');
+      renderStats();
+    }
+
+    function currentSettings() {
+      return {
+        country: $('sel-region').value,
+        quality: $('sel-quality').value,
+        type: $('sel-type').value,
+        difficulty: $('sel-difficulty').value,
+      };
+    }
+
+    function applySavedSettings() {
+      const s = loadSettings();
+      if (s.country !== undefined) $('sel-region').value = s.country;
+      if (s.quality) $('sel-quality').value = s.quality;
+      if (s.type) $('sel-type').value = s.type;
+      if (s.difficulty) $('sel-difficulty').value = s.difficulty;
+    }
+
+    async function startQuiz() {
+      const settings = currentSettings();
+      saveSettings(settings);
+      const quiz = $('quiz');
+      const body = $('quiz-body');
+      const status = $('quiz-status');
+      quiz.classList.remove('hidden');
+      body.style.display = 'none';
+      status.classList.remove('hidden', 'error');
+      status.innerHTML = `<span class="spinner"></span>Loading recordings from Xeno-Canto…`;
+      $('btn-start').disabled = true;
+      $('pool-info').textContent = '';
+      // Reset session on new quiz start.
+      state.session = { rounds: 0, correct: 0, streak: 0, bestStreak: 0 };
+      renderStats();
+      try {
+        state.pool = await loadPool(settings);
+        $('pool-info').textContent =
+          `${state.pool.species.length} species · ${state.pool.totalRecordings} recordings`;
+        newRound();
+      } catch (err) {
+        console.error(err);
+        const msg = (err && err.message) || String(err);
+        // Detect invalid-key errors from the API and push back to setup.
+        if (/key/i.test(msg) && (/invalid/i.test(msg) || /missing/i.test(msg))) {
+          showSetup(`API key was rejected: ${msg}`);
+        } else {
+          status.classList.add('error');
+          status.textContent = `Couldn't load recordings: ${msg}`;
+        }
+      } finally {
+        $('btn-start').disabled = false;
+      }
+    }
+
+    function initEventHandlers() {
+      // Setup form
+      $('setup-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const val = $('apikey-input').value.trim();
+        if (!val) return;
+        state.apiKey = val;
+        localStorage.setItem(LS_KEY, val);
+        showApp();
+      });
+      // Settings
+      $('btn-start').addEventListener('click', startQuiz);
+      $('btn-forget-key').addEventListener('click', () => {
+        if (!confirm('Remove the stored Xeno-Canto API key from this browser?')) return;
+        localStorage.removeItem(LS_KEY);
+        state.apiKey = '';
+        $('apikey-input').value = '';
+        showSetup();
+      });
+      // Quiz controls
+      $('btn-replay').addEventListener('click', () => {
+        const a = $('audio');
+        a.currentTime = 0;
+        a.play().catch(() => {});
+      });
+      $('btn-skip').addEventListener('click', revealRound);
+      $('btn-next').addEventListener('click', newRound);
+      // Stats
+      $('btn-reset-stats').addEventListener('click', () => {
+        if (!confirm('Reset all lifetime stats? This cannot be undone.')) return;
+        stats = defaultStats();
+        saveStats();
+        renderStats();
+      });
+      // Keyboard: 1-4 pick answer, N = next, R = replay, S = skip
+      document.addEventListener('keydown', e => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        if ($('quiz').classList.contains('hidden')) return;
+        const k = e.key.toLowerCase();
+        if (!state.answered && /^[1-4]$/.test(k)) {
+          const idx = parseInt(k, 10) - 1;
+          const choices = document.querySelectorAll('.choice');
+          if (choices[idx]) choices[idx].click();
+        } else if (k === 'n' && state.answered) {
+          $('btn-next').click();
+        } else if (k === 'r') {
+          $('btn-replay').click();
+        } else if (k === 's' && !state.answered) {
+          $('btn-skip').click();
+        }
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Init
+    // ─────────────────────────────────────────────────────────
+    renderRegions();
+    applySavedSettings();
+    initEventHandlers();
+    if (state.apiKey) showApp();
+    else showSetup();
+  </script>
+</body>
+</html>
