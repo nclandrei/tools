@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Birding Hour Calculator</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 720px; }
+
+  /* Location card */
+  .location-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.15rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .location-info .lbl {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.2rem;
+  }
+  .location-info .coords {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .location-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .location-actions .btn {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.82rem;
+  }
+  .location-editor {
+    display: none;
+    flex-basis: 100%;
+    gap: 0.6rem;
+    margin-top: 0.4rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .location-editor.open { display: flex; }
+  .location-editor .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .location-editor .field label {
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+  .location-editor input {
+    padding: 0.5rem 0.65rem;
+    font-size: 0.88rem;
+    width: 130px;
+  }
+
+  /* Error / notice */
+  .error {
+    padding: 0.75rem 0.95rem;
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    color: var(--red);
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
+  }
+  .notice {
+    padding: 0.75rem 0.95rem;
+    background: var(--surface-alt);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  /* Status card */
+  .status-card {
+    padding: 1.15rem 1.25rem;
+    border-radius: 10px;
+    margin-bottom: 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .status-card.prime {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  .status-phase {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+  }
+  .status-card.prime .status-phase { color: var(--accent); }
+  .status-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.25;
+    margin-bottom: 0.3rem;
+  }
+  .status-sub {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+  .status-sub strong {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Day card */
+  .day-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.15rem 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .day-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+    flex-wrap: wrap;
+  }
+  .day-head h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .day-head .meta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Timeline */
+  .timeline {
+    margin-bottom: 0.95rem;
+  }
+  .timeline svg {
+    width: 100%;
+    height: 46px;
+    display: block;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .timeline-axis {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .timeline-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.85rem;
+    margin-top: 0.55rem;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+  }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  /* Windows */
+  .window-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-bottom: 0.95rem;
+  }
+  .window-card {
+    background: var(--surface-alt);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.7rem 0.85rem;
+  }
+  .window-card .wlbl {
+    font-size: 0.64rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    margin-bottom: 0.15rem;
+  }
+  .window-card .wtime {
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .window-card .wsub {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+  }
+
+  /* Events grid */
+  .events-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.7rem 0.9rem;
+  }
+  .event-item {
+    display: flex;
+    flex-direction: column;
+  }
+  .event-item .elbl {
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.1rem;
+  }
+  .event-item .etime {
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Upcoming days */
+  .section-heading {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 1.6rem 0 0.7rem;
+  }
+  .compact-day {
+    display: grid;
+    grid-template-columns: minmax(110px, 1fr) repeat(4, auto);
+    gap: 0.4rem 1rem;
+    align-items: baseline;
+    padding: 0.75rem 0.95rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+  }
+  .compact-day .cday {
+    font-weight: 500;
+    color: var(--text);
+  }
+  .compact-day .cstat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .compact-day .clbl {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.05rem;
+  }
+  .compact-day .cval {
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-size: 0.86rem;
+  }
+
+  /* Notes */
+  .notes {
+    margin-top: 2rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .notes p { margin-bottom: 0.5rem; }
+  .notes strong { color: var(--text); }
+
+  @media (max-width: 560px) {
+    .events-grid { grid-template-columns: repeat(2, 1fr); }
+    .window-row { grid-template-columns: 1fr; }
+    .compact-day { grid-template-columns: 1fr auto auto; gap: 0.4rem 0.75rem; }
+    .compact-day .cstat.wide { display: none; }
+    .day-head { flex-direction: column; gap: 0.15rem; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Birding Hour Calculator</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+  <p class="desc">Sunrise, sunset, twilight, and the dawn chorus window for the next seven days. Birds are most active in the first hour after sunrise &mdash; now you'll know exactly when to be out.</p>
+
+  <div id="error-box"></div>
+
+  <div class="location-card">
+    <div class="location-info">
+      <div class="lbl">Location</div>
+      <div class="coords" id="coords-display">Not set</div>
+    </div>
+    <div class="location-actions">
+      <button class="btn btn-primary" id="gps-btn">Use my location</button>
+      <button class="btn btn-secondary" id="edit-btn">Edit</button>
+    </div>
+    <div class="location-editor" id="editor">
+      <div class="field">
+        <label for="lat-input">Latitude</label>
+        <input type="number" id="lat-input" step="0.0001" min="-90" max="90" placeholder="51.5074">
+      </div>
+      <div class="field">
+        <label for="lon-input">Longitude</label>
+        <input type="number" id="lon-input" step="0.0001" min="-180" max="180" placeholder="-0.1278">
+      </div>
+      <button class="btn btn-primary" id="save-btn">Save</button>
+    </div>
+  </div>
+
+  <div id="empty-state" class="notice">
+    Tap <strong>Use my location</strong> to autofill from GPS, or <strong>Edit</strong> to paste coordinates. Nothing is sent anywhere &mdash; all calculations run in this tab.
+  </div>
+
+  <div id="content" style="display:none;">
+    <div id="status" class="status-card"></div>
+    <div class="day-card" id="today-card"></div>
+    <div class="section-heading">Next six days</div>
+    <div id="upcoming"></div>
+    <div class="notes">
+      <p><strong>Dawn chorus window</strong> &mdash; 30 min before sunrise until 60 min after. Songbird activity peaks here, especially in spring and early summer on still mornings. Arrive 15 min early so you're settled before it starts.</p>
+      <p><strong>Evening window</strong> &mdash; 60 min before sunset until civil dusk. Second best for activity: raptors returning to roost, crepuscular species, and sunset waterbird flights.</p>
+      <p><strong>Twilight phases</strong> &mdash; civil (sun 6&deg; below horizon), nautical (12&deg;), astronomical (18&deg;). All times shown in this device's local timezone. Solar positions via the NOAA algorithm.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ Solar math (NOAA) ============ */
+function julianDate(d) {
+  return d.getTime() / 86400000 + 2440587.5;
+}
+
+function solarGeometry(jd) {
+  const T = (jd - 2451545) / 36525;
+  let L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;
+  if (L0 < 0) L0 += 360;
+  const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+  const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
+  const Mrad = M * Math.PI / 180;
+  const C = Math.sin(Mrad) * (1.914602 - T * (0.004817 + 0.000014 * T)) +
+            Math.sin(2 * Mrad) * (0.019993 - 0.000101 * T) +
+            Math.sin(3 * Mrad) * 0.000289;
+  const trueLong = L0 + C;
+  const omega = (125.04 - 1934.136 * T) * Math.PI / 180;
+  const appLong = trueLong - 0.00569 - 0.00478 * Math.sin(omega);
+  const seconds = 21.448 - T * (46.815 + T * (0.00059 - T * 0.001813));
+  const epsilon0 = 23 + (26 + seconds / 60) / 60;
+  const epsilon = (epsilon0 + 0.00256 * Math.cos(omega)) * Math.PI / 180;
+  const appLongRad = appLong * Math.PI / 180;
+  const decl = Math.asin(Math.sin(epsilon) * Math.sin(appLongRad));
+  const y = Math.tan(epsilon / 2) ** 2;
+  const L0rad = L0 * Math.PI / 180;
+  const eot = 4 * (180 / Math.PI) * (
+    y * Math.sin(2 * L0rad) -
+    2 * e * Math.sin(Mrad) +
+    4 * e * y * Math.sin(Mrad) * Math.cos(2 * L0rad) -
+    0.5 * y * y * Math.sin(4 * L0rad) -
+    1.25 * e * e * Math.sin(2 * Mrad)
+  );
+  return { decl, eot };
+}
+
+function hourAngleDeg(lat, decl, altDeg) {
+  const latRad = lat * Math.PI / 180;
+  const altRad = altDeg * Math.PI / 180;
+  const cosH = (Math.sin(altRad) - Math.sin(latRad) * Math.sin(decl)) / (Math.cos(latRad) * Math.cos(decl));
+  if (cosH < -1 || cosH > 1) return null;
+  return Math.acos(cosH) * 180 / Math.PI;
+}
+
+function solarEvents(year, month, day, lat, lon) {
+  // Reference instant: local noon on the target calendar day
+  const localNoon = new Date(year, month, day, 12, 0, 0);
+  const jd = julianDate(localNoon);
+  const { decl, eot } = solarGeometry(jd);
+
+  // Solar noon in UTC minutes past UTC midnight of the local calendar date
+  const noonMinUTC = 720 - 4 * lon - eot;
+  const anchor = Date.UTC(year, month, day, 0, 0, 0);
+  const solarNoon = new Date(anchor + noonMinUTC * 60000);
+
+  function at(altDeg, before) {
+    const h = hourAngleDeg(lat, decl, altDeg);
+    if (h === null) return null;
+    const offsetMs = h * 4 * 60000;
+    return new Date(solarNoon.getTime() + (before ? -offsetMs : offsetMs));
+  }
+
+  // Polar detection: is sun above horizon at local noon?
+  const hSun = hourAngleDeg(lat, decl, -0.833);
+  const noonAltitude = Math.asin(
+    Math.sin(lat * Math.PI / 180) * Math.sin(decl) +
+    Math.cos(lat * Math.PI / 180) * Math.cos(decl)
+  ) * 180 / Math.PI;
+  const polarDay = hSun === null && noonAltitude > 0;
+  const polarNight = hSun === null && noonAltitude <= 0;
+
+  return {
+    astronomicalDawn: at(-18, true),
+    nauticalDawn: at(-12, true),
+    civilDawn: at(-6, true),
+    sunrise: at(-0.833, true),
+    solarNoon,
+    sunset: at(-0.833, false),
+    civilDusk: at(-6, false),
+    nauticalDusk: at(-12, false),
+    astronomicalDusk: at(-18, false),
+    polarDay, polarNight,
+  };
+}
+
+/* ============ Formatting ============ */
+function fmtTime(d) {
+  if (!d) return '\u2014';
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function fmtDate(d, opts) {
+  return d.toLocaleDateString([], opts || { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function fmtDuration(ms) {
+  if (ms < 0) ms = 0;
+  const totalMin = Math.round(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return m + ' min';
+  if (m === 0) return h + ' h';
+  return h + ' h ' + m + ' min';
+}
+
+function dayLengthStr(sunrise, sunset) {
+  if (!sunrise || !sunset) return '\u2014';
+  const ms = sunset - sunrise;
+  const totalMin = Math.round(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h + 'h ' + String(m).padStart(2, '0') + 'm';
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+/* ============ Birding windows ============ */
+function dawnWindow(events) {
+  if (!events.sunrise) return null;
+  return {
+    start: new Date(events.sunrise.getTime() - 30 * 60000),
+    end: new Date(events.sunrise.getTime() + 60 * 60000),
+  };
+}
+
+function duskWindow(events) {
+  if (!events.sunset) return null;
+  const end = events.civilDusk || new Date(events.sunset.getTime() + 30 * 60000);
+  return {
+    start: new Date(events.sunset.getTime() - 60 * 60000),
+    end,
+  };
+}
+
+/* ============ Location ============ */
+function loadLocation() {
+  try {
+    const s = localStorage.getItem('birding-location');
+    if (s) return JSON.parse(s);
+  } catch (e) {}
+  return null;
+}
+
+function saveLocation(loc) {
+  localStorage.setItem('birding-location', JSON.stringify(loc));
+}
+
+function formatCoords(lat, lon) {
+  const lt = Math.abs(lat).toFixed(4) + '\u00b0' + (lat >= 0 ? 'N' : 'S');
+  const ln = Math.abs(lon).toFixed(4) + '\u00b0' + (lon >= 0 ? 'E' : 'W');
+  return lt + ', ' + ln;
+}
+
+let currentLocation = loadLocation();
+
+function setError(msg) {
+  const box = document.getElementById('error-box');
+  if (!msg) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="error">' + esc(msg) + '</div>';
+}
+
+function requestGPS() {
+  if (!navigator.geolocation) {
+    setError('Geolocation is not supported by your browser. Enter coordinates manually instead.');
+    openEditor();
+    return;
+  }
+  const btn = document.getElementById('gps-btn');
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Getting location\u2026';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      currentLocation = {
+        lat: +pos.coords.latitude.toFixed(4),
+        lon: +pos.coords.longitude.toFixed(4),
+      };
+      saveLocation(currentLocation);
+      setError('');
+      btn.disabled = false;
+      btn.textContent = original;
+      render();
+    },
+    err => {
+      btn.disabled = false;
+      btn.textContent = original;
+      setError('Could not get location: ' + err.message + '. Enter coordinates manually below.');
+      openEditor();
+    },
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+  );
+}
+
+function openEditor() {
+  const ed = document.getElementById('editor');
+  ed.classList.add('open');
+  if (currentLocation) {
+    document.getElementById('lat-input').value = currentLocation.lat;
+    document.getElementById('lon-input').value = currentLocation.lon;
+  }
+  document.getElementById('lat-input').focus();
+}
+
+function saveEditor() {
+  const lat = parseFloat(document.getElementById('lat-input').value);
+  const lon = parseFloat(document.getElementById('lon-input').value);
+  if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    setError('Invalid coordinates. Latitude must be \u221290 to 90, longitude \u2212180 to 180.');
+    return;
+  }
+  currentLocation = { lat: +lat.toFixed(4), lon: +lon.toFixed(4) };
+  saveLocation(currentLocation);
+  setError('');
+  document.getElementById('editor').classList.remove('open');
+  render();
+}
+
+document.getElementById('gps-btn').addEventListener('click', requestGPS);
+document.getElementById('edit-btn').addEventListener('click', openEditor);
+document.getElementById('save-btn').addEventListener('click', saveEditor);
+document.getElementById('editor').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); saveEditor(); }
+});
+
+/* ============ Rendering ============ */
+function render() {
+  if (!currentLocation) {
+    document.getElementById('coords-display').textContent = 'Not set';
+    document.getElementById('content').style.display = 'none';
+    document.getElementById('empty-state').style.display = '';
+    return;
+  }
+  document.getElementById('coords-display').textContent = formatCoords(currentLocation.lat, currentLocation.lon);
+  document.getElementById('content').style.display = '';
+  document.getElementById('empty-state').style.display = 'none';
+
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const d = now.getDate();
+
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(y, m, d + i);
+    const events = solarEvents(dt.getFullYear(), dt.getMonth(), dt.getDate(), currentLocation.lat, currentLocation.lon);
+    days.push({ date: dt, events });
+  }
+
+  renderStatus(now, days[0]);
+  renderToday(now, days[0]);
+  renderUpcoming(days.slice(1));
+}
+
+function phaseForNow(now, events, dawnW, duskW) {
+  if (events.polarDay) return { phase: 'Polar day', sub: 'Sun never sets at this latitude today.' };
+  if (events.polarNight) return { phase: 'Polar night', sub: 'Sun never rises at this latitude today.' };
+
+  const list = [
+    { at: events.astronomicalDawn, label: 'Night', next: 'Astronomical dawn' },
+    { at: events.nauticalDawn, label: 'Astronomical twilight', next: 'Nautical dawn' },
+    { at: events.civilDawn, label: 'Nautical twilight', next: 'Civil dawn' },
+    { at: dawnW && dawnW.start, label: 'Civil twilight', next: 'Dawn chorus' },
+    { at: dawnW && dawnW.end, label: 'Dawn chorus \u2014 peak birding', next: 'Window closes', prime: true },
+    { at: events.solarNoon, label: 'Morning', next: 'Solar noon' },
+    { at: duskW && duskW.start, label: 'Afternoon', next: 'Evening window' },
+    { at: duskW && duskW.end, label: 'Evening window', next: 'Window closes', prime: true },
+    { at: events.nauticalDusk, label: 'Civil twilight', next: 'Nautical dusk' },
+    { at: events.astronomicalDusk, label: 'Astronomical twilight', next: 'Astronomical dusk' },
+  ];
+
+  for (const p of list) {
+    if (p.at && now < p.at) {
+      return { phase: p.label, next: p.next, nextTime: p.at, prime: !!p.prime };
+    }
+  }
+  return { phase: 'Night', sub: 'All solar events for today have passed.' };
+}
+
+function renderStatus(now, day) {
+  const { events } = day;
+  const dawnW = dawnWindow(events);
+  const duskW = duskWindow(events);
+  const p = phaseForNow(now, events, dawnW, duskW);
+
+  const statusEl = document.getElementById('status');
+  statusEl.classList.toggle('prime', !!p.prime);
+
+  let sub;
+  if (p.sub) {
+    sub = esc(p.sub);
+  } else if (p.next && p.nextTime) {
+    sub = esc(p.next) + ' in <strong>' + esc(fmtDuration(p.nextTime - now)) + '</strong> at <strong>' + esc(fmtTime(p.nextTime)) + '</strong>';
+  } else {
+    sub = 'All events for today have passed.';
+  }
+
+  statusEl.innerHTML =
+    '<div class="status-phase">Right now \u00b7 ' + esc(fmtTime(now)) + '</div>' +
+    '<div class="status-title">' + esc(p.phase) + '</div>' +
+    '<div class="status-sub">' + sub + '</div>';
+}
+
+function renderToday(now, day) {
+  const { events, date } = day;
+  const dawnW = dawnWindow(events);
+  const duskW = duskWindow(events);
+
+  const timeline = renderTimeline(date, events, dawnW, duskW, now);
+
+  let windowsHtml = '<div class="window-row">';
+  if (dawnW) {
+    windowsHtml += '<div class="window-card">' +
+      '<div class="wlbl">Dawn chorus</div>' +
+      '<div class="wtime">' + esc(fmtTime(dawnW.start)) + ' \u2013 ' + esc(fmtTime(dawnW.end)) + '</div>' +
+      '<div class="wsub">30 min before to 1 h after sunrise</div>' +
+      '</div>';
+  }
+  if (duskW) {
+    windowsHtml += '<div class="window-card">' +
+      '<div class="wlbl">Evening window</div>' +
+      '<div class="wtime">' + esc(fmtTime(duskW.start)) + ' \u2013 ' + esc(fmtTime(duskW.end)) + '</div>' +
+      '<div class="wsub">1 h before sunset to civil dusk</div>' +
+      '</div>';
+  }
+  windowsHtml += '</div>';
+
+  const eventsHtml = '<div class="events-grid">' +
+    eventItem('Astro. dawn', events.astronomicalDawn) +
+    eventItem('Nautical dawn', events.nauticalDawn) +
+    eventItem('Civil dawn', events.civilDawn) +
+    eventItem('Sunrise', events.sunrise) +
+    eventItem('Solar noon', events.solarNoon) +
+    eventItem('Sunset', events.sunset) +
+    eventItem('Civil dusk', events.civilDusk) +
+    eventItem('Nautical dusk', events.nauticalDusk) +
+    eventItem('Astro. dusk', events.astronomicalDusk) +
+    '</div>';
+
+  let meta = esc(fmtDate(date, { weekday: 'long', month: 'long', day: 'numeric' }));
+  if (!events.polarDay && !events.polarNight) {
+    meta += ' \u00b7 day length ' + esc(dayLengthStr(events.sunrise, events.sunset));
+  }
+
+  document.getElementById('today-card').innerHTML =
+    '<div class="day-head"><h2>Today</h2><div class="meta">' + meta + '</div></div>' +
+    timeline +
+    windowsHtml +
+    eventsHtml;
+}
+
+function eventItem(label, time) {
+  return '<div class="event-item"><div class="elbl">' + esc(label) + '</div><div class="etime">' + esc(fmtTime(time)) + '</div></div>';
+}
+
+/* ============ Timeline ============ */
+const SKY = {
+  night:   '#0b1226',
+  astro:   '#172446',
+  naut:    '#2d4267',
+  civil:   '#6b8bb0',
+  day:     '#c8dff5',
+};
+
+function renderTimeline(date, events, dawnW, duskW, now) {
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
+  const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, 0, 0);
+  const total = dayEnd - dayStart;
+  const pos = d => d ? Math.max(0, Math.min(1, (d - dayStart) / total)) : null;
+
+  const W = 720, H = 46;
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">';
+
+  // Background: polar day or night fills the whole bar
+  const baseFill = events.polarDay ? SKY.day : SKY.night;
+  svg += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="' + baseFill + '" />';
+
+  // Stack layers outward from night using available events
+  const layers = [
+    { start: events.astronomicalDawn, end: events.astronomicalDusk, fill: SKY.astro },
+    { start: events.nauticalDawn,     end: events.nauticalDusk,     fill: SKY.naut },
+    { start: events.civilDawn,        end: events.civilDusk,        fill: SKY.civil },
+    { start: events.sunrise,          end: events.sunset,           fill: SKY.day },
+  ];
+  for (const layer of layers) {
+    const s = pos(layer.start), e = pos(layer.end);
+    if (s === null || e === null || e <= s) continue;
+    svg += '<rect x="' + (s * W) + '" y="0" width="' + ((e - s) * W) + '" height="' + H + '" fill="' + layer.fill + '" />';
+  }
+
+  // Birding windows: translucent overlay + accent stroke
+  function band(w, dashed) {
+    if (!w) return '';
+    const s = pos(w.start), e = pos(w.end);
+    if (s === null || e === null || e <= s) return '';
+    const x = s * W, width = (e - s) * W;
+    const stroke = dashed ? ' stroke-dasharray="4,3"' : '';
+    return '<rect x="' + x + '" y="2" width="' + width + '" height="' + (H - 4) + '" ' +
+      'style="fill: var(--accent); fill-opacity: 0.22; stroke: var(--accent); stroke-width: 1.5"' + stroke + ' />';
+  }
+  svg += band(dawnW, false);
+  svg += band(duskW, true);
+
+  // "Now" marker
+  const nowPos = pos(now);
+  if (nowPos !== null && nowPos > 0 && nowPos < 1) {
+    const x = nowPos * W;
+    svg += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + H + '" stroke="#fff" stroke-width="2" />';
+    svg += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + H + '" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3,2" />';
+  }
+
+  svg += '</svg>';
+
+  const axis = '<div class="timeline-axis"><span>12 AM</span><span>6 AM</span><span>Noon</span><span>6 PM</span><span>12 AM</span></div>';
+
+  const legend =
+    '<div class="timeline-legend">' +
+      legendItem(SKY.night, 'Night') +
+      legendItem(SKY.astro, 'Astro. twilight') +
+      legendItem(SKY.naut, 'Nautical') +
+      legendItem(SKY.civil, 'Civil') +
+      legendItem(SKY.day, 'Daylight') +
+      '<span class="legend-item"><span class="legend-swatch" style="background: var(--accent); opacity: 0.5"></span> Dawn / evening window</span>' +
+    '</div>';
+
+  return '<div class="timeline">' + svg + axis + legend + '</div>';
+}
+
+function legendItem(color, label) {
+  return '<span class="legend-item"><span class="legend-swatch" style="background:' + color + '"></span>' + esc(label) + '</span>';
+}
+
+/* ============ Upcoming ============ */
+function renderUpcoming(days) {
+  const container = document.getElementById('upcoming');
+  let html = '';
+  for (const day of days) {
+    const dawnW = dawnWindow(day.events);
+    const length = dayLengthStr(day.events.sunrise, day.events.sunset);
+    html += '<div class="compact-day">' +
+      '<div class="cday">' + esc(fmtDate(day.date)) + '</div>' +
+      '<div class="cstat wide"><div class="clbl">Chorus</div><div class="cval">' + esc(fmtTime(dawnW ? dawnW.start : null)) + '</div></div>' +
+      '<div class="cstat"><div class="clbl">Sunrise</div><div class="cval">' + esc(fmtTime(day.events.sunrise)) + '</div></div>' +
+      '<div class="cstat"><div class="clbl">Sunset</div><div class="cval">' + esc(fmtTime(day.events.sunset)) + '</div></div>' +
+      '<div class="cstat wide"><div class="clbl">Length</div><div class="cval">' + esc(length) + '</div></div>' +
+      '</div>';
+  }
+  container.innerHTML = html;
+}
+
+/* ============ Boot ============ */
+if (currentLocation) {
+  render();
+}
+
+// Refresh every minute so the "now" marker and countdown stay live
+setInterval(() => { if (currentLocation) render(); }, 60000);
+</script>
+</body>
+</html>
