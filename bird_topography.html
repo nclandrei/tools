@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bird Topography</title>
+<meta name="description" content="Interactive labeled diagram of bird anatomy — learn the parts, then quiz yourself.">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 920px; }
+
+  .canvas-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  svg.bird {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 70vh;
+  }
+
+  .bird-outline {
+    fill: var(--surface-alt);
+    stroke: var(--text);
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+
+  .bird-wing {
+    fill: var(--accent-dim);
+    stroke: var(--text);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    opacity: 0.9;
+  }
+
+  .bird-beak {
+    fill: var(--text);
+    stroke: var(--text);
+    stroke-width: 1;
+    stroke-linejoin: round;
+  }
+
+  .bird-eye {
+    fill: var(--text);
+  }
+
+  .bird-eye-highlight {
+    fill: var(--surface);
+  }
+
+  .bird-leg {
+    stroke: var(--text);
+    stroke-width: 3;
+    stroke-linecap: round;
+    fill: none;
+  }
+
+  .feather-line {
+    stroke: var(--text);
+    stroke-width: 1;
+    fill: none;
+    opacity: 0.45;
+  }
+
+  /* Mode switcher */
+  .mode-tabs {
+    display: inline-flex;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 1rem;
+    gap: 2px;
+  }
+  .mode-tabs button {
+    background: transparent;
+    border: none;
+    padding: 0.45rem 0.95rem;
+    font-size: 0.85rem;
+    font-family: inherit;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.12s, color 0.12s;
+  }
+  .mode-tabs button.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  /* Info panel */
+  .info-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    min-height: 100px;
+  }
+  .info-panel .group-tag {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+  .info-panel h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+  }
+  .info-panel p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .info-panel .placeholder {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-style: italic;
+  }
+
+  /* Quiz UI */
+  .quiz-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.6rem;
+  }
+  .quiz-score {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .quiz-prompt {
+    font-size: 0.95rem;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .quiz-prompt strong {
+    color: var(--accent);
+  }
+  .quiz-feedback {
+    font-size: 0.85rem;
+    margin-top: 0.6rem;
+    min-height: 1.2em;
+  }
+  .quiz-feedback.correct { color: var(--green); }
+  .quiz-feedback.wrong { color: var(--red); }
+  .quiz-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    flex-wrap: wrap;
+  }
+
+  /* Parts list */
+  .parts-list {
+    margin-bottom: 2rem;
+  }
+  .parts-list h3 {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin: 1rem 0 0.45rem;
+  }
+  .parts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.4rem;
+  }
+  .parts-grid button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.45rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .parts-grid button:hover {
+    border-color: var(--accent);
+  }
+  .parts-grid button.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  /* Interactive dots */
+  .part-dot {
+    cursor: pointer;
+  }
+  .part-dot .hit {
+    fill: transparent;
+  }
+  .part-dot .dot {
+    fill: var(--surface);
+    stroke: var(--accent);
+    stroke-width: 2;
+    transition: r 0.12s ease, fill 0.12s ease;
+    pointer-events: none;
+  }
+  .part-dot:hover .dot {
+    fill: var(--accent-dim);
+  }
+  .part-dot.selected .dot {
+    fill: var(--accent);
+  }
+  .part-dot.correct .dot {
+    fill: var(--green);
+    stroke: var(--green);
+  }
+  .part-dot.wrong .dot {
+    fill: var(--red);
+    stroke: var(--red);
+  }
+  .part-dot.hint .dot {
+    fill: var(--accent);
+    animation: pulse 0.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Bird Topography</h1>
+      <a href="/">&larr; All tools</a>
+    </header>
+    <p class="desc">Interactive reference for bird anatomy. Tap a point on the diagram to learn the name of that part, then switch to Quiz mode to test yourself. Ideal for decoding the jargon in field guides.</p>
+
+    <div class="mode-tabs" role="tablist">
+      <button data-mode="learn" class="active" role="tab">Learn</button>
+      <button data-mode="quiz" role="tab">Quiz</button>
+    </div>
+
+    <div class="canvas-wrap">
+      <svg class="bird" viewBox="0 0 850 520" xmlns="http://www.w3.org/2000/svg">
+        <!-- Body silhouette (compact songbird, facing left) -->
+        <path class="bird-outline" d="
+          M 250 85
+          C 295 70, 340 85, 355 135
+          C 360 155, 370 168, 385 175
+          C 460 170, 545 195, 615 235
+          C 655 258, 690 275, 720 290
+          L 840 290
+          Q 855 315, 840 345
+          L 720 345
+          C 660 380, 575 400, 470 400
+          C 370 400, 295 380, 245 350
+          C 200 320, 175 285, 170 245
+          C 168 220, 175 210, 188 202
+          L 105 215
+          L 188 185
+          C 170 150, 185 115, 215 92
+          C 228 85, 240 83, 250 85
+          Z
+        "/>
+
+        <!-- Beak mouth line -->
+        <line x1="105" y1="215" x2="188" y2="195" stroke="var(--text)" stroke-width="1.2" stroke-linecap="round"/>
+
+        <!-- Wing (folded on body, primary tips extending back) -->
+        <path class="bird-wing" d="
+          M 335 180
+          C 420 185, 510 215, 585 250
+          C 640 275, 690 300, 715 330
+          L 680 345
+          C 610 335, 525 315, 445 290
+          C 375 265, 320 230, 305 195
+          Z
+        "/>
+
+        <!-- Feather suggestion lines on wing (secondaries/primaries) -->
+        <path class="feather-line" d="M 365 195 C 440 220, 530 255, 625 310"/>
+        <path class="feather-line" d="M 400 210 C 475 240, 560 275, 660 325"/>
+        <path class="feather-line" d="M 470 240 L 595 320"/>
+        <path class="feather-line" d="M 510 260 L 645 335"/>
+        <path class="feather-line" d="M 555 285 L 685 343"/>
+
+        <!-- Tail rectrices hint (subtle vertical lines on tail) -->
+        <path class="feather-line" d="M 740 315 L 748 345"/>
+        <path class="feather-line" d="M 765 310 L 773 348"/>
+        <path class="feather-line" d="M 790 307 L 795 355"/>
+
+        <!-- Eye -->
+        <circle class="bird-eye" cx="225" cy="140" r="7"/>
+        <circle class="bird-eye-highlight" cx="227" cy="138" r="2"/>
+
+        <!-- Legs -->
+        <line class="bird-leg" x1="405" y1="398" x2="400" y2="460"/>
+        <line class="bird-leg" x1="445" y1="402" x2="448" y2="465"/>
+        <!-- Front leg toes -->
+        <line class="bird-leg" x1="400" y1="460" x2="380" y2="472"/>
+        <line class="bird-leg" x1="400" y1="460" x2="400" y2="475"/>
+        <line class="bird-leg" x1="400" y1="460" x2="420" y2="472"/>
+        <!-- Back leg toes -->
+        <line class="bird-leg" x1="448" y1="465" x2="428" y2="477"/>
+        <line class="bird-leg" x1="448" y1="465" x2="448" y2="480"/>
+        <line class="bird-leg" x1="448" y1="465" x2="468" y2="477"/>
+        <!-- Interactive dots will be injected here -->
+        <g id="dots"></g>
+      </svg>
+    </div>
+
+    <div class="info-panel" id="info-panel">
+      <p class="placeholder">Tap a labeled point on the bird to learn what it&rsquo;s called.</p>
+    </div>
+
+    <div class="parts-list" id="parts-list"></div>
+  </div>
+
+  <script>
+    // Bird part data: id, name, group, description, and (x, y) anchor on the SVG (viewBox 0 0 850 520).
+    const PARTS = [
+      // ── Head ──
+      { id: 'crown',        name: 'Crown',               group: 'Head',
+        desc: 'The top of the head, from the forehead back to the nape. Often differently coloured (e.g. Ruby-crowned Kinglet).',
+        x: 290, y: 85 },
+      { id: 'forehead',     name: 'Forehead',            group: 'Head',
+        desc: 'The front of the head between the base of the bill and the crown.',
+        x: 210, y: 115 },
+      { id: 'nape',         name: 'Nape',                group: 'Head',
+        desc: 'The back of the neck, between the crown and the mantle.',
+        x: 355, y: 135 },
+      { id: 'lores',        name: 'Lores',               group: 'Head',
+        desc: 'The small area between the eye and the base of the bill. Often a distinctive colour and key for identification.',
+        x: 195, y: 165 },
+      { id: 'supercilium',  name: 'Supercilium',         group: 'Head',
+        desc: 'The "eyebrow" stripe running above the eye from the bill toward the nape. A key ID feature in many warblers and sparrows.',
+        x: 240, y: 120 },
+      { id: 'eye-ring',     name: 'Eye-ring',            group: 'Head',
+        desc: 'A ring of contrasting feathers or bare skin around the eye. Complete, broken, or bold eye-rings are diagnostic for many species.',
+        x: 225, y: 140 },
+      { id: 'eye-line',     name: 'Eye-line',            group: 'Head',
+        desc: 'A dark stripe running through the eye, separating the supercilium from the ear coverts.',
+        x: 260, y: 150 },
+      { id: 'ear-coverts',  name: 'Ear coverts',         group: 'Head',
+        desc: 'Feathers covering the ear opening, behind and below the eye — the "cheek" of the bird. Also called auriculars.',
+        x: 290, y: 170 },
+      { id: 'malar',        name: 'Malar',               group: 'Head',
+        desc: 'The "moustache" area running down from the base of the bill along the side of the throat.',
+        x: 235, y: 200 },
+      { id: 'chin',         name: 'Chin',                group: 'Head',
+        desc: 'The small patch of feathers immediately below the base of the lower mandible.',
+        x: 200, y: 210 },
+      { id: 'throat',       name: 'Throat',              group: 'Head',
+        desc: 'The area below the chin and above the breast. Often a separately coloured patch (e.g. Yellow-throated Warbler).',
+        x: 210, y: 250 },
+      { id: 'bill',         name: 'Bill',                group: 'Head',
+        desc: 'The beak, made up of upper and lower mandibles. Shape is a major clue to diet and family.',
+        x: 145, y: 205 },
+
+      // ── Upperparts ──
+      { id: 'mantle',       name: 'Mantle',              group: 'Upperparts',
+        desc: 'The upper back between the nape and the scapulars, forming a "cape" over the top of the body.',
+        x: 430, y: 165 },
+      { id: 'scapulars',    name: 'Scapulars',           group: 'Upperparts',
+        desc: 'Feathers covering the shoulder, between the mantle and the folded wing. Often form a distinct contrasting patch.',
+        x: 420, y: 190 },
+      { id: 'back',         name: 'Back',                group: 'Upperparts',
+        desc: 'The middle-to-lower upperparts, between the mantle and the rump.',
+        x: 560, y: 215 },
+      { id: 'rump',         name: 'Rump',                group: 'Upperparts',
+        desc: 'The lower back, just above the tail. Many species show a distinctive rump patch in flight (e.g. Yellow-rumped Warbler).',
+        x: 695, y: 290 },
+      { id: 'uppertail-coverts', name: 'Uppertail coverts', group: 'Upperparts',
+        desc: 'Feathers covering the base of the tail from above.',
+        x: 760, y: 305 },
+
+      // ── Underparts ──
+      { id: 'breast',       name: 'Breast',              group: 'Underparts',
+        desc: 'The front of the body between the throat and the belly.',
+        x: 265, y: 340 },
+      { id: 'belly',        name: 'Belly',               group: 'Underparts',
+        desc: 'The underside of the body between the breast and the vent.',
+        x: 430, y: 390 },
+      { id: 'flanks',       name: 'Flanks',              group: 'Underparts',
+        desc: 'The sides of the body between the wing and the belly. Often streaked or barred.',
+        x: 570, y: 370 },
+      { id: 'vent',         name: 'Vent',                group: 'Underparts',
+        desc: 'The area around the cloaca, between the belly and the undertail coverts.',
+        x: 640, y: 385 },
+      { id: 'undertail-coverts', name: 'Undertail coverts', group: 'Underparts',
+        desc: 'Feathers covering the base of the tail from below. Colour often important for ID (e.g. yellow in several warblers).',
+        x: 700, y: 360 },
+
+      // ── Wing ──
+      { id: 'lesser-coverts', name: 'Lesser coverts',    group: 'Wing',
+        desc: 'The small feathers at the top of the closed wing, near the shoulder bend.',
+        x: 340, y: 200 },
+      { id: 'median-coverts', name: 'Median coverts',    group: 'Wing',
+        desc: 'The middle row of wing coverts. When tipped pale they form the upper wing bar.',
+        x: 410, y: 225 },
+      { id: 'greater-coverts', name: 'Greater coverts',  group: 'Wing',
+        desc: 'The largest row of wing coverts, covering the base of the secondaries. Their pale tips form the lower wing bar.',
+        x: 480, y: 255 },
+      { id: 'tertials',     name: 'Tertials',            group: 'Wing',
+        desc: 'The innermost flight feathers — the three longest visible feathers on the closed wing, nearest the body.',
+        x: 470, y: 225 },
+      { id: 'alula',        name: 'Alula',               group: 'Wing',
+        desc: 'A small tuft of feathers at the bend of the wing (the "thumb"), used for slow-flight lift control.',
+        x: 540, y: 270 },
+      { id: 'primary-coverts', name: 'Primary coverts',  group: 'Wing',
+        desc: 'Small feathers at the base of the primaries, covering the wrist bend.',
+        x: 570, y: 285 },
+      { id: 'secondaries',  name: 'Secondaries',         group: 'Wing',
+        desc: 'Flight feathers attached to the ulna, forming the inner part of the wing.',
+        x: 620, y: 305 },
+      { id: 'primaries',    name: 'Primaries',           group: 'Wing',
+        desc: 'The outermost flight feathers, attached to the "hand". They produce most of the thrust in flight.',
+        x: 680, y: 325 },
+
+      // ── Tail & legs ──
+      { id: 'tail',         name: 'Tail (rectrices)',    group: 'Tail & legs',
+        desc: 'The tail feathers, known as rectrices. Shape (forked, rounded, pointed) and pattern are major ID cues.',
+        x: 810, y: 320 },
+      { id: 'tarsus',       name: 'Tarsus',              group: 'Tail & legs',
+        desc: 'The lower "leg" of the bird — actually an elongated foot bone (tarsometatarsus). Colour is a useful ID clue.',
+        x: 400, y: 430 },
+      { id: 'feet',         name: 'Feet',                group: 'Tail & legs',
+        desc: 'Toes and claws. Passerines have three forward-pointing toes and one strong hind toe (anisodactyl).',
+        x: 415, y: 475 },
+    ];
+
+    // ── Render interactive dots onto the SVG ──
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const dotsLayer = document.getElementById('dots');
+
+    function createPartDot(part) {
+      const g = document.createElementNS(SVG_NS, 'g');
+      g.setAttribute('class', 'part-dot');
+      g.setAttribute('data-id', part.id);
+
+      // Larger invisible hit circle for easier tapping
+      const hit = document.createElementNS(SVG_NS, 'circle');
+      hit.setAttribute('class', 'hit');
+      hit.setAttribute('cx', part.x);
+      hit.setAttribute('cy', part.y);
+      hit.setAttribute('r', 18);
+      g.appendChild(hit);
+
+      // Visible dot
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('class', 'dot');
+      dot.setAttribute('cx', part.x);
+      dot.setAttribute('cy', part.y);
+      dot.setAttribute('r', 6);
+      g.appendChild(dot);
+
+      // Accessible label
+      const title = document.createElementNS(SVG_NS, 'title');
+      title.textContent = part.name;
+      g.appendChild(title);
+
+      return g;
+    }
+
+    PARTS.forEach((p) => dotsLayer.appendChild(createPartDot(p)));
+
+    // Make the visible dot and hit area scale up on smaller renders so they
+    // stay tappable on mobile (and don't get tiny on narrow viewports).
+    const svgEl = document.querySelector('svg.bird');
+    function updateDotSizes() {
+      const rect = svgEl.getBoundingClientRect();
+      if (!rect.width) return;
+      const scale = 850 / rect.width; // viewBox-units per CSS pixel
+      const dotR = Math.max(6, Math.round(7 * scale));
+      const hitR = Math.max(18, Math.round(22 * scale));
+      document.querySelectorAll('.part-dot .dot').forEach((c) => c.setAttribute('r', dotR));
+      document.querySelectorAll('.part-dot .hit').forEach((c) => c.setAttribute('r', hitR));
+    }
+    updateDotSizes();
+    window.addEventListener('resize', updateDotSizes);
+
+    // ── Build parts list grouped by category ──
+    const partsListEl = document.getElementById('parts-list');
+    const groups = [...new Set(PARTS.map((p) => p.group))];
+    groups.forEach((group) => {
+      const h3 = document.createElement('h3');
+      h3.textContent = group;
+      partsListEl.appendChild(h3);
+      const grid = document.createElement('div');
+      grid.className = 'parts-grid';
+      PARTS.filter((p) => p.group === group).forEach((p) => {
+        const btn = document.createElement('button');
+        btn.textContent = p.name;
+        btn.dataset.id = p.id;
+        btn.addEventListener('click', () => selectPart(p.id));
+        grid.appendChild(btn);
+      });
+      partsListEl.appendChild(grid);
+    });
+
+    // ── State ──
+    let mode = 'learn';
+    let selectedId = null;
+    let quiz = null; // { targetId, score, total, answered }
+
+    const infoPanel = document.getElementById('info-panel');
+
+    function getPart(id) {
+      return PARTS.find((p) => p.id === id);
+    }
+
+    function clearDotStates() {
+      document.querySelectorAll('.part-dot').forEach((d) => {
+        d.classList.remove('selected', 'correct', 'wrong', 'hint');
+      });
+    }
+
+    function highlightDot(id, cls) {
+      const d = document.querySelector('.part-dot[data-id="' + id + '"]');
+      if (d) d.classList.add(cls);
+    }
+
+    function setActiveListButton(id) {
+      document.querySelectorAll('.parts-grid button').forEach((b) => {
+        b.classList.toggle('active', b.dataset.id === id);
+      });
+    }
+
+    function selectPart(id) {
+      if (mode === 'learn') {
+        selectedId = id;
+        clearDotStates();
+        highlightDot(id, 'selected');
+        setActiveListButton(id);
+        renderInfoPanel();
+      } else if (mode === 'quiz') {
+        handleQuizAnswer(id);
+      }
+    }
+
+    function renderInfoPanel() {
+      if (mode === 'quiz') {
+        renderQuizPanel();
+        return;
+      }
+      if (!selectedId) {
+        infoPanel.innerHTML = '<p class="placeholder">Tap a labeled point on the bird to learn what it&rsquo;s called.</p>';
+        return;
+      }
+      const part = getPart(selectedId);
+      infoPanel.innerHTML =
+        '<div class="group-tag">' + escapeHtml(part.group) + '</div>' +
+        '<h2>' + escapeHtml(part.name) + '</h2>' +
+        '<p>' + escapeHtml(part.desc) + '</p>';
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // ── Wire up dot clicks ──
+    document.querySelectorAll('.part-dot').forEach((g) => {
+      g.addEventListener('click', () => selectPart(g.dataset.id));
+    });
+
+    // ── Mode switching ──
+    document.querySelectorAll('.mode-tabs button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-tabs button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        mode = btn.dataset.mode;
+        clearDotStates();
+        setActiveListButton(null);
+        if (mode === 'learn') {
+          selectedId = null;
+          renderInfoPanel();
+        } else {
+          startQuiz();
+        }
+      });
+    });
+
+    // ── Quiz mode ──
+    function startQuiz() {
+      quiz = { score: 0, total: 0, answered: false, targetId: null, recent: [] };
+      nextQuestion();
+    }
+
+    function nextQuestion() {
+      // Pick a random part not in recent history
+      const pool = PARTS.filter((p) => !quiz.recent.includes(p.id));
+      const choice = pool[Math.floor(Math.random() * pool.length)];
+      quiz.targetId = choice.id;
+      quiz.answered = false;
+      quiz.recent.push(choice.id);
+      if (quiz.recent.length > 8) quiz.recent.shift();
+      clearDotStates();
+      renderQuizPanel();
+    }
+
+    function handleQuizAnswer(id) {
+      if (!quiz || quiz.answered) return;
+      quiz.answered = true;
+      quiz.total += 1;
+      const correct = id === quiz.targetId;
+      if (correct) {
+        quiz.score += 1;
+        highlightDot(id, 'correct');
+      } else {
+        highlightDot(id, 'wrong');
+        highlightDot(quiz.targetId, 'correct');
+      }
+      renderQuizPanel(correct);
+    }
+
+    function renderQuizPanel(answeredCorrect) {
+      if (!quiz) return;
+      const target = getPart(quiz.targetId);
+      let feedbackHtml = '<div class="quiz-feedback">&nbsp;</div>';
+      let actionsHtml =
+        '<div class="quiz-actions">' +
+          '<button class="btn btn-secondary" id="quiz-skip">Skip</button>' +
+        '</div>';
+
+      if (quiz.answered) {
+        const correct = answeredCorrect;
+        feedbackHtml =
+          '<div class="quiz-feedback ' + (correct ? 'correct' : 'wrong') + '">' +
+            (correct
+              ? '✓ Correct! ' + escapeHtml(target.desc)
+              : '✗ That was the ' + escapeHtml(target.name.toLowerCase()) + '. ' + escapeHtml(target.desc)) +
+          '</div>';
+        actionsHtml =
+          '<div class="quiz-actions">' +
+            '<button class="btn btn-primary" id="quiz-next">Next question →</button>' +
+          '</div>';
+      }
+
+      infoPanel.innerHTML =
+        '<div class="quiz-status">' +
+          '<div class="quiz-prompt">Find the <strong>' + escapeHtml(target.name) + '</strong></div>' +
+          '<div class="quiz-score">' + quiz.score + ' / ' + quiz.total + '</div>' +
+        '</div>' +
+        feedbackHtml +
+        actionsHtml;
+
+      const nextBtn = document.getElementById('quiz-next');
+      if (nextBtn) nextBtn.addEventListener('click', nextQuestion);
+      const skipBtn = document.getElementById('quiz-skip');
+      if (skipBtn) skipBtn.addEventListener('click', () => {
+        // Reveal answer briefly then next
+        quiz.answered = true;
+        quiz.total += 1;
+        highlightDot(quiz.targetId, 'hint');
+        renderQuizPanel(false);
+      });
+    }
+  </script>
+</body>
+</html>
