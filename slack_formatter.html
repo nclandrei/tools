@@ -9,6 +9,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
+<script src="/slack_formatter_engine.js"></script>
 
 <style>
   body {
@@ -315,6 +316,8 @@ function convert() {
 function markdownToSlack(md) {
   // Strip common leading whitespace (terminal padding from Claude Code)
   md = dedent(md);
+  // Re-join lines that got hard-wrapped mid-sentence when copied out of a terminal.
+  md = window.SlackFormatter.unwrapHardBreaks(md);
   const lines = md.split('\n');
   const out = [];
   let inCodeBlock = false;
