@@ -226,8 +226,8 @@ function warpPerspective(srcCanvas, corners) {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const [sx, sy] = applyH(H, x, y);
-      if (sx < 0 || sx >= sw || sy < 0 || sy >= sh) continue;
       const idx = (y * w + x) * 4;
+      // sampleBicubic clamps indices, so extrapolated areas become edge-color
       od[idx]     = sampleBicubic(sx, sy, 0);
       od[idx + 1] = sampleBicubic(sx, sy, 1);
       od[idx + 2] = sampleBicubic(sx, sy, 2);
@@ -239,88 +239,160 @@ function warpPerspective(srcCanvas, corners) {
 }
 
 // ── Image Processing ─────────────────────────────────────────────────────────
+// Document enhancement via shadow removal: estimate local background illumination
+// with a large-radius box blur, then divide the image by the background. This
+// normalizes uneven lighting, eliminates paper-texture speckle, and preserves
+// anti-aliased text edges (unlike pure binary thresholding).
 
-function adaptiveThreshold(canvas) {
-  const ctx = canvas.getContext('2d');
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const d = imgData.data, w = canvas.width, h = canvas.height;
-  const gray = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
-
-  // Integral image
-  const integ = new Float64Array(w * h);
+// Compute grayscale + integral image for fast box blur
+function buildLumaIntegral(d, w, h) {
+  const N = w * h;
+  const gray = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    gray[i] = 0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2];
+  }
+  const integ = new Float64Array(N);
   for (let y = 0; y < h; y++) {
     let rs = 0;
     for (let x = 0; x < w; x++) {
-      rs += gray[y * w + x];
-      integ[y * w + x] = rs + (y > 0 ? integ[(y-1) * w + x] : 0);
+      rs += gray[y*w + x];
+      integ[y*w + x] = rs + (y > 0 ? integ[(y-1)*w + x] : 0);
     }
   }
+  return { gray, integ };
+}
 
-  let bs = Math.round(w / 8);
-  if (bs < 25) bs = 25;
-  if (bs > 201) bs = 201;
-  if (bs % 2 === 0) bs++;
-  const half = (bs - 1) >> 1;
-  const C = 10;
-
+// Estimate per-pixel background via large-radius box blur over integral image
+function estimateBackground(integ, w, h, radius) {
+  const N = w * h;
+  const bg = new Float32Array(N);
   for (let y = 0; y < h; y++) {
+    const y1 = Math.max(0, y - radius), y2 = Math.min(h - 1, y + radius);
     for (let x = 0; x < w; x++) {
-      const x1 = Math.max(0, x - half), y1 = Math.max(0, y - half);
-      const x2 = Math.min(w - 1, x + half), y2 = Math.min(h - 1, y + half);
+      const x1 = Math.max(0, x - radius), x2 = Math.min(w - 1, x + radius);
       const cnt = (x2 - x1 + 1) * (y2 - y1 + 1);
-      let s = integ[y2 * w + x2];
-      if (x1 > 0) s -= integ[y2 * w + (x1 - 1)];
-      if (y1 > 0) s -= integ[(y1 - 1) * w + x2];
-      if (x1 > 0 && y1 > 0) s += integ[(y1 - 1) * w + (x1 - 1)];
-      const val = gray[y * w + x] > (s / cnt) - C ? 255 : 0;
-      const idx = (y * w + x) * 4;
-      d[idx] = d[idx+1] = d[idx+2] = val;
-      d[idx+3] = 255;
+      let s = integ[y2*w + x2];
+      if (x1 > 0) s -= integ[y2*w + (x1 - 1)];
+      if (y1 > 0) s -= integ[(y1 - 1)*w + x2];
+      if (x1 > 0 && y1 > 0) s += integ[(y1 - 1)*w + (x1 - 1)];
+      bg[y*w + x] = s / cnt;
     }
+  }
+  return bg;
+}
+
+// Find percentile-based black/white points from a float array
+function findLevels(arr, N, lowPct, highPct) {
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < N; i++) {
+    const v = Math.min(255, Math.max(0, Math.round(arr[i])));
+    hist[v]++;
+  }
+  let blackPt = -1, whitePt = 255, cum = 0;
+  const lowT = N * lowPct, highT = N * highPct;
+  for (let i = 0; i < 256; i++) {
+    cum += hist[i];
+    if (blackPt < 0 && cum >= lowT) blackPt = i;
+    if (cum >= highT) { whitePt = i; break; }
+  }
+  if (blackPt < 0) blackPt = 0;
+  if (whitePt <= blackPt) whitePt = blackPt + 1;
+  return { blackPt, whitePt };
+}
+
+// Radius large enough to span across text strokes, so the background estimate
+// reflects paper color rather than ink. Scales with image size.
+function bgRadius(w, h) {
+  return Math.max(25, Math.floor(Math.max(w, h) / 25));
+}
+
+// B&W scan: maximum contrast, clean white background, crisp dark text
+function applyBWScan(canvas) {
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imgData.data, w = canvas.width, h = canvas.height, N = w * h;
+
+  const { gray, integ } = buildLumaIntegral(d, w, h);
+  const bg = estimateBackground(integ, w, h, bgRadius(w, h));
+
+  // Shadow removal: normalize each pixel by local background illumination
+  const norm = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    norm[i] = (gray[i] / Math.max(1, bg[i])) * 255;
+  }
+
+  // Percentile levels: paper clips to pure white, faint stains get discarded
+  const { blackPt, whitePt } = findLevels(norm, N, 0.002, 0.995);
+  const range = whitePt - blackPt;
+
+  for (let i = 0; i < N; i++) {
+    let v = (norm[i] - blackPt) / range;
+    v = v < 0 ? 0 : v > 1 ? 1 : v;
+    // S-curve: strong contrast for document-scanner look, anti-aliased edges
+    v = v < 0.5
+      ? 0.5 * Math.pow(2 * v, 1.6)
+      : 1 - 0.5 * Math.pow(2 * (1 - v), 1.6);
+    const byte = Math.round(v * 255);
+    d[i*4] = d[i*4+1] = d[i*4+2] = byte;
+    d[i*4+3] = 255;
   }
   ctx.putImageData(imgData, 0, 0);
 }
 
+// Gray scan: same shadow removal but gentler curve to preserve mid-tones
 function toGrayscaleEnhanced(canvas) {
   const ctx = canvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const d = imgData.data;
-  let mn = 255, mx = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    const g = Math.round(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
-    if (g < mn) mn = g;
-    if (g > mx) mx = g;
+  const d = imgData.data, w = canvas.width, h = canvas.height, N = w * h;
+
+  const { gray, integ } = buildLumaIntegral(d, w, h);
+  const bg = estimateBackground(integ, w, h, bgRadius(w, h));
+
+  const norm = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    norm[i] = (gray[i] / Math.max(1, bg[i])) * 255;
   }
-  const range = mx - mn || 1;
-  for (let i = 0; i < d.length; i += 4) {
-    let g = Math.round(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
-    g = Math.round(((g - mn) / range) * 255);
-    // Slight S-curve for contrast
-    let t = g / 255;
-    t = t * t * (3 - 2 * t); // smoothstep
-    g = Math.round(t * 255);
-    d[i] = d[i+1] = d[i+2] = g;
+
+  const { blackPt, whitePt } = findLevels(norm, N, 0.005, 0.99);
+  const range = whitePt - blackPt;
+
+  for (let i = 0; i < N; i++) {
+    let v = (norm[i] - blackPt) / range;
+    v = v < 0 ? 0 : v > 1 ? 1 : v;
+    // Smoothstep: gentle contrast boost, keeps tonal range
+    v = v * v * (3 - 2 * v);
+    const byte = Math.round(v * 255);
+    d[i*4] = d[i*4+1] = d[i*4+2] = byte;
+    d[i*4+3] = 255;
   }
   ctx.putImageData(imgData, 0, 0);
 }
 
+// Color scan: shadow removal preserving hue. Per-pixel gain from luminance bg,
+// applied equally to each RGB channel so color ratios (and therefore hue) are
+// preserved. Target is slightly below 255 to avoid clipping light color tints.
 function enhanceColor(canvas) {
   const ctx = canvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const d = imgData.data;
-  // Auto-levels per channel
-  for (let ch = 0; ch < 3; ch++) {
-    let mn = 255, mx = 0;
-    for (let i = ch; i < d.length; i += 4) { if (d[i] < mn) mn = d[i]; if (d[i] > mx) mx = d[i]; }
-    const r = mx - mn || 1;
-    for (let i = ch; i < d.length; i += 4) d[i] = Math.round(((d[i] - mn) / r) * 255);
+  const d = imgData.data, w = canvas.width, h = canvas.height, N = w * h;
+
+  const { integ } = buildLumaIntegral(d, w, h);
+  const bg = estimateBackground(integ, w, h, bgRadius(w, h));
+
+  const TARGET = 245;
+  for (let i = 0; i < N; i++) {
+    const gain = TARGET / Math.max(1, bg[i]);
+    const p = i * 4;
+    const r = d[p] * gain, g = d[p+1] * gain, b = d[p+2] * gain;
+    d[p]   = r > 255 ? 255 : Math.round(r);
+    d[p+1] = g > 255 ? 255 : Math.round(g);
+    d[p+2] = b > 255 ? 255 : Math.round(b);
   }
   ctx.putImageData(imgData, 0, 0);
 }
 
 function applyColorMode(canvas, mode) {
-  if (mode === 'bw') adaptiveThreshold(canvas);
+  if (mode === 'bw') applyBWScan(canvas);
   else if (mode === 'gray') toGrayscaleEnhanced(canvas);
   else enhanceColor(canvas);
 }
