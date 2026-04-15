@@ -30,8 +30,21 @@
   }
   .player-name:focus { color: var(--text); }
   .player.active .player-name { color: var(--accent); }
-  .player-score { font-size: 1.25rem; font-weight: 700; color: var(--text); margin-top: 0.1rem; }
+  .player-score {
+    width: 100%; text-align: center; border: none; background: transparent;
+    color: var(--text); font-family: inherit; font-size: 1.25rem; font-weight: 700;
+    padding: 0; outline: none; margin-top: 0.1rem;
+    -moz-appearance: textfield;
+  }
+  .player-score::-webkit-outer-spin-button,
+  .player-score::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .player.active .player-score { color: var(--accent); }
+  .player-score:read-only { cursor: default; }
+  .player-score:not(:read-only) { cursor: text; }
+  .player-score:not(:read-only):hover,
+  .player-score:not(:read-only):focus {
+    background: var(--surface-alt); border-radius: 4px;
+  }
   .target-divider { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; padding: 0 0.4rem; }
   .target-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
   .target-select {
@@ -172,17 +185,18 @@
     <h1>KCD2 Dice Advisor</h1>
     <a href="/">&larr; All tools</a>
   </header>
-  <p class="desc">Analyze your Farkle rolls in Kingdom Come: Deliverance 2. Get optimal keep/bank recommendations and track scores across rounds.</p>
+  <p class="desc">Analyze your Farkle rolls in Kingdom Come: Deliverance 2. Get optimal keep/bank recommendations and track scores across rounds. Tap the score to set a starting value (e.g. from a badge) before your first roll.</p>
 
   <!-- Scoreboard -->
   <div class="scoreboard">
     <div class="player active" id="p0">
       <input class="player-name" value="You" id="n0" maxlength="12">
-      <div class="player-score" id="s0">0</div>
+      <input class="player-score" id="s0" type="number" inputmode="numeric" min="0" value="0"
+             title="Starting score — editable before your first points are banked">
     </div>
     <div class="target-divider">
       <span class="target-label">Target</span>
-      <select class="target-select" id="tgt" onchange="G.target=+this.value">
+      <select class="target-select" id="tgt" onchange="setTarget(+this.value)">
         <option value="2000">2000</option>
         <option value="4000" selected>4000</option>
         <option value="5000">5000</option>
@@ -253,7 +267,10 @@
   </details>
 </div>
 
+<script src="/kcd2_dice_engine.js"></script>
 <script>
+const { sanitizeStartingScore } = window.KCD2DiceEngine;
+
 // Pip positions for dice faces (1-indexed in a 3x3 grid)
 const PIPS = {1:[5],2:[3,7],3:[3,5,7],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,4,7,3,6,9]};
 const BUST_P = {1:.667,2:.444,3:.278,4:.157,5:.077,6:.023};
@@ -262,7 +279,11 @@ const AVG_FUTURE = {1:25,2:100,3:175,4:250,5:350,6:500};
 const G = {
   nd: 6, dv: [1,1,1,1,1,1], ts: 0, rn: 1, target: 4000,
   p: [{name:'You',score:0}],
-  sel: null, strats: null
+  sel: null, strats: null,
+  // Flipped true as soon as the player takes any turn-committing action.
+  // While false, the player score is treated as a settable "starting score"
+  // so you can seed it from a KCD2 badge before rolling.
+  locked: false,
 };
 
 function el(id){return document.getElementById(id)}
@@ -451,13 +472,15 @@ function pickStrat(i){
 
 function keepContinue(){
   if(!G.sel) return;
+  G.locked=true;
   G.ts+=G.sel.points; G.rn++;
   const rem=G.sel.hot?6:G.sel.rem;
-  setND(rem); renderTurn(); hideRes();
+  setND(rem); renderTurn(); renderBoard(); hideRes();
 }
 
 function bankTurn(){
   if(!G.sel) return;
+  G.locked=true;
   G.ts+=G.sel.points;
   G.p[0].score+=G.ts;
   const won=G.p[0].score>=G.target;
@@ -469,7 +492,7 @@ function bankTurn(){
   }
 }
 
-function bustTurn(){resetTurn();renderBoard();}
+function bustTurn(){G.locked=true;resetTurn();renderBoard();}
 
 function resetTurn(){
   G.ts=0; G.rn=1; G.sel=null; G.strats=null;
@@ -477,12 +500,24 @@ function resetTurn(){
 }
 
 function newGame(){
-  G.p[0].score=0; G.ts=0; G.rn=1;
+  G.p[0].score=0; G.ts=0; G.rn=1; G.locked=false;
   setND(6); renderBoard(); renderTurn(); hideRes();
 }
 
+// Re-clamp the unplayed starting score if the player lowers the target.
+function setTarget(t){
+  G.target=t;
+  if(!G.locked) G.p[0].score=sanitizeStartingScore(G.p[0].score,G.target);
+  renderBoard();
+}
+
+// The score display doubles as a starting-score input. It stays editable
+// until the player takes their first turn-committing action, at which point
+// we lock it so it can't be edited mid-run.
 function renderBoard(){
-  el('s0').textContent=G.p[0].score;
+  const s0=el('s0');
+  if(document.activeElement!==s0) s0.value=G.p[0].score;
+  s0.readOnly=G.locked;
 }
 
 function renderTurn(){
@@ -492,6 +527,20 @@ function renderTurn(){
 // Keyboard
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&document.activeElement.tagName!=='INPUT') analyze();
+});
+
+// Starting-score input. The `readOnly` attribute set in renderBoard() is
+// what enforces "before first roll only" — once readOnly, this handler can't
+// fire. Sanitization clamps to [0, target-1] so you can't seed yourself into
+// an instant win.
+el('s0').addEventListener('input',e=>{
+  G.p[0].score=sanitizeStartingScore(e.target.value,G.target);
+});
+el('s0').addEventListener('blur',e=>{
+  e.target.value=G.p[0].score;
+});
+el('s0').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();e.target.blur();}
 });
 
 // Init
