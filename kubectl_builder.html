@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kubectl Command Builder</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 860px; }
+  .desc { margin-bottom: 1.5rem; }
+
+  /* Output */
+  .output-box {
+    position: sticky;
+    top: 0.75rem;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  .output-cmd {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.88rem;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+
+  .copy-btn { padding: 0.45rem 0.85rem; font-size: 0.8rem; border-radius: 6px; white-space: nowrap; }
+  .copy-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .copy-btn.copied { border-color: var(--green); color: var(--green); }
+
+  /* Section */
+  .section {
+    margin-bottom: 1.5rem;
+  }
+  .section-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  /* Verb pills */
+  .verb-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .verb-pill {
+    padding: 0.4rem 0.85rem;
+    font-size: 0.82rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .verb-pill:hover { border-color: var(--border-hover); color: var(--text); }
+  .verb-pill.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  /* Field grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .field label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .field input, .field select {
+    padding: 0.5rem 0.65rem;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  /* Checkbox row */
+  .check-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 0.25rem;
+  }
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+  }
+  .check input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  /* Subsection card */
+  .subcard {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .subcard + .subcard { margin-top: 0.75rem; }
+
+  /* Examples */
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .example {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .example:hover { border-color: var(--accent); color: var(--accent); }
+
+  .advanced-toggle {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem 0;
+    text-align: left;
+  }
+  .advanced-toggle:hover { color: var(--accent); }
+  .advanced-body { margin-top: 0.5rem; }
+  .advanced-body.hidden { display: none; }
+
+  .hidden { display: none !important; }
+
+  .hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+  }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>kubectl Command Builder</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+
+  <p class="desc">Build kubectl commands visually. Pick a verb, target, and flags &mdash; get a copyable command.</p>
+
+  <div class="output-box">
+    <div class="output-cmd" id="cmd-output">kubectl get</div>
+    <button class="btn btn-secondary copy-btn" id="copy-btn" type="button">Copy</button>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Verb</div>
+    <div class="verb-pills" id="verb-pills"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Target</div>
+    <div class="grid">
+      <div class="field">
+        <label for="resource">Resource</label>
+        <input list="resource-list" id="resource" placeholder="e.g. pods, deployment, svc">
+        <datalist id="resource-list">
+          <option value="pods"></option>
+          <option value="deployments"></option>
+          <option value="services"></option>
+          <option value="configmaps"></option>
+          <option value="secrets"></option>
+          <option value="ingresses"></option>
+          <option value="nodes"></option>
+          <option value="namespaces"></option>
+          <option value="jobs"></option>
+          <option value="cronjobs"></option>
+          <option value="statefulsets"></option>
+          <option value="daemonsets"></option>
+          <option value="replicasets"></option>
+          <option value="persistentvolumeclaims"></option>
+          <option value="persistentvolumes"></option>
+          <option value="endpoints"></option>
+          <option value="events"></option>
+          <option value="serviceaccounts"></option>
+          <option value="roles"></option>
+          <option value="rolebindings"></option>
+          <option value="clusterroles"></option>
+          <option value="clusterrolebindings"></option>
+          <option value="networkpolicies"></option>
+          <option value="horizontalpodautoscalers"></option>
+          <option value="poddisruptionbudgets"></option>
+          <option value="storageclasses"></option>
+          <option value="customresourcedefinitions"></option>
+        </datalist>
+      </div>
+      <div class="field">
+        <label for="name">Name <span style="color:var(--text-muted)">(optional)</span></label>
+        <input id="name" placeholder="e.g. my-pod">
+      </div>
+      <div class="field">
+        <label for="namespace">Namespace</label>
+        <input id="namespace" placeholder="default">
+      </div>
+    </div>
+    <div class="check-row">
+      <label class="check"><input type="checkbox" id="allNamespaces">--all-namespaces (-A)</label>
+    </div>
+  </div>
+
+  <!-- Verb-specific -->
+  <div class="section" id="verb-section">
+
+    <!-- Get/Describe/Top shared options -->
+    <div class="subcard" data-verb-group="select">
+      <div class="section-label" style="margin-bottom:0.7rem;">Query options</div>
+      <div class="grid">
+        <div class="field">
+          <label for="selector">Label selector (-l)</label>
+          <input id="selector" placeholder="app=nginx">
+        </div>
+        <div class="field">
+          <label for="fieldSelector">Field selector</label>
+          <input id="fieldSelector" placeholder="status.phase=Running">
+        </div>
+        <div class="field">
+          <label for="output">Output (-o)</label>
+          <select id="output">
+            <option value="">default</option>
+            <option value="wide">wide</option>
+            <option value="yaml">yaml</option>
+            <option value="json">json</option>
+            <option value="name">name</option>
+            <option value="jsonpath">jsonpath</option>
+            <option value="custom-columns">custom-columns</option>
+          </select>
+        </div>
+        <div class="field hidden" id="jsonpath-field">
+          <label for="jsonpath">JSONPath expression</label>
+          <input id="jsonpath" placeholder="{.items[*].metadata.name}">
+        </div>
+        <div class="field hidden" id="customColumns-field">
+          <label for="customColumns">Custom columns</label>
+          <input id="customColumns" placeholder="NAME:.metadata.name,STATUS:.status.phase">
+        </div>
+      </div>
+      <div class="check-row" data-verb-group="get-watch">
+        <label class="check"><input type="checkbox" id="watch">--watch (-w)</label>
+      </div>
+    </div>
+
+    <!-- Logs -->
+    <div class="subcard hidden" data-verb-group="logs">
+      <div class="section-label" style="margin-bottom:0.7rem;">Log options</div>
+      <div class="grid">
+        <div class="field">
+          <label for="tail">Tail lines</label>
+          <input id="tail" placeholder="100">
+        </div>
+        <div class="field">
+          <label for="since">Since</label>
+          <input id="since" placeholder="5m, 1h, 2023-01-01T00:00:00Z">
+        </div>
+        <div class="field">
+          <label for="container">Container</label>
+          <input id="container" placeholder="sidecar">
+        </div>
+      </div>
+      <div class="check-row">
+        <label class="check"><input type="checkbox" id="follow">--follow (-f)</label>
+        <label class="check"><input type="checkbox" id="previous">--previous (-p)</label>
+      </div>
+    </div>
+
+    <!-- Exec -->
+    <div class="subcard hidden" data-verb-group="exec">
+      <div class="section-label" style="margin-bottom:0.7rem;">Exec options</div>
+      <div class="grid">
+        <div class="field">
+          <label for="execContainer">Container</label>
+          <input id="execContainer" placeholder="nginx">
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label for="execCommand">Command</label>
+          <input id="execCommand" placeholder="/bin/bash">
+          <div class="hint">Appears after <code>--</code> in the command.</div>
+        </div>
+      </div>
+      <div class="check-row">
+        <label class="check"><input type="checkbox" id="stdin" checked>--stdin (-i)</label>
+        <label class="check"><input type="checkbox" id="tty" checked>--tty (-t)</label>
+      </div>
+    </div>
+
+    <!-- Apply/Create/Delete file options -->
+    <div class="subcard hidden" data-verb-group="file">
+      <div class="section-label" style="margin-bottom:0.7rem;">Manifest</div>
+      <div class="grid">
+        <div class="field" style="grid-column: 1 / -1;">
+          <label for="filename">Filename (-f)</label>
+          <input id="filename" placeholder="deploy.yaml or ./manifests">
+          <div class="hint">If set, takes precedence over Resource/Name.</div>
+        </div>
+      </div>
+      <div class="check-row">
+        <label class="check"><input type="checkbox" id="recursive">--recursive (-R)</label>
+        <label class="check" data-verb-group="apply-flags"><input type="checkbox" id="serverSide">--server-side</label>
+      </div>
+      <div class="grid" style="margin-top: 0.7rem;" data-verb-group="dry-run">
+        <div class="field">
+          <label for="dryRun">--dry-run</label>
+          <select id="dryRun">
+            <option value="">off</option>
+            <option value="client">client</option>
+            <option value="server">server</option>
+            <option value="none">none</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete -->
+    <div class="subcard hidden" data-verb-group="delete">
+      <div class="section-label" style="margin-bottom:0.7rem;">Delete options</div>
+      <div class="grid">
+        <div class="field">
+          <label for="gracePeriod">--grace-period</label>
+          <input id="gracePeriod" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="cascade">--cascade</label>
+          <select id="cascade">
+            <option value="">default (background)</option>
+            <option value="background">background</option>
+            <option value="foreground">foreground</option>
+            <option value="orphan">orphan</option>
+          </select>
+        </div>
+      </div>
+      <div class="check-row">
+        <label class="check"><input type="checkbox" id="force">--force</label>
+      </div>
+    </div>
+
+    <!-- Scale -->
+    <div class="subcard hidden" data-verb-group="scale">
+      <div class="section-label" style="margin-bottom:0.7rem;">Scale options</div>
+      <div class="grid">
+        <div class="field">
+          <label for="replicas">--replicas</label>
+          <input id="replicas" type="number" min="0" placeholder="3">
+        </div>
+      </div>
+    </div>
+
+    <!-- Rollout -->
+    <div class="subcard hidden" data-verb-group="rollout">
+      <div class="section-label" style="margin-bottom:0.7rem;">Rollout action</div>
+      <div class="grid">
+        <div class="field">
+          <label for="rolloutAction">Action</label>
+          <select id="rolloutAction">
+            <option value="status">status</option>
+            <option value="history">history</option>
+            <option value="restart">restart</option>
+            <option value="undo">undo</option>
+            <option value="pause">pause</option>
+            <option value="resume">resume</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Port forward -->
+    <div class="subcard hidden" data-verb-group="port-forward">
+      <div class="section-label" style="margin-bottom:0.7rem;">Port forward</div>
+      <div class="grid">
+        <div class="field">
+          <label for="localPort">Local port</label>
+          <input id="localPort" placeholder="8080">
+        </div>
+        <div class="field">
+          <label for="remotePort">Remote port</label>
+          <input id="remotePort" placeholder="80">
+        </div>
+      </div>
+    </div>
+
+    <!-- Run -->
+    <div class="subcard hidden" data-verb-group="run">
+      <div class="section-label" style="margin-bottom:0.7rem;">Run options</div>
+      <div class="grid">
+        <div class="field">
+          <label for="image">--image</label>
+          <input id="image" placeholder="busybox">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="section">
+    <button class="advanced-toggle" id="advanced-toggle" type="button">&#9656; Advanced (context, kubeconfig)</button>
+    <div class="advanced-body hidden" id="advanced-body">
+      <div class="grid">
+        <div class="field">
+          <label for="context">--context</label>
+          <input id="context" placeholder="prod-cluster">
+        </div>
+        <div class="field">
+          <label for="kubeconfig">--kubeconfig</label>
+          <input id="kubeconfig" placeholder="~/.kube/config">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Examples</div>
+    <div class="examples" id="examples"></div>
+  </div>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script src="/kubectl_builder_engine.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  const VERBS = [
+    'get', 'describe', 'logs', 'exec',
+    'apply', 'create', 'delete', 'edit',
+    'scale', 'rollout', 'port-forward', 'run', 'top'
+  ];
+
+  const VERB_GROUPS = {
+    get:           ['select'],
+    describe:      ['select'],
+    top:           ['select'],
+    edit:          [],
+    logs:          ['logs'],
+    exec:          ['exec'],
+    apply:         ['file'],
+    create:        ['file'],
+    delete:        ['file', 'delete', 'select'],
+    scale:         ['scale'],
+    rollout:       ['rollout'],
+    'port-forward':['port-forward'],
+    run:           ['run']
+  };
+
+  // [stateKey, inputId, trim]
+  const TEXT_FIELDS = [
+    ['resource', 'resource', true],
+    ['name', 'name', true],
+    ['namespace', 'namespace', true],
+    ['selector', 'selector', true],
+    ['fieldSelector', 'fieldSelector', true],
+    ['output', 'output', false],
+    ['jsonpath', 'jsonpath', false],
+    ['customColumns', 'customColumns', true],
+    ['tail', 'tail', true],
+    ['since', 'since', true],
+    ['execCommand', 'execCommand', true],
+    ['filename', 'filename', true],
+    ['dryRun', 'dryRun', false],
+    ['gracePeriod', 'gracePeriod', true],
+    ['cascade', 'cascade', false],
+    ['replicas', 'replicas', true],
+    ['rolloutAction', 'rolloutAction', false],
+    ['localPort', 'localPort', true],
+    ['remotePort', 'remotePort', true],
+    ['image', 'image', true],
+    ['context', 'context', true],
+    ['kubeconfig', 'kubeconfig', true]
+  ];
+
+  const BOOL_FIELDS = [
+    'allNamespaces', 'watch', 'follow', 'previous',
+    'stdin', 'tty', 'recursive', 'serverSide', 'force'
+  ];
+
+  const EXAMPLES = [
+    { label: 'List pods in all namespaces', state: { verb: 'get', resource: 'pods', allNamespaces: true, output: 'wide' } },
+    { label: 'Describe a pod', state: { verb: 'describe', resource: 'pod', name: 'my-pod' } },
+    { label: 'Tail logs with follow', state: { verb: 'logs', name: 'my-pod', follow: true, tail: '100' } },
+    { label: 'Shell into a pod', state: { verb: 'exec', name: 'my-pod', stdin: true, tty: true, execCommand: '/bin/sh' } },
+    { label: 'Apply a manifest', state: { verb: 'apply', filename: 'deploy.yaml' } },
+    { label: 'Dry-run server apply', state: { verb: 'apply', filename: 'deploy.yaml', dryRun: 'server' } },
+    { label: 'Restart a deployment', state: { verb: 'rollout', rolloutAction: 'restart', resource: 'deployment', name: 'web' } },
+    { label: 'Scale to 3 replicas', state: { verb: 'scale', resource: 'deployment', name: 'web', replicas: '3' } },
+    { label: 'Force delete a pod', state: { verb: 'delete', resource: 'pod', name: 'stuck-pod', force: true, gracePeriod: '0' } },
+    { label: 'Port-forward a service', state: { verb: 'port-forward', resource: 'service', name: 'web', localPort: '8080', remotePort: '80' } },
+    { label: 'Filter by label', state: { verb: 'get', resource: 'pods', selector: 'app=nginx' } },
+    { label: 'Only running pods', state: { verb: 'get', resource: 'pods', fieldSelector: 'status.phase=Running' } }
+  ];
+
+  const pillsEl = document.getElementById('verb-pills');
+  const outEl = document.getElementById('cmd-output');
+  const copyBtn = document.getElementById('copy-btn');
+  const outputSelect = document.getElementById('output');
+  const jsonpathField = document.getElementById('jsonpath-field');
+  const customColumnsField = document.getElementById('customColumns-field');
+  const verbGroupEls = Array.from(document.querySelectorAll('[data-verb-group]'));
+  let currentVerb = 'get';
+
+  VERBS.forEach(v => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'verb-pill' + (v === currentVerb ? ' active' : '');
+    el.textContent = v;
+    el.dataset.verb = v;
+    el.addEventListener('click', () => setVerb(v));
+    pillsEl.appendChild(el);
+  });
+
+  function setVerb(v) {
+    currentVerb = v;
+    pillsEl.querySelectorAll('.verb-pill').forEach(p => {
+      p.classList.toggle('active', p.dataset.verb === v);
+    });
+    updateVisibility();
+    update();
+  }
+
+  function updateVisibility() {
+    const groups = VERB_GROUPS[currentVerb] || [];
+    verbGroupEls.forEach(el => {
+      const g = el.dataset.verbGroup;
+      let visible;
+      if (g === 'get-watch')        visible = currentVerb === 'get';
+      else if (g === 'apply-flags') visible = currentVerb === 'apply';
+      else if (g === 'dry-run')     visible = currentVerb === 'apply' || currentVerb === 'create';
+      else                          visible = groups.includes(g);
+      el.classList.toggle('hidden', !visible);
+    });
+    jsonpathField.classList.toggle('hidden', outputSelect.value !== 'jsonpath');
+    customColumnsField.classList.toggle('hidden', outputSelect.value !== 'custom-columns');
+  }
+
+  function val(id) {
+    const el = document.getElementById(id);
+    if (!el) return '';
+    if (el.type === 'checkbox') return el.checked;
+    return el.value;
+  }
+
+  function setVal(id, v) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = !!v;
+    else el.value = v == null ? '' : v;
+  }
+
+  // exec has its own container input because logs and exec can both be visible state
+  // between verb switches; keeping them separate avoids clobbering a user's typed value.
+  function containerId() {
+    return currentVerb === 'exec' ? 'execContainer' : 'container';
+  }
+
+  function readState() {
+    const s = { verb: currentVerb };
+    TEXT_FIELDS.forEach(([key, id, trim]) => {
+      const v = val(id);
+      s[key] = trim ? v.trim() : v;
+    });
+    BOOL_FIELDS.forEach(k => { s[k] = val(k); });
+    s.container = val(containerId()).trim();
+    return s;
+  }
+
+  function applyState(state) {
+    setVerb(state.verb || 'get');
+    TEXT_FIELDS.forEach(([key, id]) => setVal(id, state[key]));
+    BOOL_FIELDS.forEach(k => setVal(k, state[k]));
+    setVal(state.verb === 'exec' ? 'execContainer' : 'container', state.container);
+    updateVisibility();
+    update();
+  }
+
+  function update() {
+    outEl.textContent = KubectlBuilder.buildCommand(readState());
+  }
+
+  const examplesEl = document.getElementById('examples');
+  EXAMPLES.forEach(ex => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'example';
+    b.textContent = ex.label;
+    b.addEventListener('click', () => applyState(ex.state));
+    examplesEl.appendChild(b);
+  });
+
+  document.querySelectorAll('input, select').forEach(el => {
+    el.addEventListener('input', () => {
+      if (el === outputSelect) updateVisibility();
+      update();
+    });
+  });
+
+  document.getElementById('advanced-toggle').addEventListener('click', () => {
+    const body = document.getElementById('advanced-body');
+    const toggle = document.getElementById('advanced-toggle');
+    const nowHidden = body.classList.toggle('hidden');
+    toggle.innerHTML = (nowHidden ? '&#9656;' : '&#9662;') + ' Advanced (context, kubeconfig)';
+  });
+
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(outEl.textContent).then(() => {
+      copyBtn.textContent = 'Copied';
+      copyBtn.classList.add('copied');
+      const toast = document.getElementById('toast');
+      toast.classList.add('show');
+      setTimeout(() => {
+        copyBtn.textContent = 'Copy';
+        copyBtn.classList.remove('copied');
+        toast.classList.remove('show');
+      }, 1400);
+    });
+  });
+
+  updateVisibility();
+  update();
+})();
+</script>
+</body>
+</html>

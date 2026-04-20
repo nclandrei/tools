@@ -41,3 +41,4 @@ No Markdown mirrors are published; all pages are HTML only.
 ## Developer
 
 - [AI Agent Session Converter](https://tools.nicolaeandrei.com/agent_session_converter.html): Convert coding agent sessions between Claude Code, Codex CLI, Cursor, Pi, and OpenCode
+- [kubectl Command Builder](https://tools.nicolaeandrei.com/kubectl_builder.html): Build kubectl commands visually. Pick a verb, target, and flags and get a copyable command
