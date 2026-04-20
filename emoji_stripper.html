@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emoji Stripper</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 720px; }
+
+  .pane-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .pane-action {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .pane-action:hover { text-decoration: underline; }
+  .pane-action:disabled { color: var(--text-muted); cursor: default; text-decoration: none; }
+
+  textarea {
+    width: 100%;
+    min-height: 160px;
+    padding: 0.7rem 0.85rem;
+    font-size: 0.9rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    border-radius: 6px;
+    resize: vertical;
+    margin-bottom: 1rem;
+    line-height: 1.55;
+  }
+
+  .output-area {
+    width: 100%;
+    min-height: 160px;
+    padding: 0.7rem 0.85rem;
+    font-size: 0.9rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    margin-bottom: 1rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.55;
+    color: var(--text);
+  }
+
+  .output-area.empty { color: var(--text-muted); font-style: italic; }
+
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+
+  .option-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .option-group label {
+    font-size: 0.82rem;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .option-group input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  .stats {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    padding: 0.7rem 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 1.25rem;
+    font-size: 0.82rem;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .stat-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  .stat-value {
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .stat-value.removed { color: var(--accent); }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Emoji Stripper</h1>
+    <a href="/">&#8592; all tools</a>
+  </header>
+
+  <p class="desc">Paste any text and strip out every emoji — single-codepoint emoji, ZWJ sequences (families, professions), flags, skin-tone modifiers, and keycaps. Runs entirely in your browser.</p>
+
+  <div class="options">
+    <div class="option-group">
+      <input type="checkbox" id="opt-collapse">
+      <label for="opt-collapse">Collapse whitespace</label>
+    </div>
+  </div>
+
+  <div class="pane-label">
+    <span>Input</span>
+    <button class="pane-action" id="btn-clear" onclick="clearInput()">Clear</button>
+  </div>
+  <textarea id="input" placeholder="Paste text with emoji here..." spellcheck="false"></textarea>
+
+  <div class="pane-label">
+    <span>Stripped output</span>
+    <button class="pane-action" id="btn-copy" onclick="copyOutput()" disabled>Copy</button>
+  </div>
+  <div class="output-area empty" id="output">Output appears here.</div>
+
+  <div class="stats">
+    <div class="stat-item">
+      <span class="stat-label">Input chars</span>
+      <span class="stat-value" id="stat-in">0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Output chars</span>
+      <span class="stat-value" id="stat-out">0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Emoji removed</span>
+      <span class="stat-value removed" id="stat-removed">0</span>
+    </div>
+  </div>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script>
+const EMOJI_RE = /\p{RGI_Emoji}/gv;
+
+function stripEmojis(text) {
+  return text.replace(EMOJI_RE, '');
+}
+
+function collapseWhitespace(text) {
+  return text
+    .split('\n')
+    .map(line => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(line => line.length > 0)
+    .join('\n');
+}
+
+function countEmojis(text) {
+  let count = 0;
+  for (const _ of text.matchAll(EMOJI_RE)) count++;
+  return count;
+}
+
+function countCodepoints(text) {
+  let count = 0;
+  for (const _ of text) count++;
+  return count;
+}
+
+const input = document.getElementById('input');
+const output = document.getElementById('output');
+const optCollapse = document.getElementById('opt-collapse');
+const btnCopy = document.getElementById('btn-copy');
+const statIn = document.getElementById('stat-in');
+const statOut = document.getElementById('stat-out');
+const statRemoved = document.getElementById('stat-removed');
+
+function run() {
+  const src = input.value;
+  let result = stripEmojis(src);
+  if (optCollapse.checked) result = collapseWhitespace(result);
+
+  if (src.length === 0) {
+    output.textContent = 'Output appears here.';
+    output.classList.add('empty');
+    btnCopy.disabled = true;
+  } else {
+    output.textContent = result;
+    output.classList.toggle('empty', result.length === 0);
+    btnCopy.disabled = result.length === 0;
+    if (result.length === 0) output.textContent = '(all emoji — nothing left)';
+  }
+
+  statIn.textContent = countCodepoints(src).toLocaleString();
+  statOut.textContent = countCodepoints(result).toLocaleString();
+  statRemoved.textContent = countEmojis(src).toLocaleString();
+}
+
+input.addEventListener('input', run);
+optCollapse.addEventListener('change', run);
+
+function clearInput() {
+  input.value = '';
+  run();
+  input.focus();
+}
+
+function copyOutput() {
+  const text = output.textContent;
+  if (!text || btnCopy.disabled) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+
+run();
+</script>
+</body>
+</html>
