@@ -239,7 +239,7 @@
   <span class="file-name" id="fileName"></span>
   <div class="format-toggle" id="formatToggle">
     <button data-fmt="storage" class="active">Storage Format</button>
-    <button data-fmt="wiki">Wiki Markup</button>
+    <button data-fmt="wiki" title="Legacy editor / Data Center only — deprecated in Confluence Cloud">Wiki Markup (legacy)</button>
   </div>
   <div style="flex:1"></div>
   <button class="btn btn-secondary" id="btnClear">Clear</button>
@@ -359,7 +359,7 @@ Paste or type Markdown here. The converted output appears on the right — copy 
         case 'escape': return escHtml(t.text);
         case 'strong': return '<strong>' + storageInline(t.tokens) + '</strong>';
         case 'em': return '<em>' + storageInline(t.tokens) + '</em>';
-        case 'del': return '<s>' + storageInline(t.tokens) + '</s>';
+        case 'del': return '<span style="text-decoration: line-through;">' + storageInline(t.tokens) + '</span>';
         case 'codespan': return '<code>' + escHtml(t.text) + '</code>';
         case 'link':
           return '<a href="' + escAttr(t.href) + '"'
@@ -376,13 +376,17 @@ Paste or type Markdown here. The converted output appears on the right — copy 
     }).join('');
   }
 
+  let taskIdCounter = 0;
+
   function storageList(list) {
     const allTasks = list.items.length > 0 && list.items.every(i => i.task);
     if (allTasks) {
       return '<ac:task-list>' + list.items.map(i => {
         const status = i.checked ? 'complete' : 'incomplete';
         const body = storageListItemBody(i);
-        return '<ac:task><ac:task-status>' + status + '</ac:task-status>'
+        const id = ++taskIdCounter;
+        return '<ac:task><ac:task-id>' + id + '</ac:task-id>'
+          + '<ac:task-status>' + status + '</ac:task-status>'
           + '<ac:task-body>' + body + '</ac:task-body></ac:task>';
       }).join('') + '</ac:task-list>';
     }
@@ -421,7 +425,7 @@ Paste or type Markdown here. The converted output appears on the right — copy 
           const alert = extractAlert(t);
           if (alert) {
             const macro = ALERT_MACROS[alert.kind];
-            out.push('<ac:structured-macro ac:name="' + macro + '"><ac:rich-text-body>'
+            out.push('<ac:structured-macro ac:name="' + macro + '" ac:schema-version="1"><ac:rich-text-body>'
               + storageBlock(alert.inner) + '</ac:rich-text-body></ac:structured-macro>');
           } else {
             out.push('<blockquote>' + storageBlock(t.tokens) + '</blockquote>');
@@ -433,7 +437,7 @@ Paste or type Markdown here. The converted output appears on the right — copy 
           break;
         case 'code': {
           const lang = (t.lang || '').trim().split(/\s+/)[0];
-          out.push('<ac:structured-macro ac:name="code">'
+          out.push('<ac:structured-macro ac:name="code" ac:schema-version="1">'
             + (lang ? '<ac:parameter ac:name="language">' + escHtml(lang) + '</ac:parameter>' : '')
             + '<ac:plain-text-body><![CDATA[' + escCdata(t.text) + ']]></ac:plain-text-body>'
             + '</ac:structured-macro>');
@@ -513,7 +517,7 @@ Paste or type Markdown here. The converted output appears on the right — copy 
         }
       }
       let prefix = marker + ' ';
-      if (item.task) prefix = marker + ' (' + (item.checked ? '/' : 'x') + ') ';
+      if (item.task) prefix = marker + ' ' + (item.checked ? '[x]' : '[ ]') + ' ';
       lines.push(prefix + inlineParts.join(' '));
       for (const n of nested) lines.push(n);
     }
@@ -577,6 +581,7 @@ Paste or type Markdown here. The converted output appears on the right — copy 
     if (!md) { output.value = ''; return; }
     try {
       const tokens = marked.lexer(md, { gfm: true });
+      taskIdCounter = 0;
       output.value = currentFormat === 'wiki' ? wikiBlock(tokens) : storageBlock(tokens);
     } catch (e) {
       output.value = '// Conversion error: ' + (e.message || e);
@@ -599,7 +604,7 @@ Paste or type Markdown here. The converted output appears on the right — copy 
       b.classList.toggle('active', b === btn)
     );
     outputLabel.textContent = currentFormat === 'wiki'
-      ? 'Confluence Wiki Markup'
+      ? 'Confluence Wiki Markup (legacy / Data Center)'
       : 'Confluence Storage Format';
     convert();
   });
