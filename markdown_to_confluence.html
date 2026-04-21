@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Markdown → Confluence</title>
 
 <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
@@ -206,16 +206,55 @@
   }
 
   @media (max-width: 700px) {
-    .tab-bar { display: flex; }
-    .editor-wrap { flex-direction: column; }
-    .pane-label { display: none; }
+    .header { padding: 14px 14px 4px; }
+    .header h1 { font-size: 1.2rem; }
+    .header p { font-size: 0.78rem; margin-top: 2px; }
+
+    .toolbar {
+      padding: 0 14px 10px;
+      gap: 6px;
+      align-items: center;
+    }
+    .toolbar .btn { padding: 7px 10px; font-size: 0.78rem; }
+    .toolbar .btn-file { order: 1; }
+    #btnClear { order: 2; }
+    #btnDownload { order: 3; margin-left: auto; }
+    .toolbar > div[style*="flex:1"] { display: none; }
+
+    .file-name {
+      order: 4;
+      flex-basis: 100%;
+      max-width: 100%;
+      text-align: center;
+      font-size: 0.7rem;
+    }
+    .file-name:empty { display: none; }
+
+    .format-toggle {
+      order: 5;
+      flex-basis: 100%;
+      width: 100%;
+    }
+    .format-toggle button { flex: 1; padding: 8px 4px; }
+
+    .tab-bar { display: flex; padding: 0 14px 8px; }
+
+    .editor-wrap { flex-direction: column; padding: 0 14px 14px; }
+    .pane:first-child .pane-label { display: none; }
+    .pane:last-child .pane-label {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0 0 6px;
+      justify-content: flex-end;
+    }
+    .pane:last-child .pane-label #outputLabel { display: none; }
     .pane:first-child textarea,
     .pane:last-child textarea {
-      border-radius: 0;
+      border-radius: 8px;
       border: 1px solid var(--border);
     }
     .pane.hidden-mobile { display: none; }
-    .toolbar { justify-content: flex-start; }
   }
 
   @media (min-width: 701px) {
