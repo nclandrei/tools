@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terminal Capture</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+  .container { max-width: 1000px; }
+
+  .paste-area {
+    width: 100%;
+    min-height: 120px;
+    padding: 1rem;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    outline: none;
+    margin-bottom: 1.25rem;
+    transition: border-color 0.15s;
+    resize: vertical;
+  }
+  .paste-area:focus { border-color: var(--accent); border-style: solid; }
+
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .section h2 {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+  }
+
+  .preview-container {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: auto;
+    max-width: 100%;
+  }
+  .preview-container pre {
+    margin: 0;
+    padding: 0.9rem 1rem;
+    white-space: pre;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .code-output {
+    width: 100%;
+    min-height: 140px;
+    max-height: 320px;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-alt);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    resize: vertical;
+    white-space: pre;
+    overflow: auto;
+  }
+
+  .row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2.5rem 1rem;
+    font-size: 0.95rem;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+  }
+
+  .error {
+    background: var(--red-dim);
+    border-left: 3px solid var(--red);
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    color: var(--red);
+    font-size: 0.88rem;
+    margin-bottom: 1rem;
+  }
+
+  .note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Terminal Capture</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
+  <p class="desc">Paste colored terminal output from macOS Terminal, iTerm2, or any app that puts RTF on the clipboard. The RTF color table is parsed and the text is rendered as HTML with colors preserved &mdash; copy the HTML or download it as a PNG.</p>
+
+  <textarea class="paste-area" id="paste-area" placeholder="Click here and paste your terminal output (Cmd+V / Ctrl+V)" spellcheck="false"></textarea>
+
+  <div id="results">
+    <div class="empty-state">Paste terminal output to see the colored rendering.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const pasteArea = document.getElementById('paste-area');
+const resultsDiv = document.getElementById('results');
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function parseRTFColor(colorDef) {
+  const r = colorDef.match(/\\red(\d+)/);
+  const g = colorDef.match(/\\green(\d+)/);
+  const b = colorDef.match(/\\blue(\d+)/);
+  if (r && g && b) return `rgb(${+r[1]}, ${+g[1]}, ${+b[1]})`;
+  return null;
+}
+
+function parseRTFColorTable(rtf) {
+  const m = rtf.match(/\{\\colortbl;([^}]+)\}/);
+  if (!m) return [];
+  const table = [null];
+  for (const def of m[1].split(';')) {
+    if (def.trim()) table.push(parseRTFColor(def.trim()));
+    else if (def === '') { /* trailing empty */ }
+  }
+  return table;
+}
+
+function rtfToHtml(rtf) {
+  const colorTable = parseRTFColorTable(rtf);
+
+  let backgroundColor = null;
+  let defaultTextColor = null;
+  const initial = rtf.match(/\\f\d+\\fs\d+\s*\\cf(\d+)\s*\\cb(\d+)/);
+  if (initial) {
+    defaultTextColor = colorTable[+initial[1]];
+    backgroundColor = colorTable[+initial[2]];
+  }
+
+  const pardIndex = rtf.indexOf('\\pard');
+  if (pardIndex === -1) throw new Error('Could not find paragraph content (\\pard) in RTF.');
+
+  // Try the canonical macOS Cocoa content marker first; fall back to first char
+  // after \pard if the marker isn't present.
+  const marker = /\\f\d+\\fs\d+\s+\\cf\d+\s+\\cb\d+\s+\\CocoaLigature\d+\s+/;
+  const mm = rtf.substring(pardIndex).match(marker);
+  let contentStart;
+  if (mm) {
+    contentStart = pardIndex + mm.index + mm[0].length;
+  } else {
+    // Fallback: skip \pard and any control words until first space + text
+    const fallback = /\\pard[^\\]*(?:\\[a-z]+\d*\s*)*/i;
+    const fm = rtf.substring(pardIndex).match(fallback);
+    contentStart = fm ? pardIndex + fm[0].length : pardIndex + 5;
+  }
+
+  const lastBrace = rtf.lastIndexOf('}');
+  const content = rtf.substring(contentStart, lastBrace);
+
+  let html = '';
+  let i = 0;
+  let currentColor = defaultTextColor;
+  let currentBg = backgroundColor;
+  let isBold = false;
+  let isItalic = false;
+  let isUnderline = false;
+
+  while (i < content.length) {
+    const ch = content[i];
+
+    if (ch === '\\') {
+      // Hex escape \'XX
+      if (content[i + 1] === "'") {
+        let j = i + 2;
+        let hex = '';
+        while (j < content.length && /[0-9a-fA-F]/.test(content[j]) && hex.length < 2) {
+          hex += content[j++];
+        }
+        if (hex.length === 2) {
+          html += escapeHtml(String.fromCharCode(parseInt(hex, 16)));
+          i = j;
+          continue;
+        }
+      }
+
+      // \<newline> is an explicit line break in RTF content.
+      if (content[i + 1] === '\n' || content[i + 1] === '\r') {
+        html += '\n';
+        i += 2;
+        if (content[i - 1] === '\r' && content[i] === '\n') i++;
+        continue;
+      }
+
+      // Escaped special chars: \\ \{ \}
+      if (content[i + 1] === '\\' || content[i + 1] === '{' || content[i + 1] === '}') {
+        html += escapeHtml(content[i + 1]);
+        i += 2;
+        continue;
+      }
+
+      // Read control word
+      let j = i + 1;
+      let word = '';
+      while (j < content.length && /[a-z]/i.test(content[j])) word += content[j++];
+      let num = '';
+      while (j < content.length && /[0-9-]/.test(content[j])) num += content[j++];
+      if (content[j] === ' ') j++;
+
+      switch (word) {
+        case 'cf':
+          currentColor = colorTable[+num] || defaultTextColor;
+          break;
+        case 'cb':
+        case 'chcbpat':
+        case 'highlight':
+          currentBg = colorTable[+num] || backgroundColor;
+          break;
+        case 'b':
+          isBold = (num !== '0');
+          break;
+        case 'i':
+          isItalic = (num !== '0');
+          break;
+        case 'ul':
+          isUnderline = true;
+          break;
+        case 'ulnone':
+          isUnderline = false;
+          break;
+        case 'par':
+        case 'line':
+          html += '\n';
+          break;
+        case 'tab':
+          html += '\t';
+          break;
+        case 'u': {
+          const cp = parseInt(num);
+          if (!isNaN(cp)) {
+            const code = cp < 0 ? 65536 + cp : cp;
+            html += escapeHtml(String.fromCharCode(code));
+          }
+          if (content[j] === '?') j++;
+          break;
+        }
+        // Everything else is ignored (font tables, stylesheets, paragraph
+        // defaults, Cocoa hints, etc.).
+      }
+      i = j;
+      continue;
+    }
+
+    if (ch === '\n' || ch === '\r') {
+      i++;
+      continue;
+    }
+
+    if (ch === '{' || ch === '}') {
+      // Group markers in the body — no state stack; terminals emit flat RTF.
+      i++;
+      continue;
+    }
+
+    // Run of plain text until next control code or newline
+    let text = '';
+    while (i < content.length && content[i] !== '\\' && content[i] !== '\n' && content[i] !== '\r' && content[i] !== '{' && content[i] !== '}') {
+      text += content[i++];
+    }
+    if (!text) continue;
+
+    const styles = [];
+    if (currentColor) styles.push(`color: ${currentColor}`);
+    if (currentBg && currentBg !== backgroundColor) styles.push(`background: ${currentBg}`);
+    if (isBold) styles.push('font-weight: bold');
+    if (isItalic) styles.push('font-style: italic');
+    if (isUnderline) styles.push('text-decoration: underline');
+
+    if (styles.length) {
+      html += `<span style="${styles.join('; ')};">${escapeHtml(text)}</span>`;
+    } else {
+      html += escapeHtml(text);
+    }
+  }
+
+  return { html, backgroundColor, defaultTextColor };
+}
+
+function buildPreStyle(bg, fg) {
+  const styles = [];
+  if (bg) styles.push(`background: ${bg}`);
+  if (fg) styles.push(`color: ${fg}`);
+  return styles.length ? ` style="${styles.join('; ')};"` : '';
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+function render(result, rtf) {
+  const { html, backgroundColor, defaultTextColor } = result;
+  const preStyle = buildPreStyle(backgroundColor, defaultTextColor);
+  const fullHtml = `<pre${preStyle}>${html}</pre>`;
+
+  resultsDiv.innerHTML = `
+    <div class="section">
+      <h2>Preview</h2>
+      <div class="preview-container" id="preview">${fullHtml}</div>
+      <div class="row" style="margin-top: 0.75rem;">
+        <button class="btn btn-primary" id="png-btn">Download PNG</button>
+        <button class="btn btn-secondary" id="copy-html-btn">Copy HTML</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>HTML code</h2>
+      <textarea class="code-output" id="html-out" readonly></textarea>
+      <p class="note">Self-contained HTML with inline styles &mdash; paste anywhere that renders HTML (email, Notion, a gist, etc.).</p>
+    </div>
+
+    <div class="section">
+      <h2>Raw RTF</h2>
+      <textarea class="code-output" id="rtf-out" readonly></textarea>
+    </div>
+  `;
+
+  document.getElementById('html-out').value = fullHtml;
+  document.getElementById('rtf-out').value = rtf;
+
+  document.getElementById('copy-html-btn').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(fullHtml);
+      showToast('HTML copied');
+    } catch {
+      const ta = document.getElementById('html-out');
+      ta.select();
+      document.execCommand('copy');
+      showToast('HTML copied');
+    }
+  });
+
+  document.getElementById('png-btn').addEventListener('click', async () => {
+    const preview = document.querySelector('#preview pre');
+    if (!preview) return;
+    showToast('Rendering PNG...');
+    try {
+      const canvas = await html2canvas(preview, {
+        backgroundColor: backgroundColor || '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'terminal.png';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('PNG downloaded');
+      }, 'image/png');
+    } catch (err) {
+      showToast('PNG failed: ' + err.message);
+    }
+  });
+}
+
+pasteArea.addEventListener('paste', (e) => {
+  e.preventDefault();
+  const clipboardData = e.clipboardData;
+  if (!clipboardData) {
+    resultsDiv.innerHTML = '<div class="error">No clipboard data detected.</div>';
+    return;
+  }
+
+  const rtf = clipboardData.getData('text/rtf');
+  if (!rtf) {
+    const plain = clipboardData.getData('text/plain') || '';
+    resultsDiv.innerHTML = `<div class="error">No RTF format on the clipboard. Your source (browser, plain text editor, etc.) didn't provide color info. Copy from macOS Terminal, iTerm2, or another app that exports RTF.</div>
+      <div class="section"><h2>Plain text</h2><textarea class="code-output" readonly>${escapeHtml(plain)}</textarea></div>`;
+    return;
+  }
+
+  try {
+    const result = rtfToHtml(rtf);
+    render(result, rtf);
+  } catch (err) {
+    resultsDiv.innerHTML = `<div class="error">Error parsing RTF: ${escapeHtml(err.message)}</div>
+      <div class="section"><h2>Raw RTF</h2><textarea class="code-output" readonly>${escapeHtml(rtf)}</textarea></div>`;
+  }
+
+  // Clear the paste area after processing so the next paste is clean.
+  setTimeout(() => { pasteArea.value = ''; }, 0);
+});
+</script>
+</body>
+</html>
