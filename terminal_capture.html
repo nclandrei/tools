@@ -231,6 +231,14 @@ function rtfToHtml(rtf) {
         }
       }
 
+      // \<newline> is an explicit line break in RTF content.
+      if (content[i + 1] === '\n' || content[i + 1] === '\r') {
+        html += '\n';
+        i += 2;
+        if (content[i - 1] === '\r' && content[i] === '\n') i++;
+        continue;
+      }
+
       // Escaped special chars: \\ \{ \}
       if (content[i + 1] === '\\' || content[i + 1] === '{' || content[i + 1] === '}') {
         html += escapeHtml(content[i + 1]);
