@@ -220,7 +220,7 @@
   <div>
     <a href="/">← all tools</a>
     <h1>Paste Formatter</h1>
-    <p class="subtitle">Paste markdown or terminal output, get clean text for Slack, LinkedIn, or anywhere</p>
+    <p class="subtitle">Paste markdown or Claude Code / terminal output — get clean Slack, LinkedIn, or anywhere text. Handles indented paste, hard-wrapped lines, markdown and box-drawn tables.</p>
   </div>
 
   <div>
@@ -276,140 +276,24 @@ const hash = await argon2.hash(password);
       <tr><td>`code`</td><td>`code`</td></tr>
       <tr><td>```block```</td><td>```block```</td></tr>
       <tr><td>> quote</td><td>&gt; quote</td></tr>
+      <tr><td>| table |</td><td>```aligned monospace```</td></tr>
+      <tr><td>┌─┐ box ├─┤</td><td>```preserved as-is```</td></tr>
     </table>
   </details>
 </div>
 
 <script>
-function dedent(text) {
-  const lines = text.split('\n');
-  // Find minimum leading whitespace across non-empty lines
-  let minIndent = Infinity;
-  for (const line of lines) {
-    if (line.trim().length === 0) continue;
-    const match = line.match(/^(\s+)/);
-    if (match) {
-      minIndent = Math.min(minIndent, match[1].length);
-    } else {
-      minIndent = 0;
-      break;
-    }
-  }
-  if (minIndent === 0 || minIndent === Infinity) return text;
-  return lines.map(l => l.slice(minIndent)).join('\n');
-}
-
 function convert() {
   const input = document.getElementById('input').value;
   if (!input.trim()) return;
 
-  const result = markdownToSlack(input);
+  const result = window.SlackFormatter.markdownToSlack(input);
   document.getElementById('output').value = result;
   renderPreview(result);
 
-  // Reset copy button
   const btn = document.getElementById('copyBtn');
   btn.textContent = 'Copy to Clipboard';
   btn.classList.remove('copied');
-}
-
-function markdownToSlack(md) {
-  // Strip common leading whitespace (terminal padding from Claude Code)
-  md = dedent(md);
-  // Re-join lines that got hard-wrapped mid-sentence when copied out of a terminal.
-  md = window.SlackFormatter.unwrapHardBreaks(md);
-  const lines = md.split('\n');
-  const out = [];
-  let inCodeBlock = false;
-  let codeLang = '';
-  let codeLines = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
-
-    // Code block toggle
-    if (line.match(/^\s*```/)) {
-      if (!inCodeBlock) {
-        inCodeBlock = true;
-        codeLang = line.replace(/^```/, '').trim();
-        codeLines = [];
-        continue;
-      } else {
-        inCodeBlock = false;
-        out.push('```');
-        out.push(...codeLines);
-        out.push('```');
-        continue;
-      }
-    }
-
-    if (inCodeBlock) {
-      codeLines.push(line);
-      continue;
-    }
-
-    // Headers → bold
-    line = line.replace(/^#{1,6}\s+(.+)$/, '*$1*');
-
-    // Horizontal rules
-    if (line.match(/^(-{3,}|_{3,}|\*{3,})$/)) {
-      out.push('---');
-      continue;
-    }
-
-    // Unordered lists: - or * at start → bullet
-    line = line.replace(/^(\s*)[-*]\s+/, (match, indent) => {
-      const depth = Math.floor(indent.length / 2);
-      return '  '.repeat(depth) + '• ';
-    });
-
-    // Inline transforms (skip inside backticks)
-    line = transformInline(line);
-
-    out.push(line);
-  }
-
-  // Handle unclosed code block
-  if (inCodeBlock) {
-    out.push('```');
-    out.push(...codeLines);
-    out.push('```');
-  }
-
-  return out.join('\n').trim();
-}
-
-function transformInline(line) {
-  // Split by inline code to avoid transforming inside backticks
-  const parts = line.split(/(`[^`]+`)/g);
-
-  return parts.map((part, i) => {
-    // Odd indices are code spans — leave them alone
-    if (i % 2 === 1) return part;
-
-    // Links: [text](url) → <url|text>
-    part = part.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<$2|$1>');
-
-    // Images: ![alt](url) → <url|alt> (already handled by link regex above mostly, but just in case)
-    part = part.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<$2|$1>');
-
-    // Bold: **text** → *text*
-    part = part.replace(/\*\*(.+?)\*\*/g, '*$1*');
-
-    // Bold: __text__ → *text*
-    part = part.replace(/__(.+?)__/g, '*$1*');
-
-    // Italic: *text* → _text_ (but not inside bold which we already converted)
-    // Only match single * that aren't part of **
-    part = part.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '_$1_');
-
-    // Italic: _text_ → _text_ (already correct for Slack)
-
-    // Strikethrough: ~~text~~ → ~text~
-    part = part.replace(/~~(.+?)~~/g, '~$1~');
-
-    return part;
-  }).join('');
 }
 
 function copyOutput() {
