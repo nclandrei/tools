@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Text Escape Converter</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 780px; }
+
+  .desc { margin-bottom: 1.25rem; }
+
+  .mode-toggle {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+
+  .mode-btn {
+    flex: 1;
+    padding: 7px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .mode-btn.active { background: var(--accent); color: #fff; }
+  .mode-btn:not(.active):hover { color: var(--text); }
+
+  .mode-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+  .mode-hint code {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.72rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem 1.1rem;
+    margin-bottom: 1rem;
+    padding: 0.65rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  .option-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .option-group label {
+    font-size: 0.78rem;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .option-group input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+  }
+
+  .pane-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .pane-actions {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .pane-action {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0;
+  }
+
+  .pane-action:hover { text-decoration: underline; }
+  .pane-action:disabled { color: var(--text-muted); cursor: default; text-decoration: none; }
+
+  textarea {
+    width: 100%;
+    min-height: 160px;
+    padding: 0.75rem 0.85rem;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    border-radius: 6px;
+    resize: vertical;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+    tab-size: 4;
+  }
+
+  .swap-row {
+    display: flex;
+    justify-content: center;
+    margin: -0.25rem 0 0.5rem;
+  }
+
+  .swap-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-family: inherit;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .swap-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    min-height: 1.1em;
+  }
+  .stats strong {
+    color: var(--text);
+    font-weight: 500;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  details.ref {
+    margin-top: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+  }
+  details.ref summary {
+    padding: 0.55rem 0.85rem;
+    font-size: 0.82rem;
+    color: var(--text);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  details.ref summary::-webkit-details-marker { display: none; }
+  details.ref summary::before {
+    content: '▸';
+    display: inline-block;
+    margin-right: 0.4rem;
+    color: var(--text-muted);
+    transition: transform 0.15s;
+  }
+  details.ref[open] summary::before { transform: rotate(90deg); }
+
+  .ref-body {
+    padding: 0.25rem 0.85rem 0.85rem;
+    font-size: 0.78rem;
+  }
+  .ref-body table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .ref-body th, .ref-body td {
+    text-align: left;
+    padding: 0.3rem 0.55rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .ref-body tr:last-child td { border-bottom: none; }
+  .ref-body th {
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+  .ref-body code {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.76rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Text Escape Converter</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+
+  <p class="desc">
+    Convert escape sequences to real characters and back. Handy for text copied out of Claude Code,
+    JSON logs, or shell output where newlines and tabs show up as literal <code>\n</code> / <code>\t</code>.
+  </p>
+
+  <div class="mode-toggle">
+    <button class="mode-btn active" data-mode="unescape" onclick="setMode('unescape')">Unescape (\n &rarr; newline)</button>
+    <button class="mode-btn" data-mode="escape" onclick="setMode('escape')">Escape (newline &rarr; \n)</button>
+  </div>
+
+  <div class="mode-hint" id="mode-hint"></div>
+
+  <div class="options" id="options"></div>
+
+  <div class="pane-label">
+    <span id="input-label">Escaped input</span>
+    <div class="pane-actions">
+      <button class="pane-action" onclick="pasteInput()">Paste</button>
+      <button class="pane-action" onclick="clearInput()">Clear</button>
+    </div>
+  </div>
+  <textarea id="input" placeholder="Paste text here (e.g. `Hello\nworld\tfoo` or a JSON string)..." spellcheck="false" autofocus></textarea>
+
+  <div class="swap-row">
+    <button class="swap-btn" onclick="swapPanes()" title="Move output into input and flip mode">&uarr;&darr; Swap &amp; flip mode</button>
+  </div>
+
+  <div class="pane-label">
+    <span id="output-label">Decoded output</span>
+    <div class="pane-actions">
+      <button class="pane-action" onclick="copyOutput()">Copy</button>
+    </div>
+  </div>
+  <textarea id="output" readonly placeholder="Result appears here"></textarea>
+
+  <div class="stats" id="stats"></div>
+
+  <details class="ref">
+    <summary>Supported escape sequences</summary>
+    <div class="ref-body">
+      <table>
+        <thead>
+          <tr><th>Sequence</th><th>Character</th><th>Name</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>\n</code></td><td>LF (0x0A)</td><td>Line feed</td></tr>
+          <tr><td><code>\r</code></td><td>CR (0x0D)</td><td>Carriage return</td></tr>
+          <tr><td><code>\t</code></td><td>TAB (0x09)</td><td>Horizontal tab</td></tr>
+          <tr><td><code>\b</code></td><td>BS (0x08)</td><td>Backspace</td></tr>
+          <tr><td><code>\f</code></td><td>FF (0x0C)</td><td>Form feed</td></tr>
+          <tr><td><code>\v</code></td><td>VT (0x0B)</td><td>Vertical tab</td></tr>
+          <tr><td><code>\0</code></td><td>NUL (0x00)</td><td>Null</td></tr>
+          <tr><td><code>\a</code></td><td>BEL (0x07)</td><td>Bell</td></tr>
+          <tr><td><code>\e</code></td><td>ESC (0x1B)</td><td>Escape (non-standard, common)</td></tr>
+          <tr><td><code>\\</code></td><td>\</td><td>Backslash</td></tr>
+          <tr><td><code>\"</code> <code>\'</code></td><td>" '</td><td>Quotes</td></tr>
+          <tr><td><code>\xHH</code></td><td>any byte</td><td>Hex byte</td></tr>
+          <tr><td><code>\uHHHH</code></td><td>any BMP char</td><td>Unicode code unit</td></tr>
+          <tr><td><code>\u{HHHHHH}</code></td><td>any char</td><td>Unicode code point (ES6)</td></tr>
+          <tr><td><code>\NNN</code></td><td>any byte</td><td>Octal (optional)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+</div>
+
+<div class="copied-toast" id="toast">Copied</div>
+
+<script>
+const MODES = {
+  unescape: {
+    hint: 'Converts escape sequences like <code>\\n</code>, <code>\\t</code>, <code>\\"</code>, <code>\\xHH</code>, <code>\\uHHHH</code> into real characters.',
+    inputLabel: 'Escaped input',
+    outputLabel: 'Decoded output',
+    options: [
+      { id: 'opt-ansi', label: 'Strip ANSI color codes', default: false },
+      { id: 'opt-octal', label: 'Decode octal (\\NNN)', default: false },
+      { id: 'opt-unquote', label: 'Trim surrounding quotes', default: false },
+    ],
+  },
+  escape: {
+    hint: 'Converts real newlines, tabs, and control characters into escape sequences — useful for embedding text into JSON or shell strings.',
+    inputLabel: 'Raw input',
+    outputLabel: 'Escaped output',
+    options: [
+      { id: 'opt-quote-double', label: 'Escape "', default: true },
+      { id: 'opt-quote-single', label: "Escape '", default: false },
+      { id: 'opt-non-ascii', label: 'Escape non-ASCII as \\uHHHH', default: false },
+      { id: 'opt-wrap', label: 'Wrap in double quotes', default: false },
+    ],
+  },
+};
+
+let mode = 'unescape';
+
+function buildOptions() {
+  const wrap = document.getElementById('options');
+  wrap.innerHTML = '';
+  MODES[mode].options.forEach(opt => {
+    const group = document.createElement('div');
+    group.className = 'option-group';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = opt.id;
+    cb.checked = opt.default;
+    cb.addEventListener('change', convert);
+    const lbl = document.createElement('label');
+    lbl.htmlFor = opt.id;
+    lbl.textContent = opt.label;
+    group.appendChild(cb);
+    group.appendChild(lbl);
+    wrap.appendChild(group);
+  });
+}
+
+function setMode(m) {
+  if (m === mode) return;
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  document.getElementById('mode-hint').innerHTML = MODES[mode].hint;
+  document.getElementById('input-label').textContent = MODES[mode].inputLabel;
+  document.getElementById('output-label').textContent = MODES[mode].outputLabel;
+  buildOptions();
+  convert();
+}
+
+function opt(id) {
+  const el = document.getElementById(id);
+  return el ? el.checked : false;
+}
+
+// ANSI CSI/OSC/ESC sequences: covers color, cursor, etc.
+const ANSI_RE = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
+
+function unescapeText(src) {
+  let input = src;
+  let replacements = 0;
+
+  if (opt('opt-unquote')) {
+    const trimmed = input.trim();
+    if (trimmed.length >= 2) {
+      const first = trimmed[0], last = trimmed[trimmed.length - 1];
+      if ((first === '"' && last === '"') || (first === "'" && last === "'") || (first === '`' && last === '`')) {
+        input = trimmed.slice(1, -1);
+      }
+    }
+  }
+
+  const allowOctal = opt('opt-octal');
+  let out = '';
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch !== '\\' || i === input.length - 1) {
+      out += ch;
+      i++;
+      continue;
+    }
+    const next = input[i + 1];
+    let consumed = 2;
+    let replacement = null;
+
+    switch (next) {
+      case 'n': replacement = '\n'; break;
+      case 'r': replacement = '\r'; break;
+      case 't': replacement = '\t'; break;
+      case 'b': replacement = '\b'; break;
+      case 'f': replacement = '\f'; break;
+      case 'v': replacement = '\v'; break;
+      case '0':
+        // Could be \0 or start of octal. Prefer NUL unless followed by octal digits and option enabled.
+        if (allowOctal && /[0-7]/.test(input[i + 2] || '')) {
+          const m = input.slice(i + 1).match(/^[0-7]{1,3}/);
+          replacement = String.fromCharCode(parseInt(m[0], 8));
+          consumed = 1 + m[0].length;
+        } else {
+          replacement = '\0';
+        }
+        break;
+      case 'a': replacement = '\x07'; break;
+      case 'e': replacement = '\x1b'; break;
+      case '\\': replacement = '\\'; break;
+      case '"': replacement = '"'; break;
+      case "'": replacement = "'"; break;
+      case '`': replacement = '`'; break;
+      case '/': replacement = '/'; break;
+      case '?': replacement = '?'; break;
+      case '\n': replacement = ''; break; // line continuation
+      case 'x': {
+        const m = input.slice(i + 2).match(/^[0-9a-fA-F]{2}/);
+        if (m) {
+          replacement = String.fromCharCode(parseInt(m[0], 16));
+          consumed = 2 + m[0].length;
+        }
+        break;
+      }
+      case 'u': {
+        if (input[i + 2] === '{') {
+          const m = input.slice(i + 3).match(/^([0-9a-fA-F]{1,6})\}/);
+          if (m) {
+            replacement = String.fromCodePoint(parseInt(m[1], 16));
+            consumed = 3 + m[1].length + 1;
+          }
+        } else {
+          const m = input.slice(i + 2).match(/^[0-9a-fA-F]{4}/);
+          if (m) {
+            let cp = parseInt(m[0], 16);
+            consumed = 2 + 4;
+            // Handle surrogate pair
+            if (cp >= 0xD800 && cp <= 0xDBFF) {
+              const lowMatch = input.slice(i + consumed).match(/^\\u([0-9a-fA-F]{4})/);
+              if (lowMatch) {
+                const low = parseInt(lowMatch[1], 16);
+                if (low >= 0xDC00 && low <= 0xDFFF) {
+                  cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
+                  consumed += 6;
+                }
+              }
+            }
+            replacement = String.fromCodePoint(cp);
+          }
+        }
+        break;
+      }
+      default:
+        if (allowOctal && /[1-7]/.test(next)) {
+          const m = input.slice(i + 1).match(/^[0-7]{1,3}/);
+          replacement = String.fromCharCode(parseInt(m[0], 8));
+          consumed = 1 + m[0].length;
+        }
+        break;
+    }
+
+    if (replacement !== null) {
+      out += replacement;
+      replacements++;
+      i += consumed;
+    } else {
+      // Unknown escape — keep as-is
+      out += ch;
+      i++;
+    }
+  }
+
+  let ansiStripped = 0;
+  if (opt('opt-ansi')) {
+    out = out.replace(ANSI_RE, (match) => { ansiStripped++; return ''; });
+  }
+
+  return { text: out, replacements, ansiStripped };
+}
+
+function escapeText(src) {
+  const escapeDouble = opt('opt-quote-double');
+  const escapeSingle = opt('opt-quote-single');
+  const nonAscii = opt('opt-non-ascii');
+  const wrap = opt('opt-wrap');
+
+  let out = '';
+  let replacements = 0;
+
+  for (const ch of src) {
+    const code = ch.codePointAt(0);
+    let rep = null;
+    switch (ch) {
+      case '\\': rep = '\\\\'; break;
+      case '\n': rep = '\\n'; break;
+      case '\r': rep = '\\r'; break;
+      case '\t': rep = '\\t'; break;
+      case '\b': rep = '\\b'; break;
+      case '\f': rep = '\\f'; break;
+      case '\v': rep = '\\v'; break;
+      case '\0': rep = '\\0'; break;
+      case '"':
+        if (escapeDouble) rep = '\\"';
+        break;
+      case "'":
+        if (escapeSingle) rep = "\\'";
+        break;
+    }
+    if (rep === null) {
+      if (code < 0x20 || code === 0x7f) {
+        rep = '\\x' + code.toString(16).padStart(2, '0').toUpperCase();
+      } else if (nonAscii && code > 0x7e) {
+        if (code > 0xffff) {
+          // Supplementary plane
+          const high = 0xD800 + ((code - 0x10000) >> 10);
+          const low = 0xDC00 + ((code - 0x10000) & 0x3ff);
+          rep = '\\u' + high.toString(16).padStart(4, '0').toUpperCase() +
+                '\\u' + low.toString(16).padStart(4, '0').toUpperCase();
+        } else {
+          rep = '\\u' + code.toString(16).padStart(4, '0').toUpperCase();
+        }
+      } else {
+        rep = ch;
+      }
+    }
+    if (rep !== ch) replacements++;
+    out += rep;
+  }
+
+  if (wrap) out = '"' + out + '"';
+
+  return { text: out, replacements, ansiStripped: 0 };
+}
+
+function convert() {
+  const input = document.getElementById('input').value;
+  const output = document.getElementById('output');
+  const stats = document.getElementById('stats');
+
+  if (!input) {
+    output.value = '';
+    stats.textContent = '';
+    return;
+  }
+
+  const result = mode === 'unescape' ? unescapeText(input) : escapeText(input);
+  output.value = result.text;
+
+  const parts = [];
+  parts.push('<span><strong>' + input.length + '</strong> &rarr; <strong>' + result.text.length + '</strong> chars</span>');
+  const noun = mode === 'unescape' ? 'sequences decoded' : 'chars escaped';
+  parts.push('<span><strong>' + result.replacements + '</strong> ' + noun + '</span>');
+  if (result.ansiStripped) {
+    parts.push('<span><strong>' + result.ansiStripped + '</strong> ANSI codes stripped</span>');
+  }
+  stats.innerHTML = parts.join('');
+}
+
+function swapPanes() {
+  const input = document.getElementById('input');
+  const output = document.getElementById('output');
+  const newInput = output.value;
+  setMode(mode === 'unescape' ? 'escape' : 'unescape');
+  input.value = newInput;
+  convert();
+}
+
+async function pasteInput() {
+  try {
+    const text = await navigator.clipboard.readText();
+    document.getElementById('input').value = text;
+    convert();
+  } catch (e) {
+    // permission denied or unsupported — focus the input so the user can paste manually
+    document.getElementById('input').focus();
+  }
+}
+
+function clearInput() {
+  document.getElementById('input').value = '';
+  convert();
+  document.getElementById('input').focus();
+}
+
+function copyOutput() {
+  const text = document.getElementById('output').value;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+
+document.getElementById('input').addEventListener('input', convert);
+
+// Init
+document.getElementById('mode-hint').innerHTML = MODES[mode].hint;
+buildOptions();
+convert();
+</script>
+</body>
+</html>
