@@ -844,6 +844,22 @@
     })();
   </script>
   <script>
+    (function() {
+      const SCROLL_KEY = 'tools-index-scroll';
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+      const saved = sessionStorage.getItem(SCROLL_KEY);
+      if (saved !== null) {
+        const y = parseInt(saved, 10);
+        if (!isNaN(y)) {
+          const restore = () => window.scrollTo(0, y);
+          if (document.readyState === 'complete') restore();
+          else window.addEventListener('load', restore, { once: true });
+        }
+      }
+      const save = () => sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
+      window.addEventListener('pagehide', save);
+    })();
+
     const search = document.getElementById('search');
     const categoriesEl = document.getElementById('categories');
     const searchResults = document.getElementById('search-results');
