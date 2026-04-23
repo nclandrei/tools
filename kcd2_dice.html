@@ -196,12 +196,13 @@
     </div>
     <div class="target-divider">
       <span class="target-label">Target</span>
-      <select class="target-select" id="tgt" onchange="setTarget(+this.value)">
+      <select class="target-select" id="tgt" onchange="onTargetChange(this)">
         <option value="2000">2000</option>
         <option value="4000" selected>4000</option>
         <option value="5000">5000</option>
         <option value="8000">8000</option>
         <option value="10000">10000</option>
+        <option value="custom">Custom&hellip;</option>
       </select>
     </div>
   </div>
@@ -509,6 +510,30 @@ function setTarget(t){
   G.target=t;
   if(!G.locked) G.p[0].score=sanitizeStartingScore(G.p[0].score,G.target);
   renderBoard();
+}
+
+// Handle target dropdown changes. The "Custom…" entry opens a prompt; any
+// other value is a direct target selection. A custom value is injected as a
+// new <option> so re-selecting it is one click; only one custom entry is
+// ever kept around to avoid clutter.
+function onTargetChange(sel){
+  if(sel.value!=='custom'){setTarget(+sel.value);return;}
+  const raw=prompt('Enter custom target score:',String(G.target));
+  const n=Number(raw);
+  if(!Number.isFinite(n)||n<=0||Math.floor(n)!==n){
+    sel.value=String(G.target);
+    return;
+  }
+  const t=Math.floor(n);
+  sel.querySelectorAll('option.custom-target').forEach(o=>{if(o.value!==String(t))o.remove();});
+  let opt=sel.querySelector('option[value="'+t+'"]');
+  if(!opt){
+    opt=document.createElement('option');
+    opt.value=String(t); opt.textContent=String(t); opt.className='custom-target';
+    sel.insertBefore(opt,sel.querySelector('option[value="custom"]'));
+  }
+  sel.value=String(t);
+  setTarget(t);
 }
 
 // The score display doubles as a starting-score input. It stays editable
