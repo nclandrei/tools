@@ -9,17 +9,21 @@
 // previous approach — POSTing to /youtubei/v1/player with an ANDROID
 // client context — now reliably returns HTTP 400 FAILED_PRECONDITION
 // because ANDROID/IOS/WEB clients require a PO token (attestation)
-// server-side clients cannot mint. This module tries two fallbacks that
-// still work unauthenticated:
+// server-side clients cannot mint. This module tries three fallbacks
+// that still work unauthenticated:
 //
 //   1. InnerTube with the ANDROID_VR (Meta Quest) client — it's on the
 //      short list of clients yt-dlp/community reports as not gated
 //      behind PO tokens. Works cleanly for many videos but some return
 //      LOGIN_REQUIRED / UNPLAYABLE.
-//   2. Scrape https://www.youtube.com/watch?v=... and extract
+//   2. InnerTube with the TVHTML5_SIMPLY_EMBEDDED_PLAYER client — the
+//      smart-TV embed flow. YouTube doesn't gate the TV embed path
+//      behind PO tokens, so it bypasses the "Sign in to confirm you're
+//      not a bot" wall that hits ANDROID_VR on some Pages egress IPs.
+//   3. Scrape https://www.youtube.com/watch?v=... and extract
 //      `ytInitialPlayerResponse` from the HTML. This is the original
 //      approach; it intermittently gets HTTP 429 from Pages egress IPs
-//      but fills in the gap for videos ANDROID_VR refuses.
+//      but fills in the gap for videos the InnerTube clients refuse.
 //
 // We pick whichever response is "best": an OK playability status with
 // caption tracks wins; otherwise we return the first non-empty result so
@@ -32,6 +36,14 @@ const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 const ANDROID_VR_CLIENT_VERSION = '1.60.19';
 const ANDROID_VR_USER_AGENT =
   'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
+
+// TVHTML5_SIMPLY_EMBEDDED_PLAYER (smart-TV embed). clientName=85.
+// Used by smart TVs / consoles to render embedded YouTube videos.
+// YouTube doesn't gate the TV embed flow behind PO tokens, so it tends
+// to keep working when ANDROID_VR gets the bot-check wall.
+const TV_SIMPLY_CLIENT_VERSION = '2.0';
+const TV_SIMPLY_USER_AGENT =
+  'Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15';
 
 // Desktop Chrome UA for the watch-page scrape fallback. YouTube serves a
 // stripped-down "please update your browser" page to unrecognised UAs.
@@ -60,26 +72,12 @@ function isGoodPlayerResponse(data) {
   return Array.isArray(tracks) && tracks.length > 0;
 }
 
-async function fetchViaAndroidVr(videoId) {
+async function fetchViaInnerTube(videoId, client) {
   const payload = {
     videoId,
     contentCheckOk: true,
     racyCheckOk: true,
-    context: {
-      client: {
-        clientName: 'ANDROID_VR',
-        clientVersion: ANDROID_VR_CLIENT_VERSION,
-        deviceMake: 'Oculus',
-        deviceModel: 'Quest 3',
-        osName: 'Android',
-        osVersion: '12L',
-        androidSdkVersion: 32,
-        platform: 'MOBILE',
-        hl: 'en',
-        gl: 'US',
-        userAgent: ANDROID_VR_USER_AGENT,
-      },
-    },
+    context: { client: client.context },
   };
 
   const upstreamUrl =
@@ -89,9 +87,9 @@ async function fetchViaAndroidVr(videoId) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'User-Agent': ANDROID_VR_USER_AGENT,
-      'X-YouTube-Client-Name': '28',
-      'X-YouTube-Client-Version': ANDROID_VR_CLIENT_VERSION,
+      'User-Agent': client.userAgent,
+      'X-YouTube-Client-Name': client.clientNameNumber,
+      'X-YouTube-Client-Version': client.context.clientVersion,
       Origin: 'https://www.youtube.com',
       Referer: 'https://www.youtube.com/',
     },
@@ -108,6 +106,39 @@ async function fetchViaAndroidVr(videoId) {
     return { ok: false, status: 502, data: null };
   }
 }
+
+const ANDROID_VR_CLIENT = {
+  label: 'ANDROID_VR',
+  clientNameNumber: '28',
+  userAgent: ANDROID_VR_USER_AGENT,
+  context: {
+    clientName: 'ANDROID_VR',
+    clientVersion: ANDROID_VR_CLIENT_VERSION,
+    deviceMake: 'Oculus',
+    deviceModel: 'Quest 3',
+    osName: 'Android',
+    osVersion: '12L',
+    androidSdkVersion: 32,
+    platform: 'MOBILE',
+    hl: 'en',
+    gl: 'US',
+    userAgent: ANDROID_VR_USER_AGENT,
+  },
+};
+
+const TV_SIMPLY_CLIENT = {
+  label: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+  clientNameNumber: '85',
+  userAgent: TV_SIMPLY_USER_AGENT,
+  context: {
+    clientName: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+    clientVersion: TV_SIMPLY_CLIENT_VERSION,
+    platform: 'TV',
+    hl: 'en',
+    gl: 'US',
+    userAgent: TV_SIMPLY_USER_AGENT,
+  },
+};
 
 // Slice a JSON object out of a string starting at `from`, honouring
 // nested braces and string literals. Returns the JSON text or null.
@@ -223,25 +254,34 @@ export async function onRequest(context) {
 
   const attempts = [];
 
-  // ── Attempt 1: ANDROID_VR InnerTube ────────────────────────────────
-  try {
-    const r = await fetchViaAndroidVr(videoId);
-    if (r.ok && r.data) {
-      if (isGoodPlayerResponse(r.data)) return json(r.data);
-      attempts.push(r.data);
-    } else if (r.status === 429) {
+  // ── Attempts 1 & 2: InnerTube clients ──────────────────────────────
+  // ANDROID_VR first (fast and works for most videos), then
+  // TVHTML5_SIMPLY_EMBEDDED_PLAYER if ANDROID_VR is bot-checked or
+  // returns LOGIN_REQUIRED.
+  for (const client of [ANDROID_VR_CLIENT, TV_SIMPLY_CLIENT]) {
+    try {
+      const r = await fetchViaInnerTube(videoId, client);
+      if (r.ok && r.data) {
+        if (isGoodPlayerResponse(r.data)) return json(r.data);
+        attempts.push(r.data);
+      } else if (r.status === 429) {
+        attempts.push({
+          __err:
+            'YouTube rate-limited the request (HTTP 429). Try again in a moment.',
+        });
+      } else if (r.status) {
+        attempts.push({
+          __err: `InnerTube ${client.label} returned HTTP ${r.status}.`,
+        });
+      }
+    } catch (err) {
       attempts.push({
-        __err:
-          'YouTube rate-limited the request (HTTP 429). Try again in a moment.',
+        __err: `InnerTube ${client.label} fetch failed: ${err.message}`,
       });
-    } else if (r.status) {
-      attempts.push({ __err: `InnerTube returned HTTP ${r.status}.` });
     }
-  } catch (err) {
-    attempts.push({ __err: `InnerTube fetch failed: ${err.message}` });
   }
 
-  // ── Attempt 2: watch page scrape ───────────────────────────────────
+  // ── Attempt 3: watch page scrape ───────────────────────────────────
   try {
     const r = await fetchViaWatchPageScrape(videoId);
     if (r.ok && r.data) {
@@ -259,10 +299,10 @@ export async function onRequest(context) {
     attempts.push({ __err: `Watch page fetch failed: ${err.message}` });
   }
 
-  // Neither attempt produced a playable+captioned response. Pick the
-  // first attempt that has a real player-response shape so the frontend
-  // can render a useful error (LOGIN_REQUIRED, UNPLAYABLE, "no
-  // captions", age-restricted, etc.) rather than a bare HTTP code.
+  // No attempt produced a playable+captioned response. Pick the first
+  // attempt that has a real player-response shape so the frontend can
+  // render a useful error (LOGIN_REQUIRED, UNPLAYABLE, "no captions",
+  // age-restricted, etc.) rather than a bare HTTP code.
   const firstPlayerShaped = attempts.find(
     (a) => a && typeof a === 'object' && !a.__err && a.playabilityStatus
   );
