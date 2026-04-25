@@ -145,6 +145,13 @@
       color: var(--text-muted);
       display: none;
     }
+
+    .popular-hits {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-left: 0.4rem;
+      font-weight: 400;
+    }
   </style>
 </head>
 <body>
@@ -172,6 +179,11 @@
       autocomplete="off"
       autofocus
     >
+
+    <div id="popular" class="category" data-category="popular" hidden>
+      <h2>Popular this week</h2>
+      <div class="tools-list" id="popular-list"></div>
+    </div>
 
     <div id="categories">
       <div class="category" data-category="image-media">
@@ -871,6 +883,10 @@
     const categoriesEl = document.getElementById('categories');
     const searchResults = document.getElementById('search-results');
     const noResults = document.getElementById('no-results');
+    const popularEl = document.getElementById('popular');
+    const popularList = document.getElementById('popular-list');
+    // Captured before the async /api/popular fetch resolves, so cloned
+    // cards in #popular are never in this list — search ignores them.
     const cards = Array.from(document.querySelectorAll('.tool-card'));
 
     // Remember each card's original parent so we can restore it
@@ -916,6 +932,7 @@
         searchResults.style.display = 'none';
         categoriesEl.style.display = '';
         noResults.style.display = 'none';
+        if (popularList.children.length > 0) popularEl.style.display = '';
         cards.forEach(card => {
           card.style.display = '';
           originalParents.get(card).appendChild(card);
@@ -936,8 +953,9 @@
 
       scored.sort((a, b) => b.score - a.score);
 
-      // Hide categories, show flat results
+      // Hide categories and popular, show flat results
       categoriesEl.style.display = 'none';
+      popularEl.style.display = 'none';
       searchResults.style.display = '';
       searchResults.innerHTML = '';
 
@@ -954,6 +972,45 @@
 
       noResults.style.display = anyVisible ? 'none' : '';
     });
+
+    // Populate the "Popular this week" section by cloning matching tool
+    // cards. Stays hidden if the fetch fails or the API returns nothing.
+    (async function loadPopular() {
+      let tools;
+      try {
+        const res = await fetch('/api/popular', { credentials: 'omit' });
+        if (!res.ok) return;
+        ({ tools } = await res.json());
+      } catch {
+        return;
+      }
+      if (!Array.isArray(tools) || tools.length === 0) return;
+
+      const cardByHref = new Map();
+      cards.forEach((c) => cardByHref.set(c.getAttribute('href'), c));
+
+      const frag = document.createDocumentFragment();
+      for (const { tool, hits } of tools) {
+        const original = cardByHref.get(`/${tool}.html`);
+        if (!original) continue;
+        const clone = original.cloneNode(true);
+        clone.classList.add('popular-clone');
+        if (Number.isFinite(hits)) {
+          const titleEl = clone.querySelector('.tool-title');
+          if (titleEl) {
+            const badge = document.createElement('span');
+            badge.className = 'popular-hits';
+            badge.textContent = `${hits} hits`;
+            titleEl.appendChild(badge);
+          }
+        }
+        frag.appendChild(clone);
+      }
+      if (frag.childElementCount === 0) return;
+
+      popularList.appendChild(frag);
+      if (!search.value.trim()) popularEl.hidden = false;
+    })();
   </script>
 <!-- PWA standalone refresh button -->
 <script>(function(){if(window.navigator.standalone||window.matchMedia("(display-mode:standalone)").matches){var b=document.getElementById("pwa-refresh-btn");if(b)b.style.display="block"}})()</script>
