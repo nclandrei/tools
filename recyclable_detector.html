@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recyclable Detector</title>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .container { max-width: 900px; }
+    header { margin-bottom: 2rem; }
+    h1 { font-size: 1.75rem; }
+    .drop-zone { position: relative; padding: 2.5rem 1.5rem; }
+    .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .drop-icon { font-size: 2rem; margin-bottom: .5rem; }
+
+    .preview-wrap { display: none; animation: fadeUp .3s ease; }
+    .preview-wrap.visible { display: block; }
+    .preview-wrap img {
+      max-width: 100%; max-height: 420px;
+      border-radius: 10px; border: 1px solid var(--border);
+      display: block; margin: 0 auto;
+    }
+    .actions-bar { display: flex; gap: .6rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
+
+    .status-row {
+      display: none;
+      align-items: center; gap: .6rem;
+      margin-top: 1rem; font-size: .9rem; color: var(--text-muted);
+      justify-content: center;
+    }
+    .status-row.visible { display: flex; }
+    .status-row .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    .result-panel {
+      display: none;
+      margin-top: 1.25rem;
+      padding: 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      animation: fadeUp .3s ease;
+    }
+    .result-panel.visible { display: block; }
+
+    .result-head {
+      display: flex; align-items: center; gap: .9rem;
+      flex-wrap: wrap;
+    }
+    .result-emoji { font-size: 2rem; line-height: 1; }
+    .result-title { font-size: 1.25rem; font-weight: 600; }
+    .disposal-badge {
+      display: inline-block;
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .disposal-badge.recyclable { color: var(--green); border-color: var(--green-dim, var(--green)); }
+    .disposal-badge.compost    { color: var(--green); border-color: var(--green-dim, var(--green)); }
+    .disposal-badge.special    { color: var(--amber); border-color: var(--amber-dim, var(--amber)); }
+    .disposal-badge.trash      { color: var(--red); border-color: var(--red-dim, var(--red)); }
+
+    .top-prediction {
+      font-size: .9rem;
+      color: var(--text-muted);
+      margin-top: .6rem;
+    }
+    .confidence-badge {
+      display: inline-block;
+      font-family: monospace;
+      font-size: .8rem;
+      padding: .15rem .45rem;
+      margin-left: .4rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .hint {
+      margin-top: .9rem;
+      padding: .8rem .9rem;
+      background: var(--surface-alt, var(--bg));
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .9rem;
+      line-height: 1.5;
+    }
+    .alternatives {
+      margin-top: 1rem;
+      padding-top: .8rem;
+      border-top: 1px dashed var(--border);
+      font-size: .85rem;
+      color: var(--text-muted);
+    }
+    .alternatives ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+    .alternatives li { margin: .2rem 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Recyclable Detector</h1>
+      <a href="/">&larr; all tools</a>
+    </header>
+
+    <p class="desc">Upload a photo of an item and find out if it's recyclable and which category it belongs to. Runs entirely in your browser.</p>
+
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">&#9851;</div>
+      <p>Drop an image here or click to select</p>
+      <p style="font-size:.8rem; margin-top:.4rem; color:var(--text-muted)">Supports JPEG, PNG, WebP</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div class="preview-wrap" id="previewWrap">
+      <img id="previewImg" alt="Selected image">
+
+      <div class="status-row" id="statusRow">
+        <div class="spinner"></div>
+        <span id="statusText">Loading model…</span>
+      </div>
+
+      <div class="result-panel" id="resultPanel">
+        <div class="result-head">
+          <span class="result-emoji" id="resultEmoji"></span>
+          <span class="result-title" id="resultTitle"></span>
+          <span class="disposal-badge" id="disposalBadge"></span>
+        </div>
+        <p class="top-prediction">
+          Detected: <span id="topPrediction"></span>
+          <span class="confidence-badge" id="confidenceBadge"></span>
+        </p>
+        <p class="hint" id="resultHint"></p>
+        <div class="alternatives" id="alternativesWrap" style="display:none">
+          <strong>Other guesses</strong>
+          <ul id="alternatives"></ul>
+        </div>
+      </div>
+
+      <div class="actions-bar">
+        <button class="btn" id="resetBtn">New Image</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Recyclable category model ---
+    // Categorizes an ImageNet label string into a disposal category.
+    const CATEGORIES = {
+      plastic: {
+        label: 'Plastic',
+        disposal: 'recyclable',
+        emoji: '♻️',
+        hint: 'Empty, rinse, and place in the plastics recycling bin. Caps usually go on. Avoid black plastic where local rules exclude it.',
+      },
+      glass: {
+        label: 'Glass',
+        disposal: 'recyclable',
+        emoji: '\u{1F37E}',
+        hint: 'Rinse and place in the glass bin. Remove metal lids (recycle separately). Broken glass goes to trash for safety.',
+      },
+      metal: {
+        label: 'Metal',
+        disposal: 'recyclable',
+        emoji: '\u{1F96B}',
+        hint: 'Rinse cans, foil, and tins, and place in the metals/cans recycling bin. Squashing saves space.',
+      },
+      paper: {
+        label: 'Paper',
+        disposal: 'recyclable',
+        emoji: '\u{1F4C4}',
+        hint: 'Place clean, dry paper in the paper bin. Greasy or food-soiled paper goes to compost or trash.',
+      },
+      cardboard: {
+        label: 'Cardboard',
+        disposal: 'recyclable',
+        emoji: '\u{1F4E6}',
+        hint: 'Flatten boxes and remove tape. Greasy pizza-style boxes typically go to compost or trash.',
+      },
+      organic: {
+        label: 'Organic / Compost',
+        disposal: 'compost',
+        emoji: '\u{1F33F}',
+        hint: 'Compostable. Put in food-waste/compost bin where available; otherwise general waste.',
+      },
+      electronic: {
+        label: 'E-Waste',
+        disposal: 'special',
+        emoji: '\u{1F50C}',
+        hint: 'Do not put in regular bins. Take to an electronics drop-off or municipal e-waste collection.',
+      },
+      battery: {
+        label: 'Battery',
+        disposal: 'special',
+        emoji: '\u{1F50B}',
+        hint: 'Never bin or burn. Drop off at a battery collection point (most supermarkets and electronics stores accept them).',
+      },
+      textile: {
+        label: 'Textile',
+        disposal: 'special',
+        emoji: '\u{1F457}',
+        hint: 'Wearable items: donate or use a textile bank. Worn-out fabrics go to textile recycling, not the regular recycling bin.',
+      },
+      hazardous: {
+        label: 'Hazardous',
+        disposal: 'special',
+        emoji: '⚠️',
+        hint: 'Take to a household hazardous waste facility. Do not pour down drains or place in any household bin.',
+      },
+      trash: {
+        label: 'General Waste',
+        disposal: 'trash',
+        emoji: '\u{1F5D1}️',
+        hint: 'Not commonly recyclable. Goes in the general waste bin.',
+      },
+      unknown: {
+        label: 'Unknown',
+        disposal: 'trash',
+        emoji: '❓',
+        hint: "Couldn't confidently determine recyclability. When in doubt, check your local council's guidance.",
+      },
+    };
+
+    // Keyword rules. Each ImageNet label is split on commas/whitespace; if any
+    // rule's pattern matches the lowercased label, that category is returned.
+    // Rules are ordered most-specific first so e-waste beats "metal", etc.
+    const RULES = [
+      // Hazardous
+      { cat: 'hazardous', re: /\b(syringe|aerosol|gas pump|ashcan)\b/ },
+      // Battery
+      { cat: 'battery', re: /\bbattery\b/ },
+      // Electronics / e-waste
+      { cat: 'electronic', re: /\b(cellular|cell ?phone|mobile phone|telephone|dial telephone|laptop|notebook computer|desktop computer|computer|monitor|screen|crt|hand-held computer|ipod|printer|photocopier|scanner|modem|router|hard disc|hard disk|floppy|cassette player|tape player|cd player|dvd|microwave|toaster|dishwasher|iron|hair dryer|electric fan|space heater|vacuum|loudspeaker|amplifier|radio|stove|oven|refrigerator|washer|home theater|joystick|remote control|mouse, computer mouse|computer mouse|computer keyboard|keyboard|television|projector|camera|polaroid|reflex camera|tape drive|usb)\b/ },
+      // Cardboard / boxes
+      { cat: 'cardboard', re: /\b(carton|packing box|crate|wooden box|shipping box|cardboard)\b/ },
+      // Paper
+      { cat: 'paper', re: /\b(envelope|paper towel|toilet tissue|book jacket|comic book|notebook|menu|crossword|magazine|newspaper|paper|book)\b/ },
+      // Plastic
+      { cat: 'plastic', re: /\b(water bottle|pop bottle|soda bottle|pill bottle|plastic bag|shopping bag|trash can|garbage can|bin liner|tupperware|toilet seat|squeegee|bucket)\b/ },
+      // Glass
+      { cat: 'glass', re: /\b(beer bottle|wine bottle|whiskey|whisky|champagne|beer glass|wineglass|water jug|vase|goblet|jar|hourglass)\b/ },
+      // Metal cans / foil / tins
+      { cat: 'metal', re: /\b(beer can|milk can|tin can|soup can|saltshaker|frying pan|wok|skillet|caldron|cauldron|dutch oven|teapot|coffeepot|spatula|ladle|wrench|nail|safety pin|paper clip|chain|chainsaw|cleaver|can opener|tin foil|aluminum|aluminium|barrel|drum)\b/ },
+      // Textiles
+      { cat: 'textile', re: /\b(jersey|t-shirt|tee shirt|sweatshirt|sweater|cardigan|jean|jeans|fur coat|kimono|gown|abaya|sarong|poncho|miniskirt|trench coat|lab coat|cloak|stole|suit|swimsuit|trunks|bib|apron|shirt|pajama|hosiery|sock|stocking|brassiere|bath towel|handkerchief|necktie|bow tie|wig|wool|sandal|loafer|shoe|sneaker|running shoe|cowboy boot|knee pad|mitten|glove|umbrella|backpack|handbag|purse|wallet|sleeping bag)\b/ },
+      // Organic / food
+      { cat: 'organic', re: /\b(banana|apple|orange|lemon|pineapple|strawberry|jackfruit|fig|pomegranate|granny smith|broccoli|cauliflower|zucchini|cucumber|artichoke|bell pepper|cardoon|mushroom|corn|acorn|hip|ear, spike|bagel|pretzel|cheeseburger|hotdog|hot dog|pizza|burrito|guacamole|consomme|trifle|ice cream|ice lolly|french loaf|meatloaf|head cabbage|spaghetti|sushi|carbonara|fungus|earthstar|stinkhorn|mushroom|coral|coffee mug|nut|fruit|leaf|flower|plant|grass|wood|tree|cabbage|squash|butternut|spaghetti squash|bok choy|chard|kohlrabi|rutabaga|radish|potato|sweet potato)\b/ },
+    ];
+
+    function categorize(label) {
+      if (!label) return { key: 'unknown', ...CATEGORIES.unknown };
+      const lc = String(label).toLowerCase();
+      for (const r of RULES) {
+        if (r.re.test(lc)) return { key: r.cat, ...CATEGORIES[r.cat] };
+      }
+      return { key: 'unknown', ...CATEGORIES.unknown };
+    }
+
+    window.__rd = { CATEGORIES, categorize };
+  </script>
+
+  <script type="module">
+    // Real classifier: lazily loaded MobileNetV2 ImageNet pipeline via transformers.js.
+    // Skipped automatically when window.__rd_mock is set (tests).
+    if (!window.__rd_mock) {
+      const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.2/dist/transformers.min.js');
+      env.allowLocalModels = false;
+
+      const MODEL_ID = 'Xenova/vit-base-patch16-224';
+      let classifierPromise = null;
+
+      function loadClassifier() {
+        if (classifierPromise) return classifierPromise;
+        const status = document.getElementById('statusText');
+        const ensureStatusVisible = () => {
+          const row = document.getElementById('statusRow');
+          if (row && !row.classList.contains('visible')) row.classList.add('visible');
+        };
+        if (status) { status.textContent = 'Loading model (first run only, ~85 MB)…'; ensureStatusVisible(); }
+        classifierPromise = pipeline('image-classification', MODEL_ID, {
+          progress_callback: (p) => {
+            if (!status) return;
+            if (p.status === 'progress' && p.total) {
+              const pct = Math.round((p.loaded / p.total) * 100);
+              status.textContent = `Loading model… ${pct}%`;
+              ensureStatusVisible();
+            } else if (p.status === 'ready') {
+              status.textContent = 'Model ready.';
+            }
+          },
+        }).catch((err) => { classifierPromise = null; throw err; });
+        return classifierPromise;
+      }
+
+      window.__rd_classify = async (file) => {
+        const classifier = await loadClassifier();
+        const url = URL.createObjectURL(file);
+        try {
+          const out = await classifier(url, { top_k: 5 });
+          return Array.isArray(out) ? out : [out];
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      };
+    }
+  </script>
+
+  <script>
+    (() => {
+      const dropZone = document.getElementById('dropZone');
+      const fileInput = document.getElementById('fileInput');
+      const previewWrap = document.getElementById('previewWrap');
+      const previewImg = document.getElementById('previewImg');
+      const resetBtn = document.getElementById('resetBtn');
+      const statusRow = document.getElementById('statusRow');
+      const statusText = document.getElementById('statusText');
+      const resultPanel = document.getElementById('resultPanel');
+      const resultEmoji = document.getElementById('resultEmoji');
+      const resultTitle = document.getElementById('resultTitle');
+      const disposalBadge = document.getElementById('disposalBadge');
+      const topPrediction = document.getElementById('topPrediction');
+      const confidenceBadge = document.getElementById('confidenceBadge');
+      const resultHint = document.getElementById('resultHint');
+      const alternativesWrap = document.getElementById('alternativesWrap');
+      const alternativesList = document.getElementById('alternatives');
+
+      let currentBlobUrl = null;
+
+      const DISPOSAL_TEXT = {
+        recyclable: 'Recyclable',
+        compost: 'Compostable',
+        special: 'Special drop-off',
+        trash: 'Not recyclable',
+      };
+
+      function showStatus(msg) {
+        statusText.textContent = msg;
+        statusRow.classList.add('visible');
+        resultPanel.classList.remove('visible');
+      }
+      function hideStatus() { statusRow.classList.remove('visible'); }
+
+      function showError(msg) {
+        statusText.textContent = msg;
+        statusRow.classList.add('visible');
+      }
+
+      function renderResult(predictions) {
+        const top = predictions[0];
+        const cat = window.__rd.categorize(top ? top.label : '');
+
+        resultEmoji.textContent = cat.emoji || '';
+        resultTitle.textContent = cat.label;
+        disposalBadge.textContent = DISPOSAL_TEXT[cat.disposal] || cat.disposal;
+        disposalBadge.className = 'disposal-badge ' + cat.disposal;
+        topPrediction.textContent = top ? top.label : '—';
+        confidenceBadge.textContent = top ? `${Math.round(top.score * 100)}%` : '';
+        resultHint.textContent = cat.hint;
+
+        const alts = predictions.slice(1, 3);
+        alternativesList.innerHTML = '';
+        if (alts.length) {
+          alternativesWrap.style.display = '';
+          for (const a of alts) {
+            const li = document.createElement('li');
+            li.textContent = `${a.label} (${Math.round(a.score * 100)}%)`;
+            alternativesList.appendChild(li);
+          }
+        } else {
+          alternativesWrap.style.display = 'none';
+        }
+
+        hideStatus();
+        resultPanel.classList.add('visible');
+      }
+
+      async function classify(file) {
+        // Test/dev hook: window.__rd_mock.classify(file) returns predictions.
+        if (window.__rd_mock && typeof window.__rd_mock.classify === 'function') {
+          return await window.__rd_mock.classify(file);
+        }
+        if (typeof window.__rd_classify === 'function') {
+          return await window.__rd_classify(file);
+        }
+        throw new Error('No classifier loaded.');
+      }
+
+      async function showPreview(file) {
+        if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = URL.createObjectURL(file);
+        previewImg.src = currentBlobUrl;
+        dropZone.style.display = 'none';
+        previewWrap.classList.add('visible');
+        resultPanel.classList.remove('visible');
+        showStatus('Analysing image…');
+        try {
+          const predictions = await classify(file);
+          if (!predictions || !predictions.length) {
+            renderResult([{ label: '', score: 0 }]);
+            return;
+          }
+          renderResult(predictions);
+        } catch (err) {
+          console.error(err);
+          showError('Classification failed: ' + (err && err.message ? err.message : err));
+        }
+      }
+
+      function reset() {
+        if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+        previewImg.removeAttribute('src');
+        previewWrap.classList.remove('visible');
+        resultPanel.classList.remove('visible');
+        hideStatus();
+        dropZone.style.display = '';
+        fileInput.value = '';
+      }
+
+      fileInput.addEventListener('change', () => {
+        const f = fileInput.files && fileInput.files[0];
+        if (f) showPreview(f);
+      });
+
+      ['dragenter', 'dragover'].forEach(ev =>
+        dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+      ['dragleave', 'drop'].forEach(ev =>
+        dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
+      dropZone.addEventListener('drop', e => {
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f && f.type.startsWith('image/')) showPreview(f);
+      });
+
+      document.addEventListener('paste', e => {
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (const it of items) {
+          if (it.type.startsWith('image/')) { showPreview(it.getAsFile()); return; }
+        }
+      });
+
+      resetBtn.addEventListener('click', reset);
+    })();
+  </script>
+</body>
+</html>
