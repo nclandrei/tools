@@ -23,6 +23,87 @@
       display: block; margin: 0 auto;
     }
     .actions-bar { display: flex; gap: .6rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
+
+    .status-row {
+      display: none;
+      align-items: center; gap: .6rem;
+      margin-top: 1rem; font-size: .9rem; color: var(--text-muted);
+      justify-content: center;
+    }
+    .status-row.visible { display: flex; }
+    .status-row .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    .result-panel {
+      display: none;
+      margin-top: 1.25rem;
+      padding: 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      animation: fadeUp .3s ease;
+    }
+    .result-panel.visible { display: block; }
+
+    .result-head {
+      display: flex; align-items: center; gap: .9rem;
+      flex-wrap: wrap;
+    }
+    .result-emoji { font-size: 2rem; line-height: 1; }
+    .result-title { font-size: 1.25rem; font-weight: 600; }
+    .disposal-badge {
+      display: inline-block;
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .disposal-badge.recyclable { color: var(--green); border-color: var(--green-dim, var(--green)); }
+    .disposal-badge.compost    { color: var(--green); border-color: var(--green-dim, var(--green)); }
+    .disposal-badge.special    { color: var(--amber); border-color: var(--amber-dim, var(--amber)); }
+    .disposal-badge.trash      { color: var(--red); border-color: var(--red-dim, var(--red)); }
+
+    .top-prediction {
+      font-size: .9rem;
+      color: var(--text-muted);
+      margin-top: .6rem;
+    }
+    .confidence-badge {
+      display: inline-block;
+      font-family: monospace;
+      font-size: .8rem;
+      padding: .15rem .45rem;
+      margin-left: .4rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .hint {
+      margin-top: .9rem;
+      padding: .8rem .9rem;
+      background: var(--surface-alt, var(--bg));
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .9rem;
+      line-height: 1.5;
+    }
+    .alternatives {
+      margin-top: 1rem;
+      padding-top: .8rem;
+      border-top: 1px dashed var(--border);
+      font-size: .85rem;
+      color: var(--text-muted);
+    }
+    .alternatives ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+    .alternatives li { margin: .2rem 0; }
   </style>
 </head>
 <body>
@@ -43,6 +124,29 @@
 
     <div class="preview-wrap" id="previewWrap">
       <img id="previewImg" alt="Selected image">
+
+      <div class="status-row" id="statusRow">
+        <div class="spinner"></div>
+        <span id="statusText">Loading model…</span>
+      </div>
+
+      <div class="result-panel" id="resultPanel">
+        <div class="result-head">
+          <span class="result-emoji" id="resultEmoji"></span>
+          <span class="result-title" id="resultTitle"></span>
+          <span class="disposal-badge" id="disposalBadge"></span>
+        </div>
+        <p class="top-prediction">
+          Detected: <span id="topPrediction"></span>
+          <span class="confidence-badge" id="confidenceBadge"></span>
+        </p>
+        <p class="hint" id="resultHint"></p>
+        <div class="alternatives" id="alternativesWrap" style="display:none">
+          <strong>Other guesses</strong>
+          <ul id="alternatives"></ul>
+        </div>
+      </div>
+
       <div class="actions-bar">
         <button class="btn" id="resetBtn">New Image</button>
       </div>
@@ -172,21 +276,106 @@
       const previewWrap = document.getElementById('previewWrap');
       const previewImg = document.getElementById('previewImg');
       const resetBtn = document.getElementById('resetBtn');
+      const statusRow = document.getElementById('statusRow');
+      const statusText = document.getElementById('statusText');
+      const resultPanel = document.getElementById('resultPanel');
+      const resultEmoji = document.getElementById('resultEmoji');
+      const resultTitle = document.getElementById('resultTitle');
+      const disposalBadge = document.getElementById('disposalBadge');
+      const topPrediction = document.getElementById('topPrediction');
+      const confidenceBadge = document.getElementById('confidenceBadge');
+      const resultHint = document.getElementById('resultHint');
+      const alternativesWrap = document.getElementById('alternativesWrap');
+      const alternativesList = document.getElementById('alternatives');
 
       let currentBlobUrl = null;
 
-      function showPreview(file) {
+      const DISPOSAL_TEXT = {
+        recyclable: 'Recyclable',
+        compost: 'Compostable',
+        special: 'Special drop-off',
+        trash: 'Not recyclable',
+      };
+
+      function showStatus(msg) {
+        statusText.textContent = msg;
+        statusRow.classList.add('visible');
+        resultPanel.classList.remove('visible');
+      }
+      function hideStatus() { statusRow.classList.remove('visible'); }
+
+      function showError(msg) {
+        statusText.textContent = msg;
+        statusRow.classList.add('visible');
+      }
+
+      function renderResult(predictions) {
+        const top = predictions[0];
+        const cat = window.__rd.categorize(top ? top.label : '');
+
+        resultEmoji.textContent = cat.emoji || '';
+        resultTitle.textContent = cat.label;
+        disposalBadge.textContent = DISPOSAL_TEXT[cat.disposal] || cat.disposal;
+        disposalBadge.className = 'disposal-badge ' + cat.disposal;
+        topPrediction.textContent = top ? top.label : '—';
+        confidenceBadge.textContent = top ? `${Math.round(top.score * 100)}%` : '';
+        resultHint.textContent = cat.hint;
+
+        const alts = predictions.slice(1, 3);
+        alternativesList.innerHTML = '';
+        if (alts.length) {
+          alternativesWrap.style.display = '';
+          for (const a of alts) {
+            const li = document.createElement('li');
+            li.textContent = `${a.label} (${Math.round(a.score * 100)}%)`;
+            alternativesList.appendChild(li);
+          }
+        } else {
+          alternativesWrap.style.display = 'none';
+        }
+
+        hideStatus();
+        resultPanel.classList.add('visible');
+      }
+
+      async function classify(file) {
+        // Test/dev hook: window.__rd_mock.classify(file) returns predictions.
+        if (window.__rd_mock && typeof window.__rd_mock.classify === 'function') {
+          return await window.__rd_mock.classify(file);
+        }
+        if (typeof window.__rd_classify === 'function') {
+          return await window.__rd_classify(file);
+        }
+        throw new Error('No classifier loaded.');
+      }
+
+      async function showPreview(file) {
         if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
         currentBlobUrl = URL.createObjectURL(file);
         previewImg.src = currentBlobUrl;
         dropZone.style.display = 'none';
         previewWrap.classList.add('visible');
+        resultPanel.classList.remove('visible');
+        showStatus('Analysing image…');
+        try {
+          const predictions = await classify(file);
+          if (!predictions || !predictions.length) {
+            renderResult([{ label: '', score: 0 }]);
+            return;
+          }
+          renderResult(predictions);
+        } catch (err) {
+          console.error(err);
+          showError('Classification failed: ' + (err && err.message ? err.message : err));
+        }
       }
 
       function reset() {
         if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
         previewImg.removeAttribute('src');
         previewWrap.classList.remove('visible');
+        resultPanel.classList.remove('visible');
+        hideStatus();
         dropZone.style.display = '';
         fileInput.value = '';
       }
