@@ -269,6 +269,52 @@
     window.__rd = { CATEGORIES, categorize };
   </script>
 
+  <script type="module">
+    // Real classifier: lazily loaded MobileNetV2 ImageNet pipeline via transformers.js.
+    // Skipped automatically when window.__rd_mock is set (tests).
+    if (!window.__rd_mock) {
+      const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.2/dist/transformers.min.js');
+      env.allowLocalModels = false;
+
+      const MODEL_ID = 'Xenova/vit-base-patch16-224';
+      let classifierPromise = null;
+
+      function loadClassifier() {
+        if (classifierPromise) return classifierPromise;
+        const status = document.getElementById('statusText');
+        const ensureStatusVisible = () => {
+          const row = document.getElementById('statusRow');
+          if (row && !row.classList.contains('visible')) row.classList.add('visible');
+        };
+        if (status) { status.textContent = 'Loading model (first run only, ~85 MB)…'; ensureStatusVisible(); }
+        classifierPromise = pipeline('image-classification', MODEL_ID, {
+          progress_callback: (p) => {
+            if (!status) return;
+            if (p.status === 'progress' && p.total) {
+              const pct = Math.round((p.loaded / p.total) * 100);
+              status.textContent = `Loading model… ${pct}%`;
+              ensureStatusVisible();
+            } else if (p.status === 'ready') {
+              status.textContent = 'Model ready.';
+            }
+          },
+        }).catch((err) => { classifierPromise = null; throw err; });
+        return classifierPromise;
+      }
+
+      window.__rd_classify = async (file) => {
+        const classifier = await loadClassifier();
+        const url = URL.createObjectURL(file);
+        try {
+          const out = await classifier(url, { top_k: 5 });
+          return Array.isArray(out) ? out : [out];
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      };
+    }
+  </script>
+
   <script>
     (() => {
       const dropZone = document.getElementById('dropZone');
