@@ -50,6 +50,122 @@
   </div>
 
   <script>
+    // --- Recyclable category model ---
+    // Categorizes an ImageNet label string into a disposal category.
+    const CATEGORIES = {
+      plastic: {
+        label: 'Plastic',
+        disposal: 'recyclable',
+        emoji: '♻️',
+        hint: 'Empty, rinse, and place in the plastics recycling bin. Caps usually go on. Avoid black plastic where local rules exclude it.',
+      },
+      glass: {
+        label: 'Glass',
+        disposal: 'recyclable',
+        emoji: '\u{1F37E}',
+        hint: 'Rinse and place in the glass bin. Remove metal lids (recycle separately). Broken glass goes to trash for safety.',
+      },
+      metal: {
+        label: 'Metal',
+        disposal: 'recyclable',
+        emoji: '\u{1F96B}',
+        hint: 'Rinse cans, foil, and tins, and place in the metals/cans recycling bin. Squashing saves space.',
+      },
+      paper: {
+        label: 'Paper',
+        disposal: 'recyclable',
+        emoji: '\u{1F4C4}',
+        hint: 'Place clean, dry paper in the paper bin. Greasy or food-soiled paper goes to compost or trash.',
+      },
+      cardboard: {
+        label: 'Cardboard',
+        disposal: 'recyclable',
+        emoji: '\u{1F4E6}',
+        hint: 'Flatten boxes and remove tape. Greasy pizza-style boxes typically go to compost or trash.',
+      },
+      organic: {
+        label: 'Organic / Compost',
+        disposal: 'compost',
+        emoji: '\u{1F33F}',
+        hint: 'Compostable. Put in food-waste/compost bin where available; otherwise general waste.',
+      },
+      electronic: {
+        label: 'E-Waste',
+        disposal: 'special',
+        emoji: '\u{1F50C}',
+        hint: 'Do not put in regular bins. Take to an electronics drop-off or municipal e-waste collection.',
+      },
+      battery: {
+        label: 'Battery',
+        disposal: 'special',
+        emoji: '\u{1F50B}',
+        hint: 'Never bin or burn. Drop off at a battery collection point (most supermarkets and electronics stores accept them).',
+      },
+      textile: {
+        label: 'Textile',
+        disposal: 'special',
+        emoji: '\u{1F457}',
+        hint: 'Wearable items: donate or use a textile bank. Worn-out fabrics go to textile recycling, not the regular recycling bin.',
+      },
+      hazardous: {
+        label: 'Hazardous',
+        disposal: 'special',
+        emoji: '⚠️',
+        hint: 'Take to a household hazardous waste facility. Do not pour down drains or place in any household bin.',
+      },
+      trash: {
+        label: 'General Waste',
+        disposal: 'trash',
+        emoji: '\u{1F5D1}️',
+        hint: 'Not commonly recyclable. Goes in the general waste bin.',
+      },
+      unknown: {
+        label: 'Unknown',
+        disposal: 'trash',
+        emoji: '❓',
+        hint: "Couldn't confidently determine recyclability. When in doubt, check your local council's guidance.",
+      },
+    };
+
+    // Keyword rules. Each ImageNet label is split on commas/whitespace; if any
+    // rule's pattern matches the lowercased label, that category is returned.
+    // Rules are ordered most-specific first so e-waste beats "metal", etc.
+    const RULES = [
+      // Hazardous
+      { cat: 'hazardous', re: /\b(syringe|aerosol|gas pump|ashcan)\b/ },
+      // Battery
+      { cat: 'battery', re: /\bbattery\b/ },
+      // Electronics / e-waste
+      { cat: 'electronic', re: /\b(cellular|cell ?phone|mobile phone|telephone|dial telephone|laptop|notebook computer|desktop computer|computer|monitor|screen|crt|hand-held computer|ipod|printer|photocopier|scanner|modem|router|hard disc|hard disk|floppy|cassette player|tape player|cd player|dvd|microwave|toaster|dishwasher|iron|hair dryer|electric fan|space heater|vacuum|loudspeaker|amplifier|radio|stove|oven|refrigerator|washer|home theater|joystick|remote control|mouse, computer mouse|computer mouse|computer keyboard|keyboard|television|projector|camera|polaroid|reflex camera|tape drive|usb)\b/ },
+      // Cardboard / boxes
+      { cat: 'cardboard', re: /\b(carton|packing box|crate|wooden box|shipping box|cardboard)\b/ },
+      // Paper
+      { cat: 'paper', re: /\b(envelope|paper towel|toilet tissue|book jacket|comic book|notebook|menu|crossword|magazine|newspaper|paper|book)\b/ },
+      // Plastic
+      { cat: 'plastic', re: /\b(water bottle|pop bottle|soda bottle|pill bottle|plastic bag|shopping bag|trash can|garbage can|bin liner|tupperware|toilet seat|squeegee|bucket)\b/ },
+      // Glass
+      { cat: 'glass', re: /\b(beer bottle|wine bottle|whiskey|whisky|champagne|beer glass|wineglass|water jug|vase|goblet|jar|hourglass)\b/ },
+      // Metal cans / foil / tins
+      { cat: 'metal', re: /\b(beer can|milk can|tin can|soup can|saltshaker|frying pan|wok|skillet|caldron|cauldron|dutch oven|teapot|coffeepot|spatula|ladle|wrench|nail|safety pin|paper clip|chain|chainsaw|cleaver|can opener|tin foil|aluminum|aluminium|barrel|drum)\b/ },
+      // Textiles
+      { cat: 'textile', re: /\b(jersey|t-shirt|tee shirt|sweatshirt|sweater|cardigan|jean|jeans|fur coat|kimono|gown|abaya|sarong|poncho|miniskirt|trench coat|lab coat|cloak|stole|suit|swimsuit|trunks|bib|apron|shirt|pajama|hosiery|sock|stocking|brassiere|bath towel|handkerchief|necktie|bow tie|wig|wool|sandal|loafer|shoe|sneaker|running shoe|cowboy boot|knee pad|mitten|glove|umbrella|backpack|handbag|purse|wallet|sleeping bag)\b/ },
+      // Organic / food
+      { cat: 'organic', re: /\b(banana|apple|orange|lemon|pineapple|strawberry|jackfruit|fig|pomegranate|granny smith|broccoli|cauliflower|zucchini|cucumber|artichoke|bell pepper|cardoon|mushroom|corn|acorn|hip|ear, spike|bagel|pretzel|cheeseburger|hotdog|hot dog|pizza|burrito|guacamole|consomme|trifle|ice cream|ice lolly|french loaf|meatloaf|head cabbage|spaghetti|sushi|carbonara|fungus|earthstar|stinkhorn|mushroom|coral|coffee mug|nut|fruit|leaf|flower|plant|grass|wood|tree|cabbage|squash|butternut|spaghetti squash|bok choy|chard|kohlrabi|rutabaga|radish|potato|sweet potato)\b/ },
+    ];
+
+    function categorize(label) {
+      if (!label) return { key: 'unknown', ...CATEGORIES.unknown };
+      const lc = String(label).toLowerCase();
+      for (const r of RULES) {
+        if (r.re.test(lc)) return { key: r.cat, ...CATEGORIES[r.cat] };
+      }
+      return { key: 'unknown', ...CATEGORIES.unknown };
+    }
+
+    window.__rd = { CATEGORIES, categorize };
+  </script>
+
+  <script>
     (() => {
       const dropZone = document.getElementById('dropZone');
       const fileInput = document.getElementById('fileInput');
