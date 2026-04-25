@@ -308,7 +308,7 @@
   </div>
 
   <div class="notice">
-    <strong>How it works:</strong> YouTube doesn't expose a public CORS-friendly transcript API, so requests are routed through this site's own Cloudflare Pages Functions. Video metadata is fetched via YouTube's InnerTube <code>/youtubei/v1/player</code> endpoint using an ANDROID client context (the same path the mobile apps use, which isn't rate-limited the way the HTML watch page is), and caption track XML is pulled through a small whitelist proxy. Nothing is stored. Videos without captions (or with captions disabled by the uploader) can't be extracted.
+    <strong>How it works:</strong> YouTube doesn't expose a public CORS-friendly transcript API, so requests are routed through this site's own Cloudflare Pages Functions. Video metadata is fetched via YouTube's <code>oembed</code> endpoint and the list of caption tracks via <code>/api/timedtext?type=list</code> — neither sits behind the "confirm you're not a bot" wall that gates the InnerTube player API. Caption XML is then pulled through a small whitelist proxy. Nothing is stored. Only user-uploaded captions are exposed; videos with auto-generated (ASR) captions only can't be extracted this way.
   </div>
 </div>
 
@@ -445,10 +445,9 @@ async function loadVideo(videoId) {
   currentState = { videoId, title: '', author: '', tracks: [], entries: [] };
 
   showStatus('Fetching video metadata…', true);
-  // Hit our Pages Function that calls YouTube's InnerTube /youtubei/v1/player
-  // endpoint with an ANDROID client context. This is dramatically more
-  // reliable from server IPs than scraping the HTML watch page, which
-  // YouTube rate-limits (HTTP 429) from Cloudflare Pages egress ranges.
+  // Hit our Pages Function that pulls metadata from oembed and caption
+  // tracks from /api/timedtext?type=list — both unauthenticated, neither
+  // gated by the InnerTube bot-check.
   let data;
   try {
     const res = await fetch('/api/youtube_player?v=' + encodeURIComponent(videoId), { cache: 'no-store' });
@@ -485,7 +484,7 @@ async function loadVideo(videoId) {
     hideStatus();
     renderVideoHeader(videoId);
     videoSection.classList.add('show');
-    showError('<strong>No captions found for this video.</strong> The uploader either didn\'t publish any captions and YouTube didn\'t auto-generate them, or captions are disabled.');
+    showError('<strong>No user-uploaded captions for this video.</strong> Auto-generated (ASR) captions aren\'t available through this tool — only captions the uploader added themselves.');
     return;
   }
 

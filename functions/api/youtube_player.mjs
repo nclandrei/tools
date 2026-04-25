@@ -1,53 +1,40 @@
 // Cloudflare Pages Function: /api/youtube_player?v=<videoId>
 //
-// Returns a YouTube player response JSON whose shape matches what the
-// watch page used to expose via `ytInitialPlayerResponse` — the frontend
-// reads `videoDetails`, `playabilityStatus`, and
-// `captions.playerCaptionsTracklistRenderer.captionTracks` unchanged.
+// Returns a YouTube player-response-shaped JSON whose layout matches what
+// the frontend already reads — `videoDetails`, `playabilityStatus`, and
+// `captions.playerCaptionsTracklistRenderer.captionTracks`.
 //
-// YouTube tightened its anti-bot gates in late 2024 / early 2025. The
-// previous approach — POSTing to /youtubei/v1/player with an ANDROID
-// client context — now reliably returns HTTP 400 FAILED_PRECONDITION
-// because ANDROID/IOS/WEB clients require a PO token (attestation)
-// server-side clients cannot mint. This module tries three fallbacks
-// that still work unauthenticated:
+// Background: YouTube's InnerTube `/youtubei/v1/player` endpoint and the
+// HTML watch page are both behind a "Sign in to confirm you're not a bot"
+// wall when called from datacenter IPs (including Cloudflare Pages
+// egress). Every InnerTube client we cycled through — ANDROID_VR,
+// TVHTML5_SIMPLY_EMBEDDED_PLAYER, MWEB, etc. — eventually got gated.
 //
-//   1. InnerTube with the ANDROID_VR (Meta Quest) client — it's on the
-//      short list of clients yt-dlp/community reports as not gated
-//      behind PO tokens. Works cleanly for many videos but some return
-//      LOGIN_REQUIRED / UNPLAYABLE.
-//   2. InnerTube with the TVHTML5_SIMPLY_EMBEDDED_PLAYER client — the
-//      smart-TV embed flow. YouTube doesn't gate the TV embed path
-//      behind PO tokens, so it bypasses the "Sign in to confirm you're
-//      not a bot" wall that hits ANDROID_VR on some Pages egress IPs.
-//   3. Scrape https://www.youtube.com/watch?v=... and extract
-//      `ytInitialPlayerResponse` from the HTML. This is the original
-//      approach; it intermittently gets HTTP 429 from Pages egress IPs
-//      but fills in the gap for videos the InnerTube clients refuse.
+// This module skips InnerTube entirely and uses two of YouTube's older,
+// non-bot-gated endpoints:
 //
-// We pick whichever response is "best": an OK playability status with
-// caption tracks wins; otherwise we return the first non-empty result so
-// the frontend can surface a meaningful error (LOGIN_REQUIRED, UNPLAYABLE,
-// "no captions", etc.).
+//   1. oEmbed (`/oembed?format=json&url=...`) for video metadata
+//      (title, author, thumbnail). Returns 401 for private/removed
+//      videos and 404 for unknown ids — those map to a synthesised
+//      `playabilityStatus` error so the frontend can render its
+//      existing "Video unavailable" banner.
+//
+//   2. timedtext list (`/api/timedtext?type=list&v=<id>`) for the set
+//      of caption tracks. Returns XML enumerating user-uploaded tracks
+//      (lang_code, name, lang_translated). For each track we synthesise
+//      a srv1-format baseUrl pointing back at /api/timedtext, which the
+//      frontend then fetches via its existing /api/proxy whitelist.
+//
+// Tradeoff: the timedtext list endpoint only enumerates user-authored
+// captions, not auto-generated (ASR) ones. Videos with only ASR tracks
+// will surface as "no captions found". This is the deliberate cost of
+// avoiding InnerTube's bot-check.
 
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
-// ANDROID_VR (Meta Quest YouTube app). clientName=28.
-const ANDROID_VR_CLIENT_VERSION = '1.60.19';
-const ANDROID_VR_USER_AGENT =
-  'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
-
-// TVHTML5_SIMPLY_EMBEDDED_PLAYER (smart-TV embed). clientName=85.
-// Used by smart TVs / consoles to render embedded YouTube videos.
-// YouTube doesn't gate the TV embed flow behind PO tokens, so it tends
-// to keep working when ANDROID_VR gets the bot-check wall.
-const TV_SIMPLY_CLIENT_VERSION = '2.0';
-const TV_SIMPLY_USER_AGENT =
-  'Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15';
-
-// Desktop Chrome UA for the watch-page scrape fallback. YouTube serves a
-// stripped-down "please update your browser" page to unrecognised UAs.
-const DESKTOP_CHROME_UA =
+// Standard desktop UA. oEmbed and timedtext are public endpoints, but
+// YouTube still serves stripped responses to obviously-bot UAs.
+const DESKTOP_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 function json(obj, status = 200) {
@@ -61,174 +48,122 @@ function json(obj, status = 200) {
   });
 }
 
-// Returns true if the player response has at least one caption track and
-// the video is actually playable.
-function isGoodPlayerResponse(data) {
-  if (!data || typeof data !== 'object') return false;
-  const status = data.playabilityStatus?.status;
-  if (status && status !== 'OK') return false;
-  const tracks =
-    data.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-  return Array.isArray(tracks) && tracks.length > 0;
-}
-
-async function fetchViaInnerTube(videoId, client) {
-  const payload = {
-    videoId,
-    contentCheckOk: true,
-    racyCheckOk: true,
-    context: { client: client.context },
+function unavailableResponse(reason) {
+  return {
+    playabilityStatus: { status: 'ERROR', reason },
+    videoDetails: {},
+    captions: { playerCaptionsTracklistRenderer: { captionTracks: [] } },
   };
+}
 
-  const upstreamUrl =
-    'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
-
-  const upstream = await fetch(upstreamUrl, {
-    method: 'POST',
+async function fetchOembed(videoId) {
+  const target =
+    'https://www.youtube.com/oembed?format=json&url=' +
+    encodeURIComponent('https://www.youtube.com/watch?v=' + videoId);
+  const r = await fetch(target, {
     headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': client.userAgent,
-      'X-YouTube-Client-Name': client.clientNameNumber,
-      'X-YouTube-Client-Version': client.context.clientVersion,
-      Origin: 'https://www.youtube.com',
-      Referer: 'https://www.youtube.com/',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const text = await upstream.text();
-  if (!upstream.ok) {
-    return { ok: false, status: upstream.status, data: null };
-  }
-  try {
-    return { ok: true, status: 200, data: JSON.parse(text) };
-  } catch {
-    return { ok: false, status: 502, data: null };
-  }
-}
-
-const ANDROID_VR_CLIENT = {
-  label: 'ANDROID_VR',
-  clientNameNumber: '28',
-  userAgent: ANDROID_VR_USER_AGENT,
-  context: {
-    clientName: 'ANDROID_VR',
-    clientVersion: ANDROID_VR_CLIENT_VERSION,
-    deviceMake: 'Oculus',
-    deviceModel: 'Quest 3',
-    osName: 'Android',
-    osVersion: '12L',
-    androidSdkVersion: 32,
-    platform: 'MOBILE',
-    hl: 'en',
-    gl: 'US',
-    userAgent: ANDROID_VR_USER_AGENT,
-  },
-};
-
-const TV_SIMPLY_CLIENT = {
-  label: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-  clientNameNumber: '85',
-  userAgent: TV_SIMPLY_USER_AGENT,
-  context: {
-    clientName: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-    clientVersion: TV_SIMPLY_CLIENT_VERSION,
-    platform: 'TV',
-    hl: 'en',
-    gl: 'US',
-    userAgent: TV_SIMPLY_USER_AGENT,
-  },
-};
-
-// Slice a JSON object out of a string starting at `from`, honouring
-// nested braces and string literals. Returns the JSON text or null.
-function sliceBalancedJson(src, from) {
-  let depth = 0;
-  let inStr = false;
-  let escape = false;
-  for (let i = from; i < src.length; i++) {
-    const c = src[i];
-    if (inStr) {
-      if (escape) {
-        escape = false;
-      } else if (c === '\\') {
-        escape = true;
-      } else if (c === '"') {
-        inStr = false;
-      }
-      continue;
-    }
-    if (c === '"') {
-      inStr = true;
-      continue;
-    }
-    if (c === '{') {
-      depth++;
-    } else if (c === '}') {
-      depth--;
-      if (depth === 0) return src.slice(from, i + 1);
-    }
-  }
-  return null;
-}
-
-function extractPlayerResponseFromHtml(html) {
-  // ytInitialPlayerResponse = {...};
-  const marker = 'ytInitialPlayerResponse';
-  let i = 0;
-  while (i < html.length) {
-    const found = html.indexOf(marker, i);
-    if (found < 0) return null;
-    // Walk forward to the first '{' after the marker. Tolerate an '='
-    // or ':' separator and surrounding whitespace.
-    let j = found + marker.length;
-    while (j < html.length && html[j] !== '{' && html[j] !== '<') j++;
-    if (html[j] === '{') {
-      const blob = sliceBalancedJson(html, j);
-      if (blob && blob.length > 100) {
-        try {
-          return JSON.parse(blob);
-        } catch {
-          // keep searching for another occurrence
-        }
-      }
-    }
-    i = found + marker.length;
-  }
-  return null;
-}
-
-async function fetchViaWatchPageScrape(videoId) {
-  const watchUrl =
-    'https://www.youtube.com/watch?v=' +
-    encodeURIComponent(videoId) +
-    // bpctr bypasses age-restriction interstitials
-    '&bpctr=9999999999&has_verified=1';
-
-  const upstream = await fetch(watchUrl, {
-    headers: {
-      'User-Agent': DESKTOP_CHROME_UA,
-      Accept:
-        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'User-Agent': DESKTOP_UA,
       'Accept-Language': 'en-US,en;q=0.9',
-      // The consent cookie dodges the EU consent interstitial which
-      // otherwise replaces the player response with a consent form.
-      Cookie:
-        'CONSENT=YES+; SOCS=CAISEwgDEgk0NzE5ODk2MzgaAmVuIAEaBgiAq_rDBg',
     },
-    redirect: 'follow',
   });
-
-  if (!upstream.ok) {
-    return { ok: false, status: upstream.status, data: null };
+  if (r.status === 401) {
+    return { ok: false, reason: 'Private video or sign-in required.' };
   }
-
-  const html = await upstream.text();
-  const data = extractPlayerResponseFromHtml(html);
-  if (!data) {
-    return { ok: false, status: 502, data: null };
+  if (r.status === 404) {
+    return { ok: false, reason: 'Video not found.' };
   }
-  return { ok: true, status: 200, data };
+  if (!r.ok) {
+    return { ok: false, reason: 'YouTube oEmbed returned HTTP ' + r.status + '.' };
+  }
+  let body;
+  try {
+    body = await r.json();
+  } catch {
+    return { ok: false, reason: 'YouTube oEmbed returned an unparseable response.' };
+  }
+  return {
+    ok: true,
+    title: typeof body.title === 'string' ? body.title : '',
+    author: typeof body.author_name === 'string' ? body.author_name : '',
+    thumbnail: typeof body.thumbnail_url === 'string' ? body.thumbnail_url : '',
+  };
+}
+
+// Pull every <track .../> element's attribute bag out of the timedtext
+// list XML. The schema is shallow (single <transcript_list> root, flat
+// <track ... /> children), so a regex over self-closing tags is enough
+// and avoids dragging in an XML parser.
+function parseTimedtextList(xml) {
+  const tracks = [];
+  const trackRe = /<track\b([^>]*?)\/?>/g;
+  let m;
+  while ((m = trackRe.exec(xml)) !== null) {
+    const attrs = {};
+    const attrRe = /(\w+)="([^"]*)"/g;
+    let a;
+    while ((a = attrRe.exec(m[1])) !== null) {
+      attrs[a[1]] = a[2];
+    }
+    if (attrs.lang_code) tracks.push(attrs);
+  }
+  return tracks;
+}
+
+async function fetchTimedtextList(videoId) {
+  const target =
+    'https://www.youtube.com/api/timedtext?type=list&v=' +
+    encodeURIComponent(videoId);
+  const r = await fetch(target, {
+    headers: {
+      'User-Agent': DESKTOP_UA,
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  });
+  if (!r.ok) {
+    return { ok: false, reason: 'Caption list returned HTTP ' + r.status + '.' };
+  }
+  const xml = await r.text();
+  return { ok: true, tracks: parseTimedtextList(xml) };
+}
+
+// Decode HTML/XML entities that show up in lang_translated / name
+// attributes (e.g. &amp;, &#39;). The values came from XML attributes
+// so the set is small.
+function decodeXmlEntity(s) {
+  return s.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/g, (m, ent) => {
+    if (ent === 'amp') return '&';
+    if (ent === 'lt') return '<';
+    if (ent === 'gt') return '>';
+    if (ent === 'quot') return '"';
+    if (ent === 'apos') return "'";
+    if (ent[0] === '#') {
+      const code =
+        ent[1] === 'x' ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+    }
+    return m;
+  });
+}
+
+function trackLabel(attrs) {
+  const lang = decodeXmlEntity(attrs.lang_translated || attrs.lang_original || attrs.lang_code || '');
+  const name = decodeXmlEntity(attrs.name || '');
+  if (name && lang) return lang + ' — ' + name;
+  return name || lang || attrs.lang_code || 'Track';
+}
+
+function buildCaptionTrack(videoId, attrs) {
+  const params = new URLSearchParams();
+  params.set('v', videoId);
+  params.set('lang', attrs.lang_code);
+  if (attrs.name) params.set('name', attrs.name);
+  params.set('fmt', 'srv1');
+  return {
+    baseUrl: 'https://www.youtube.com/api/timedtext?' + params.toString(),
+    name: { simpleText: trackLabel(attrs) },
+    languageCode: attrs.lang_code,
+    // timedtext list never enumerates ASR tracks, so leave kind unset.
+  };
 }
 
 export async function onRequest(context) {
@@ -252,65 +187,40 @@ export async function onRequest(context) {
     return json({ error: 'Invalid YouTube video id' }, 400);
   }
 
-  const attempts = [];
-
-  // ── Attempts 1 & 2: InnerTube clients ──────────────────────────────
-  // ANDROID_VR first (fast and works for most videos), then
-  // TVHTML5_SIMPLY_EMBEDDED_PLAYER if ANDROID_VR is bot-checked or
-  // returns LOGIN_REQUIRED.
-  for (const client of [ANDROID_VR_CLIENT, TV_SIMPLY_CLIENT]) {
-    try {
-      const r = await fetchViaInnerTube(videoId, client);
-      if (r.ok && r.data) {
-        if (isGoodPlayerResponse(r.data)) return json(r.data);
-        attempts.push(r.data);
-      } else if (r.status === 429) {
-        attempts.push({
-          __err:
-            'YouTube rate-limited the request (HTTP 429). Try again in a moment.',
-        });
-      } else if (r.status) {
-        attempts.push({
-          __err: `InnerTube ${client.label} returned HTTP ${r.status}.`,
-        });
-      }
-    } catch (err) {
-      attempts.push({
-        __err: `InnerTube ${client.label} fetch failed: ${err.message}`,
-      });
-    }
-  }
-
-  // ── Attempt 3: watch page scrape ───────────────────────────────────
+  let oembed;
   try {
-    const r = await fetchViaWatchPageScrape(videoId);
-    if (r.ok && r.data) {
-      if (isGoodPlayerResponse(r.data)) return json(r.data);
-      attempts.push(r.data);
-    } else if (r.status === 429) {
-      attempts.push({
-        __err:
-          'YouTube rate-limited the request (HTTP 429). Try again in a moment.',
-      });
-    } else if (r.status) {
-      attempts.push({ __err: `Watch page returned HTTP ${r.status}.` });
-    }
+    oembed = await fetchOembed(videoId);
   } catch (err) {
-    attempts.push({ __err: `Watch page fetch failed: ${err.message}` });
+    oembed = { ok: false, reason: 'oEmbed fetch failed: ' + err.message };
+  }
+  if (!oembed.ok) {
+    return json(unavailableResponse(oembed.reason));
   }
 
-  // No attempt produced a playable+captioned response. Pick the first
-  // attempt that has a real player-response shape so the frontend can
-  // render a useful error (LOGIN_REQUIRED, UNPLAYABLE, "no captions",
-  // age-restricted, etc.) rather than a bare HTTP code.
-  const firstPlayerShaped = attempts.find(
-    (a) => a && typeof a === 'object' && !a.__err && a.playabilityStatus
-  );
-  if (firstPlayerShaped) return json(firstPlayerShaped);
+  let listResult;
+  try {
+    listResult = await fetchTimedtextList(videoId);
+  } catch (err) {
+    listResult = { ok: false, reason: 'Caption list fetch failed: ' + err.message };
+  }
 
-  const firstErr = attempts.find((a) => a && a.__err);
-  const errMsg =
-    (firstErr && firstErr.__err) ||
-    'YouTube did not return a usable player response.';
-  return json({ error: errMsg }, 502);
+  const captionTracks =
+    listResult.ok && Array.isArray(listResult.tracks)
+      ? listResult.tracks.map((t) => buildCaptionTrack(videoId, t))
+      : [];
+
+  return json({
+    playabilityStatus: { status: 'OK' },
+    videoDetails: {
+      videoId,
+      title: oembed.title,
+      author: oembed.author,
+      thumbnail: oembed.thumbnail,
+    },
+    captions: {
+      playerCaptionsTracklistRenderer: {
+        captionTracks,
+      },
+    },
+  });
 }
