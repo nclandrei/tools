@@ -14,6 +14,15 @@
     .drop-zone { position: relative; padding: 2.5rem 1.5rem; }
     .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
     .drop-icon { font-size: 2rem; margin-bottom: .5rem; }
+
+    .preview-wrap { display: none; animation: fadeUp .3s ease; }
+    .preview-wrap.visible { display: block; }
+    .preview-wrap img {
+      max-width: 100%; max-height: 420px;
+      border-radius: 10px; border: 1px solid var(--border);
+      display: block; margin: 0 auto;
+    }
+    .actions-bar { display: flex; gap: .6rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
   </style>
 </head>
 <body>
@@ -31,6 +40,65 @@
       <p style="font-size:.8rem; margin-top:.4rem; color:var(--text-muted)">Supports JPEG, PNG, WebP</p>
       <input type="file" id="fileInput" accept="image/*">
     </div>
+
+    <div class="preview-wrap" id="previewWrap">
+      <img id="previewImg" alt="Selected image">
+      <div class="actions-bar">
+        <button class="btn" id="resetBtn">New Image</button>
+      </div>
+    </div>
   </div>
+
+  <script>
+    (() => {
+      const dropZone = document.getElementById('dropZone');
+      const fileInput = document.getElementById('fileInput');
+      const previewWrap = document.getElementById('previewWrap');
+      const previewImg = document.getElementById('previewImg');
+      const resetBtn = document.getElementById('resetBtn');
+
+      let currentBlobUrl = null;
+
+      function showPreview(file) {
+        if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = URL.createObjectURL(file);
+        previewImg.src = currentBlobUrl;
+        dropZone.style.display = 'none';
+        previewWrap.classList.add('visible');
+      }
+
+      function reset() {
+        if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+        previewImg.removeAttribute('src');
+        previewWrap.classList.remove('visible');
+        dropZone.style.display = '';
+        fileInput.value = '';
+      }
+
+      fileInput.addEventListener('change', () => {
+        const f = fileInput.files && fileInput.files[0];
+        if (f) showPreview(f);
+      });
+
+      ['dragenter', 'dragover'].forEach(ev =>
+        dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+      ['dragleave', 'drop'].forEach(ev =>
+        dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
+      dropZone.addEventListener('drop', e => {
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f && f.type.startsWith('image/')) showPreview(f);
+      });
+
+      document.addEventListener('paste', e => {
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (const it of items) {
+          if (it.type.startsWith('image/')) { showPreview(it.getAsFile()); return; }
+        }
+      });
+
+      resetBtn.addEventListener('click', reset);
+    })();
+  </script>
 </body>
 </html>
