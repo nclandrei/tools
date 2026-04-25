@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recyclable Detector</title>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .container { max-width: 900px; }
+    header { margin-bottom: 2rem; }
+    h1 { font-size: 1.75rem; }
+    .drop-zone { position: relative; padding: 2.5rem 1.5rem; }
+    .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .drop-icon { font-size: 2rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Recyclable Detector</h1>
+      <a href="/">&larr; all tools</a>
+    </header>
+
+    <p class="desc">Upload a photo of an item and find out if it's recyclable and which category it belongs to. Runs entirely in your browser.</p>
+
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">&#9851;</div>
+      <p>Drop an image here or click to select</p>
+      <p style="font-size:.8rem; margin-top:.4rem; color:var(--text-muted)">Supports JPEG, PNG, WebP</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+  </div>
+</body>
+</html>
