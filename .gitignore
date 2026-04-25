@@ -4,5 +4,7 @@ node_modules/
 package.json
 package-lock.json
 test-results/
+playwright.config.js
+tests/
 .claude/
 .codex-runtime/

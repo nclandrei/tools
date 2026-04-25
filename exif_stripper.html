@@ -164,7 +164,10 @@ function parseExif(arrayBuffer) {
       if (exifHeader === 'Exif') {
         tags.push({ key: 'EXIF block', value: formatSize(segLen) + ' of EXIF data' });
         try {
-          parseIFD(view, offset + 10, offset + 10, tags);
+          const tiffStart = offset + 10;
+          const le = view.getUint16(tiffStart) === 0x4949;
+          const ifd0Offset = tiffStart + (le ? view.getUint32(tiffStart + 4, true) : view.getUint32(tiffStart + 4, false));
+          parseIFD(view, ifd0Offset, tiffStart, tags);
         } catch (e) { /* partial parse is fine */ }
       }
     }
