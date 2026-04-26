@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Cropper &amp; Rotator</title>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .container { max-width: 900px; }
+    .drop-zone { position: relative; }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Image Cropper &amp; Rotator</h1>
+    <a href="/">&larr; all tools</a>
+  </header>
+
+  <main>
+    <p class="desc">Crop and rotate images locally — nothing leaves your browser.</p>
+
+    <div class="drop-zone" id="dropZone">
+      <p>Drop an image here or click to browse</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+  </main>
+</div>
+</body>
+</html>
