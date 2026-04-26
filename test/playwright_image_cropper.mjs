@@ -198,6 +198,65 @@ test('rotating 90° counter-clockwise rotates the other way', async (page) => {
   if (!eq(tl, [0, 255, 0])) throw new Error('CCW TL not green: ' + tl);
 });
 
+// ── Test 4: crop ─────────────────────────────────────────────────────────
+// Cropping the green quadrant (x=50, y=0, w=50, h=30) of the 100x60
+// source should leave a 50x30 canvas filled entirely with green.
+test('cropping to a sub-rectangle keeps only those pixels', async (page) => {
+  await page.goto('http://localhost:' + PORT + '/image_cropper.html');
+  await page.locator('#fileInput').setInputFiles(await makeTestPng(page));
+  await page.waitForSelector('#canvas:not([hidden])', { timeout: 5000 });
+
+  await page.locator('#cropX').fill('50');
+  await page.locator('#cropY').fill('0');
+  await page.locator('#cropW').fill('50');
+  await page.locator('#cropH').fill('30');
+  await page.locator('#applyCropBtn').click();
+
+  const result = await page.evaluate(() => {
+    const c = document.getElementById('canvas');
+    const ctx = c.getContext('2d');
+    const px = (x, y) => Array.from(ctx.getImageData(x, y, 1, 1).data).slice(0, 3);
+    return {
+      w: c.width,
+      h: c.height,
+      tl: px(2, 2),
+      tr: px(47, 2),
+      bl: px(2, 27),
+      br: px(47, 27),
+    };
+  });
+  if (result.w !== 50 || result.h !== 30) {
+    throw new Error('Cropped dims wrong: ' + result.w + 'x' + result.h);
+  }
+  const eq = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 5);
+  for (const [k, v] of Object.entries(result)) {
+    if (k === 'w' || k === 'h') continue;
+    if (!eq(v, [0, 255, 0])) throw new Error('Cropped ' + k + ' not green: ' + v);
+  }
+});
+
+// Cropping must clamp inputs to the canvas bounds rather than throw.
+test('cropping with out-of-bounds values clamps to canvas', async (page) => {
+  await page.goto('http://localhost:' + PORT + '/image_cropper.html');
+  await page.locator('#fileInput').setInputFiles(await makeTestPng(page));
+  await page.waitForSelector('#canvas:not([hidden])', { timeout: 5000 });
+
+  await page.locator('#cropX').fill('80');
+  await page.locator('#cropY').fill('40');
+  await page.locator('#cropW').fill('500');
+  await page.locator('#cropH').fill('500');
+  await page.locator('#applyCropBtn').click();
+
+  const dims = await page.evaluate(() => {
+    const c = document.getElementById('canvas');
+    return { w: c.width, h: c.height };
+  });
+  // Source is 100x60, so the clamped crop is (80,40)→(100,60) = 20x20.
+  if (dims.w !== 20 || dims.h !== 20) {
+    throw new Error('Clamped dims wrong: ' + JSON.stringify(dims));
+  }
+});
+
 try {
   const ctx = await browser.newContext();
   for (const { name, fn } of tests) {
