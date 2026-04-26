@@ -142,6 +142,62 @@ test('uploading an image renders it on the working canvas', async (page) => {
   if (!eq(quads.br, [255, 255, 0])) throw new Error('BR not yellow: ' + quads.br);
 });
 
+// ── Test 3: rotation ─────────────────────────────────────────────────────
+// Rotating 90° CW must:
+//   1. Swap the canvas dimensions (100x60 → 60x100).
+//   2. Move pixels: original top-left ends at top-right, etc.
+test('rotating 90° clockwise rotates pixels and swaps dimensions', async (page) => {
+  await page.goto('http://localhost:' + PORT + '/image_cropper.html');
+  await page.locator('#fileInput').setInputFiles(await makeTestPng(page));
+  await page.waitForSelector('#canvas:not([hidden])', { timeout: 5000 });
+
+  await page.locator('#rotateCwBtn').click();
+
+  const result = await page.evaluate(() => {
+    const c = document.getElementById('canvas');
+    const ctx = c.getContext('2d');
+    const px = (x, y) => Array.from(ctx.getImageData(x, y, 1, 1).data).slice(0, 3);
+    return {
+      w: c.width,
+      h: c.height,
+      // After CW rotation: red was top-left → now top-right
+      //                    green was top-right → now bottom-right
+      //                    yellow was bottom-right → now bottom-left
+      //                    blue was bottom-left → now top-left
+      tl: px(10, 10),
+      tr: px(45, 10),
+      bl: px(10, 85),
+      br: px(45, 85),
+    };
+  });
+  if (result.w !== 60 || result.h !== 100) {
+    throw new Error('Dims after rotate wrong: ' + result.w + 'x' + result.h);
+  }
+  const eq = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 5);
+  if (!eq(result.tl, [0, 0, 255])) throw new Error('Rotated TL not blue: ' + result.tl);
+  if (!eq(result.tr, [255, 0, 0])) throw new Error('Rotated TR not red: ' + result.tr);
+  if (!eq(result.bl, [255, 255, 0])) throw new Error('Rotated BL not yellow: ' + result.bl);
+  if (!eq(result.br, [0, 255, 0])) throw new Error('Rotated BR not green: ' + result.br);
+});
+
+// Two CCW rotations should be equivalent to two CW rotations (i.e. 180°),
+// putting yellow in the top-left.
+test('rotating 90° counter-clockwise rotates the other way', async (page) => {
+  await page.goto('http://localhost:' + PORT + '/image_cropper.html');
+  await page.locator('#fileInput').setInputFiles(await makeTestPng(page));
+  await page.waitForSelector('#canvas:not([hidden])', { timeout: 5000 });
+
+  await page.locator('#rotateCcwBtn').click();
+
+  const tl = await page.evaluate(() => {
+    const ctx = document.getElementById('canvas').getContext('2d');
+    return Array.from(ctx.getImageData(10, 10, 1, 1).data).slice(0, 3);
+  });
+  // After CCW: green (originally top-right) lands at top-left.
+  const eq = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 5);
+  if (!eq(tl, [0, 255, 0])) throw new Error('CCW TL not green: ' + tl);
+});
+
 try {
   const ctx = await browser.newContext();
   for (const { name, fn } of tests) {

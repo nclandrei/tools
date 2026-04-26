@@ -28,6 +28,11 @@
       display: block;
       background: #fff;
     }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: .5rem;
+      margin-top: 1rem;
+    }
+    .toolbar .btn { padding: .45rem .8rem; font-size: .9rem; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -49,6 +54,11 @@
     <div class="stage" id="stage" hidden>
       <canvas id="canvas" hidden></canvas>
     </div>
+
+    <div class="toolbar" id="toolbar" hidden>
+      <button class="btn btn-secondary" id="rotateCcwBtn" type="button" title="Rotate 90° counter-clockwise">&#x21BA; 90° CCW</button>
+      <button class="btn btn-secondary" id="rotateCwBtn" type="button" title="Rotate 90° clockwise">&#x21BB; 90° CW</button>
+    </div>
   </main>
 </div>
 
@@ -58,6 +68,9 @@ const fileInput = $('fileInput');
 const dropZone = $('dropZone');
 const stage = $('stage');
 const canvas = $('canvas');
+const toolbar = $('toolbar');
+const rotateCwBtn = $('rotateCwBtn');
+const rotateCcwBtn = $('rotateCcwBtn');
 
 let sourceImage = null;
 
@@ -94,7 +107,37 @@ async function handleFile(file) {
   dropZone.hidden = true;
   stage.hidden = false;
   canvas.hidden = false;
+  toolbar.hidden = false;
 }
+
+// Rotate the current canvas in place by ±90°. We render the existing
+// pixels onto a temp canvas with a transform so each rotation composes
+// with whatever the user has already applied (multiple rotations, future
+// crops, etc.).
+function rotateCanvas(quarterTurnsCw) {
+  const turns = ((quarterTurnsCw % 4) + 4) % 4;
+  if (turns === 0) return;
+  const src = document.createElement('canvas');
+  src.width = canvas.width;
+  src.height = canvas.height;
+  src.getContext('2d').drawImage(canvas, 0, 0);
+
+  const swap = turns % 2 === 1;
+  const newW = swap ? src.height : src.width;
+  const newH = swap ? src.width : src.height;
+  canvas.width = newW;
+  canvas.height = newH;
+
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.translate(newW / 2, newH / 2);
+  ctx.rotate((turns * Math.PI) / 2);
+  ctx.drawImage(src, -src.width / 2, -src.height / 2);
+  ctx.restore();
+}
+
+rotateCwBtn.addEventListener('click', () => rotateCanvas(1));
+rotateCcwBtn.addEventListener('click', () => rotateCanvas(-1));
 
 fileInput.addEventListener('change', (e) => {
   const f = e.target.files[0];
