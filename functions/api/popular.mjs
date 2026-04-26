@@ -1,13 +1,25 @@
-// Returns the most-hit tools as JSON.
+// Returns the most-hit tools over the last 7 days as JSON.
 //
-// Reads from the `KV` namespace binding. Each `hits:<tool>` key carries
-// its count in metadata, so a single `list()` call is enough — no per-key
-// reads. When KV is unbound or the call fails, returns `{ tools: [] }`
-// so the landing page degrades gracefully.
+// Queries Cloudflare Analytics Engine over its SQL HTTP API. The AE
+// dataset is populated by functions/_middleware.mjs via writeDataPoint.
+//
+// Required env:
+//   CF_ACCOUNT_ID  Cloudflare account ID (plain env var)
+//   CF_AE_TOKEN    API token with `Account Analytics:Read` (secret)
+//
+// When either is missing or the call fails, returns `{ tools: [] }` so
+// the landing page degrades gracefully.
 
-const PREFIX = 'hits:';
-const MIN_HITS = 5;
-const LIMIT = 8;
+const QUERY = `
+  SELECT blob1 AS tool, SUM(_sample_interval * double1) AS hits
+  FROM tool_hits
+  WHERE timestamp > NOW() - INTERVAL '7' DAY
+  GROUP BY tool
+  HAVING hits >= 5
+  ORDER BY hits DESC
+  LIMIT 8
+  FORMAT JSON
+`;
 
 const HEADERS = {
   'Content-Type': 'application/json',
@@ -20,14 +32,20 @@ export async function onRequest(context) {
 }
 
 async function fetchTop(env) {
-  if (!env?.KV) return [];
+  if (!env?.CF_ACCOUNT_ID || !env?.CF_AE_TOKEN) return [];
+  const url = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/analytics_engine/sql`;
   try {
-    const { keys } = await env.KV.list({ prefix: PREFIX });
-    return keys
-      .map((k) => ({ tool: k.name.slice(PREFIX.length), hits: k.metadata?.count ?? 0 }))
-      .filter((t) => t.hits >= MIN_HITS)
-      .sort((a, b) => b.hits - a.hits)
-      .slice(0, LIMIT);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.CF_AE_TOKEN}` },
+      body: QUERY,
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    if (!Array.isArray(json?.data)) return [];
+    return json.data
+      .filter((r) => r && typeof r.tool === 'string')
+      .map((r) => ({ tool: r.tool, hits: Math.round(Number(r.hits) || 0) }));
   } catch {
     return [];
   }
