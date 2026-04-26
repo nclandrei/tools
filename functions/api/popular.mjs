@@ -1,18 +1,13 @@
-// Returns the most-hit tools over the last 7 days as JSON.
+// Returns the most-hit tools as JSON.
 //
-// Reads from the `DB` D1 binding (see schema.sql). When the binding is
-// missing or the query fails, returns `{ tools: [] }` so the landing
-// page can degrade gracefully.
+// Reads from the `KV` namespace binding. Each `hits:<tool>` key carries
+// its count in metadata, so a single `list()` call is enough — no per-key
+// reads. When KV is unbound or the call fails, returns `{ tools: [] }`
+// so the landing page degrades gracefully.
 
-const QUERY = `
-  SELECT tool, SUM(count) AS hits
-  FROM tool_hits
-  WHERE day >= date('now', '-7 days')
-  GROUP BY tool
-  HAVING hits >= 5
-  ORDER BY hits DESC
-  LIMIT 8
-`;
+const PREFIX = 'hits:';
+const MIN_HITS = 5;
+const LIMIT = 8;
 
 const HEADERS = {
   'Content-Type': 'application/json',
@@ -25,10 +20,14 @@ export async function onRequest(context) {
 }
 
 async function fetchTop(env) {
-  if (!env?.DB) return [];
+  if (!env?.KV) return [];
   try {
-    const { results } = await env.DB.prepare(QUERY).all();
-    return results || [];
+    const { keys } = await env.KV.list({ prefix: PREFIX });
+    return keys
+      .map((k) => ({ tool: k.name.slice(PREFIX.length), hits: k.metadata?.count ?? 0 }))
+      .filter((t) => t.hits >= MIN_HITS)
+      .sort((a, b) => b.hits - a.hits)
+      .slice(0, LIMIT);
   } catch {
     return [];
   }

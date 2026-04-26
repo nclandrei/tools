@@ -1,10 +1,11 @@
 // Records a hit for each tool page view, fire-and-forget.
 //
-// Bindings (configured in the Cloudflare Pages dashboard):
-//   - DB:    D1 database `tools_stats` (see schema.sql)
-//   - DEDUP: KV namespace for 1-hour idempotency tokens
-// Both are optional — when missing, the middleware skips recording and
-// returns the downstream response unchanged.
+// Single binding: `KV` (a Cloudflare Workers KV namespace).
+// Two key prefixes share that namespace:
+//   - hits:<tool>      value: '', metadata: { count }
+//   - dedup:<sha256>   value: '1', expirationTtl: 3600
+// When KV is unbound, the middleware skips recording and returns the
+// downstream response unchanged.
 
 const BOT_RE = /bot|crawler|spider|curl|wget|headless|lighthouse|preview|fetch|monitor/i;
 const TOOL_PATH_RE = /^\/([a-z][a-z0-9_]*)\.html$/;
@@ -14,8 +15,8 @@ export async function onRequest(context) {
   const response = await next();
 
   const tool = toolFromRequest(request, response);
-  if (tool && env?.DB && env?.DEDUP) {
-    context.waitUntil(recordHit(env, request, tool).catch(() => {}));
+  if (tool && env?.KV) {
+    context.waitUntil(recordHit(env.KV, request, tool).catch(() => {}));
   }
   return response;
 }
@@ -38,19 +39,18 @@ function toolFromRequest(request, response) {
   return m ? m[1] : null;
 }
 
-async function recordHit(env, request, tool) {
+async function recordHit(KV, request, tool) {
   const ip = request.headers.get('cf-connecting-ip') || '';
   const hour = Math.floor(Date.now() / 3_600_000);
-  const token = await sha256(`${ip}|${tool}|${hour}`);
+  const dedupKey = `dedup:${await sha256(`${ip}|${tool}|${hour}`)}`;
 
-  if (await env.DEDUP.get(token)) return;
-  await env.DEDUP.put(token, '1', { expirationTtl: 3600 });
+  if (await KV.get(dedupKey)) return;
+  await KV.put(dedupKey, '1', { expirationTtl: 3600 });
 
-  const day = new Date().toISOString().slice(0, 10);
-  await env.DB.prepare(
-    `INSERT INTO tool_hits (tool, day, count) VALUES (?, ?, 1)
-     ON CONFLICT(tool, day) DO UPDATE SET count = count + 1`,
-  ).bind(tool, day).run();
+  const hitsKey = `hits:${tool}`;
+  const { metadata } = await KV.getWithMetadata(hitsKey);
+  const count = (metadata?.count ?? 0) + 1;
+  await KV.put(hitsKey, '', { metadata: { count } });
 }
 
 async function sha256(input) {
