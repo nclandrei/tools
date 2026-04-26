@@ -13,6 +13,22 @@
     .drop-zone input[type="file"] {
       position: absolute; inset: 0; opacity: 0; cursor: pointer;
     }
+    .stage {
+      margin-top: 1.25rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex; justify-content: center;
+      overflow: auto;
+    }
+    .stage canvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      background: #fff;
+    }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
@@ -29,7 +45,68 @@
       <p>Drop an image here or click to browse</p>
       <input type="file" id="fileInput" accept="image/*">
     </div>
+
+    <div class="stage" id="stage" hidden>
+      <canvas id="canvas" hidden></canvas>
+    </div>
   </main>
 </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fileInput = $('fileInput');
+const dropZone = $('dropZone');
+const stage = $('stage');
+const canvas = $('canvas');
+
+let sourceImage = null;
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      reject(new Error('not an image'));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+    img.src = url;
+  });
+}
+
+function drawSource() {
+  if (!sourceImage) return;
+  canvas.width = sourceImage.naturalWidth;
+  canvas.height = sourceImage.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(sourceImage, 0, 0);
+}
+
+async function handleFile(file) {
+  try {
+    sourceImage = await loadImage(file);
+  } catch {
+    return;
+  }
+  drawSource();
+  dropZone.hidden = true;
+  stage.hidden = false;
+  canvas.hidden = false;
+}
+
+fileInput.addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) handleFile(f);
+});
+
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); });
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+</script>
 </body>
 </html>
