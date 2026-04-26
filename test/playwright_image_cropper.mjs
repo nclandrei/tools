@@ -257,6 +257,46 @@ test('cropping with out-of-bounds values clamps to canvas', async (page) => {
   }
 });
 
+// ── Test 5: download ─────────────────────────────────────────────────────
+// After cropping, hitting download should produce a PNG whose decoded
+// size matches the cropped canvas. We re-decode the downloaded file in
+// the browser to assert dimensions, since reading a Node PNG decoder
+// would add a dependency we don't otherwise need.
+test('downloading after crop yields a PNG with cropped dimensions', async (page) => {
+  await page.goto('http://localhost:' + PORT + '/image_cropper.html');
+  await page.locator('#fileInput').setInputFiles(await makeTestPng(page));
+  await page.waitForSelector('#canvas:not([hidden])', { timeout: 5000 });
+
+  await page.locator('#cropX').fill('0');
+  await page.locator('#cropY').fill('0');
+  await page.locator('#cropW').fill('40');
+  await page.locator('#cropH').fill('25');
+  await page.locator('#applyCropBtn').click();
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#downloadBtn').click(),
+  ]);
+  if (!/\.png$/i.test(download.suggestedFilename())) {
+    throw new Error('Suggested filename not .png: ' + download.suggestedFilename());
+  }
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  const buf = Buffer.concat(chunks);
+  // PNG magic: 89 50 4E 47 0D 0A 1A 0A
+  const magic = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  for (let i = 0; i < magic.length; i++) {
+    if (buf[i] !== magic[i]) throw new Error('Not a PNG file');
+  }
+  // PNG IHDR width/height are big-endian uint32 at bytes 16-23.
+  const w = buf.readUInt32BE(16);
+  const h = buf.readUInt32BE(20);
+  if (w !== 40 || h !== 25) {
+    throw new Error('Downloaded PNG dims wrong: ' + w + 'x' + h);
+  }
+});
+
 try {
   const ctx = await browser.newContext();
   for (const { name, fn } of tests) {

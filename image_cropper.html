@@ -75,6 +75,8 @@
         <label for="cropH">H</label><input type="number" id="cropH" min="1" value="0">
       </div>
       <button class="btn btn-secondary" id="applyCropBtn" type="button">Apply crop</button>
+      <span class="sep"></span>
+      <button class="btn btn-primary" id="downloadBtn" type="button">Download PNG</button>
     </div>
   </main>
 </div>
@@ -203,6 +205,22 @@ function applyCrop() {
 }
 
 applyCropBtn.addEventListener('click', applyCrop);
+
+function download() {
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'cropped.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, 'image/png');
+}
+
+document.getElementById('downloadBtn').addEventListener('click', download);
 
 fileInput.addEventListener('change', (e) => {
   const f = e.target.files[0];
