@@ -85,6 +85,18 @@ async function pinDate(page, isoDate) {
   })()`);
 }
 
+// ── Test: client details is a multi-line textarea ─────────────────────
+test('client details field is a textarea preserving line breaks', async (page) => {
+  await pinDate(page, '2026-04-30T12:00:00Z');
+  await page.goto(URL_BASE);
+  const tag = await page.locator('#to-details').evaluate((el) => el.tagName);
+  if (tag !== 'TEXTAREA') throw new Error('#to-details expected TEXTAREA, got ' + tag);
+  const multiline = 'Bridgit Inc.\n55 Northfield Drive East, Unit 150\nWaterloo, ON Canada\nN2K 3T6';
+  await page.locator('#to-details').fill(multiline);
+  const got = await page.locator('#to-details').inputValue();
+  if (got !== multiline) throw new Error('multiline value not preserved: ' + JSON.stringify(got));
+});
+
 // ── Test: default dates use the current month ─────────────────────────
 test('default dates: current-month period, today issue, last-day-of-next-month due', async (page) => {
   await pinDate(page, '2026-04-30T12:00:00Z');
