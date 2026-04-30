@@ -204,6 +204,32 @@
     color: #999;
   }
 
+  .invoice-bank {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e5e0;
+    font-size: 0.85rem;
+    color: #333;
+  }
+
+  .invoice-bank h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #999;
+    margin-bottom: 0.5rem;
+  }
+
+  .invoice-bank p {
+    margin: 0.15rem 0;
+  }
+
+  .invoice-bank .bank-label {
+    color: #666;
+    display: inline-block;
+    min-width: 6.5rem;
+  }
+
   @media (max-width: 600px) {
     .form-grid { grid-template-columns: 1fr; }
     .invoice-preview { padding: 1.5rem; }
@@ -229,7 +255,7 @@
       <h1>Invoice Generator</h1>
     </div>
   </header>
-  <p class="desc">Generate professional invoices. Defaults to the previous full month. Saves company profiles locally for reuse.</p>
+  <p class="desc">Generate professional invoices. Defaults to the current month, issued today. Saves company profiles locally for reuse.</p>
 
   <div class="saved-profiles" id="profiles-section" style="display:none">
     <label>Saved Profiles</label>
@@ -253,9 +279,9 @@
       <label for="to-name">Bill To (Company Name)</label>
       <input type="text" id="to-name" placeholder="Client Corp">
     </div>
-    <div class="form-group">
-      <label for="to-details">Client Details (address, etc.)</label>
-      <input type="text" id="to-details" placeholder="456 Oak Ave, Berlin, DE">
+    <div class="form-group full-width">
+      <label for="to-details">Client Details (address, country, etc.)</label>
+      <textarea id="to-details" placeholder="456 Oak Ave&#10;Berlin&#10;Germany"></textarea>
     </div>
     <div class="form-group">
       <label for="period-start">Period Start</label>
@@ -274,12 +300,16 @@
       <input type="date" id="due-date">
     </div>
     <div class="form-group">
-      <label for="amount">Amount</label>
-      <input type="number" id="amount" step="0.01" min="0" placeholder="5000.00">
+      <label for="rate">Rate per Hour (optional)</label>
+      <input type="number" id="rate" step="0.01" min="0" placeholder="110">
     </div>
     <div class="form-group">
       <label for="hours">Hours Worked (optional)</label>
       <input type="number" id="hours" step="0.5" min="0" placeholder="160">
+    </div>
+    <div class="form-group full-width">
+      <label for="amount">Amount</label>
+      <input type="number" id="amount" step="0.01" min="0" placeholder="5000.00">
     </div>
     <div class="form-group">
       <label for="currency">Currency</label>
@@ -297,6 +327,22 @@
     <div class="form-group full-width">
       <label for="description">Description of Services</label>
       <textarea id="description" placeholder="Software development services for the month of March 2026."></textarea>
+    </div>
+    <div class="form-group">
+      <label for="bank-name">Bank Name (optional)</label>
+      <input type="text" id="bank-name" placeholder="Revolut Bank">
+    </div>
+    <div class="form-group">
+      <label for="bic">SWIFT / BIC (optional)</label>
+      <input type="text" id="bic" placeholder="REVOLT21XXX">
+    </div>
+    <div class="form-group full-width">
+      <label for="bank-address">Bank Address (optional)</label>
+      <input type="text" id="bank-address" placeholder="1 Canada Square, London, UK">
+    </div>
+    <div class="form-group full-width">
+      <label for="iban">IBAN / Account Number (optional)</label>
+      <input type="text" id="iban" placeholder="RO27 REVO 0000 1186 7965 4321">
     </div>
     <div class="form-group full-width">
       <label for="notes">Footer Notes (optional)</label>
@@ -321,22 +367,17 @@
 <script>
   const STORAGE_KEY = 'invoice_profiles';
 
-  // --- Default dates: previous full month ---
+  // --- Default dates: current month, issued today, due end of next month ---
   function getDefaultDates() {
     const now = new Date();
-    // Go to first day of current month, then back one month
-    const firstOfCurrent = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonth = new Date(firstOfCurrent);
-    lastMonth.setDate(lastMonth.getDate() - 1); // last day of previous month
-
-    const start = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
-    const end = lastMonth;
-
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const due = new Date(now.getFullYear(), now.getMonth() + 2, 0);
     return {
       periodStart: fmt(start),
       periodEnd: fmt(end),
-      issueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 1, 1)), // 1st of current month
-      dueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 2, 0))   // last day of current month
+      issueDate: fmt(now),
+      dueDate: fmt(due)
     };
   }
 
@@ -354,6 +395,22 @@
     document.getElementById('issue-date').value = defaults.issueDate;
     document.getElementById('due-date').value = defaults.dueDate;
     refreshProfiles();
+    wireRateAutoCompute();
+  }
+
+  function wireRateAutoCompute() {
+    const rate = document.getElementById('rate');
+    const hours = document.getElementById('hours');
+    const amount = document.getElementById('amount');
+    const recompute = () => {
+      const r = parseFloat(rate.value);
+      const h = parseFloat(hours.value);
+      if (!isNaN(r) && !isNaN(h)) {
+        amount.value = +(r * h).toFixed(2);
+      }
+    };
+    rate.addEventListener('input', recompute);
+    hours.addEventListener('input', recompute);
   }
 
   // --- Profiles ---
@@ -402,10 +459,15 @@
       toName: toName,
       toDetails: document.getElementById('to-details').value,
       amount: document.getElementById('amount').value,
+      rate: document.getElementById('rate').value,
       hours: document.getElementById('hours').value,
       currency: document.getElementById('currency').value,
       description: document.getElementById('description').value,
-      notes: document.getElementById('notes').value
+      notes: document.getElementById('notes').value,
+      bankName: document.getElementById('bank-name').value,
+      bankAddress: document.getElementById('bank-address').value,
+      iban: document.getElementById('iban').value,
+      bic: document.getElementById('bic').value
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
     refreshProfiles();
@@ -424,10 +486,15 @@
     document.getElementById('to-name').value = p.toName || '';
     document.getElementById('to-details').value = p.toDetails || '';
     document.getElementById('amount').value = p.amount || '';
+    document.getElementById('rate').value = p.rate || '';
     document.getElementById('hours').value = p.hours || '';
     document.getElementById('currency').value = p.currency || 'EUR';
     document.getElementById('description').value = p.description || '';
     document.getElementById('notes').value = p.notes || '';
+    document.getElementById('bank-name').value = p.bankName || '';
+    document.getElementById('bank-address').value = p.bankAddress || '';
+    document.getElementById('iban').value = p.iban || '';
+    document.getElementById('bic').value = p.bic || '';
   }
 
   function deleteProfile() {
@@ -478,6 +545,11 @@
     const currency = document.getElementById('currency').value;
     const description = document.getElementById('description').value.trim();
     const notes = document.getElementById('notes').value.trim();
+    const rate = document.getElementById('rate').value ? parseFloat(document.getElementById('rate').value) : null;
+    const bankName = document.getElementById('bank-name').value.trim();
+    const bankAddress = document.getElementById('bank-address').value.trim();
+    const iban = document.getElementById('iban').value.trim();
+    const bic = document.getElementById('bic').value.trim();
 
     if (!toName || !amount || !periodStart || !periodEnd) {
       alert('Please fill in at least: company name, amount, period start and end.');
@@ -502,7 +574,7 @@
         </div>
         <div>
           <h3>Bill To</h3>
-          <p><strong>${esc(toName)}</strong><br>${esc(toDetails)}</p>
+          <p><strong>${esc(toName)}</strong><br>${escMulti(toDetails)}</p>
         </div>
       </div>
       <table class="invoice-table">
@@ -516,7 +588,7 @@
           <tr>
             <td>
               ${esc(description) || 'Services rendered'}
-              <div class="desc-cell">${formatDate(periodStart)} &mdash; ${formatDate(periodEnd)}${hours ? ' &middot; ' + hours + ' hours' : ''}</div>
+              <div class="desc-cell">${formatDate(periodStart)} &mdash; ${formatDate(periodEnd)}${hours ? ' &middot; ' + hours + ' hours' : ''}${rate ? ' &middot; ' + formatMoney(rate, currency) + '/hr' : ''}</div>
             </td>
             <td>${formatMoney(amount, currency)}</td>
           </tr>
@@ -526,6 +598,15 @@
         <span class="label">Total Due</span><br>
         <span class="amount">${formatMoney(amount, currency)}</span>
       </div>
+      ${(bankName || bankAddress || iban || bic) ? `
+        <div class="invoice-bank">
+          <h3>Payment Details</h3>
+          ${bankName ? `<p><span class="bank-label">Bank:</span> ${esc(bankName)}</p>` : ''}
+          ${bankAddress ? `<p><span class="bank-label">Bank Address:</span> ${esc(bankAddress)}</p>` : ''}
+          ${iban ? `<p><span class="bank-label">IBAN:</span> ${esc(iban)}</p>` : ''}
+          ${bic ? `<p><span class="bank-label">SWIFT/BIC:</span> ${esc(bic)}</p>` : ''}
+        </div>
+      ` : ''}
       ${notes ? `<div class="invoice-footer">${esc(notes)}</div>` : ''}
     `;
 
@@ -540,6 +621,10 @@
     const el = document.createElement('span');
     el.textContent = s;
     return el.innerHTML;
+  }
+
+  function escMulti(s) {
+    return esc(s).replace(/\n/g, '<br>');
   }
 
   // --- PDF download via print ---
