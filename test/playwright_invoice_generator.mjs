@@ -85,6 +85,55 @@ async function pinDate(page, isoDate) {
   })()`);
 }
 
+// ── Test: bank fields exist and render in invoice ─────────────────────
+test('bank fields (name, address, iban, bic) appear in form and rendered invoice', async (page) => {
+  await pinDate(page, '2026-04-30T12:00:00Z');
+  await page.goto(URL_BASE);
+  for (const id of ['bank-name', 'bank-address', 'iban', 'bic']) {
+    if ((await page.locator('#' + id).count()) === 0)
+      throw new Error('Missing #' + id);
+  }
+  await page.locator('#from-name').fill('Nicolae Andrei-Mihai PFA');
+  await page.locator('#from-details').fill('Str. Mihai Viteazul 13, Romania');
+  await page.locator('#to-name').fill('Bridgit Inc.');
+  await page.locator('#to-details').fill('55 Northfield Drive East, Unit 150\nWaterloo, ON Canada\nN2K 3T6');
+  await page.locator('#bank-name').fill('Revolut Bank');
+  await page.locator('#bank-address').fill('1 Canada Square, London, UK');
+  await page.locator('#iban').fill('RO27REVO0000118679654321');
+  await page.locator('#bic').fill('REVOLT21XXX');
+  await page.locator('#amount').fill('5500');
+  await page.locator('#hours').fill('50');
+  await page.locator('button:has-text("Generate Invoice")').click();
+  const html = await page.locator('#invoice-preview').innerHTML();
+  for (const expected of ['Revolut Bank', '1 Canada Square, London, UK', 'RO27REVO0000118679654321', 'REVOLT21XXX']) {
+    if (!html.includes(expected))
+      throw new Error('Invoice missing bank info: ' + expected);
+  }
+  if (!/Northfield/.test(html) || !/Waterloo/.test(html) || !/N2K 3T6/.test(html))
+    throw new Error('Invoice missing client multi-line address');
+});
+
+// ── Test: bank fields persist via profile save/load ───────────────────
+test('bank fields are saved and restored via profile', async (page) => {
+  await pinDate(page, '2026-04-30T12:00:00Z');
+  await page.goto(URL_BASE);
+  await page.locator('#to-name').fill('TestCo');
+  await page.locator('#bank-name').fill('My Bank');
+  await page.locator('#bank-address').fill('Bank St 1');
+  await page.locator('#iban').fill('GB00TEST00001234');
+  await page.locator('#bic').fill('TESTGB22');
+  await page.locator('#rate').fill('100');
+  await page.locator('button:has-text("Save as Profile")').click();
+  await page.reload();
+  await page.locator('#profile-select').selectOption('TestCo');
+  await page.locator('button:has-text("Load")').click();
+  if ((await page.locator('#bank-name').inputValue()) !== 'My Bank') throw new Error('bank-name not restored');
+  if ((await page.locator('#bank-address').inputValue()) !== 'Bank St 1') throw new Error('bank-address not restored');
+  if ((await page.locator('#iban').inputValue()) !== 'GB00TEST00001234') throw new Error('iban not restored');
+  if ((await page.locator('#bic').inputValue()) !== 'TESTGB22') throw new Error('bic not restored');
+  if ((await page.locator('#rate').inputValue()) !== '100') throw new Error('rate not restored');
+});
+
 // ── Test: rate per hour with auto-compute ─────────────────────────────
 test('rate-per-hour times hours auto-fills the amount field', async (page) => {
   await pinDate(page, '2026-04-30T12:00:00Z');
