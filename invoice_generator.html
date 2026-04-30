@@ -7,7 +7,8 @@
 <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <style>
   .container { max-width: 860px; }
 
@@ -206,12 +207,12 @@
   }
 
   /* Compact mode applied while capturing PDF, ensures one-page fit */
-  .invoice-preview.pdf-mode { padding: 2rem; }
-  .invoice-preview.pdf-mode .invoice-header { margin-bottom: 1.5rem; padding-bottom: 1rem; }
-  .invoice-preview.pdf-mode .invoice-parties { margin-bottom: 1.5rem; }
-  .invoice-preview.pdf-mode .invoice-table { margin-bottom: 1.2rem; }
-  .invoice-preview.pdf-mode .invoice-bank { margin-top: 1.4rem; padding-top: 1rem; }
-  .invoice-preview.pdf-mode .invoice-footer { margin-top: 1.4rem; padding-top: 1rem; }
+  .pdf-mode .invoice-header { margin-bottom: 1.5rem; padding-bottom: 1rem; }
+  .pdf-mode .invoice-parties { margin-bottom: 1.5rem; }
+  .pdf-mode .invoice-table { margin-bottom: 1.2rem; }
+  .pdf-mode .invoice-bank { margin-top: 1.4rem; padding-top: 1rem; }
+  .pdf-mode .invoice-footer { margin-top: 1.4rem; padding-top: 1rem; }
+
 
   .invoice-bank {
     margin-top: 1.8rem;
@@ -636,32 +637,72 @@
     return esc(s).replace(/\n/g, '<br>');
   }
 
-  // --- PDF download via html2pdf (avoids browser-injected URL/date/page footer) ---
-  function downloadPDF() {
+  // --- PDF download (html2canvas + jsPDF, avoids browser-injected URL/date/page footer) ---
+  async function downloadPDF() {
     const preview = document.getElementById('invoice-preview');
     if (!preview.innerHTML.trim()) { alert('Generate the invoice first.'); return; }
+    if (typeof html2canvas === 'undefined' || !window.jspdf) {
+      alert('PDF library is still loading — try again in a moment.');
+      return;
+    }
 
     const toName = document.getElementById('to-name').value.trim();
     const periodStart = document.getElementById('period-start').value;
     const periodEnd = document.getElementById('period-end').value;
     const filename = generateInvoiceId(toName, periodStart, periodEnd) + '.pdf';
 
-    preview.classList.add('pdf-mode');
+    // Render into a fresh off-screen container at A4 pixel width (210mm @ 96dpi
+    // ≈ 794px) so the output is identical regardless of viewport. On phones the
+    // live preview is narrow and the mobile media query collapses the grid,
+    // which html2canvas would otherwise capture at the wrong dimensions. The
+    // host is a 0x0 overflow-hidden box so the child stays in normal flow
+    // (heights compute) while staying invisible to the user.
+    const host = document.createElement('div');
+    host.style.cssText = 'position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: hidden; z-index: -1;';
+    const container = document.createElement('div');
+    container.className = 'pdf-mode';
+    container.innerHTML = preview.innerHTML;
+    container.style.cssText = [
+      'width: 794px',
+      'padding: 40px',
+      'background: #ffffff',
+      'color: #1a1a1a',
+      "font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      'font-size: 14px',
+      'line-height: 1.6',
+      'box-sizing: border-box'
+    ].join(';');
+    host.appendChild(container);
+    document.body.appendChild(host);
 
-    const opts = {
-      margin: [10, 10, 10, 10],
-      filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all'] }
-    };
+    try {
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
 
-    html2pdf().set(opts).from(preview).save().then(() => {
-      preview.classList.remove('pdf-mode');
-    }).catch(() => {
-      preview.classList.remove('pdf-mode');
-    });
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      const pageW = 210, pageH = 297, marginMm = 10;
+      const maxW = pageW - marginMm * 2;
+      const maxH = pageH - marginMm * 2;
+      // Fit the captured canvas within the page, preserving aspect ratio. This
+      // guarantees a single-page output regardless of content height.
+      const aspect = canvas.width / canvas.height;
+      let drawW = maxW;
+      let drawH = drawW / aspect;
+      if (drawH > maxH) { drawH = maxH; drawW = drawH * aspect; }
+      const x = (pageW - drawW) / 2;
+      const y = marginMm;
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', x, y, drawW, drawH);
+      pdf.save(filename);
+    } finally {
+      host.remove();
+    }
   }
 
   init();
