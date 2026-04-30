@@ -229,7 +229,7 @@
       <h1>Invoice Generator</h1>
     </div>
   </header>
-  <p class="desc">Generate professional invoices. Defaults to the previous full month. Saves company profiles locally for reuse.</p>
+  <p class="desc">Generate professional invoices. Defaults to the current month, issued today. Saves company profiles locally for reuse.</p>
 
   <div class="saved-profiles" id="profiles-section" style="display:none">
     <label>Saved Profiles</label>
@@ -321,22 +321,17 @@
 <script>
   const STORAGE_KEY = 'invoice_profiles';
 
-  // --- Default dates: previous full month ---
+  // --- Default dates: current month, issued today, due end of next month ---
   function getDefaultDates() {
     const now = new Date();
-    // Go to first day of current month, then back one month
-    const firstOfCurrent = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonth = new Date(firstOfCurrent);
-    lastMonth.setDate(lastMonth.getDate() - 1); // last day of previous month
-
-    const start = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
-    const end = lastMonth;
-
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const due = new Date(now.getFullYear(), now.getMonth() + 2, 0);
     return {
       periodStart: fmt(start),
       periodEnd: fmt(end),
-      issueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 1, 1)), // 1st of current month
-      dueDate: fmt(new Date(end.getFullYear(), end.getMonth() + 2, 0))   // last day of current month
+      issueDate: fmt(now),
+      dueDate: fmt(due)
     };
   }
 
