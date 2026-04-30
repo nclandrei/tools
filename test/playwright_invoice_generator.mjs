@@ -126,7 +126,7 @@ test('bank fields are saved and restored via profile', async (page) => {
   await page.locator('button:has-text("Save as Profile")').click();
   await page.reload();
   await page.locator('#profile-select').selectOption('TestCo');
-  await page.locator('button:has-text("Load")').click();
+  await page.getByRole('button', { name: 'Load', exact: true }).click();
   if ((await page.locator('#bank-name').inputValue()) !== 'My Bank') throw new Error('bank-name not restored');
   if ((await page.locator('#bank-address').inputValue()) !== 'Bank St 1') throw new Error('bank-address not restored');
   if ((await page.locator('#iban').inputValue()) !== 'GB00TEST00001234') throw new Error('iban not restored');

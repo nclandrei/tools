@@ -204,6 +204,32 @@
     color: #999;
   }
 
+  .invoice-bank {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e5e0;
+    font-size: 0.85rem;
+    color: #333;
+  }
+
+  .invoice-bank h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #999;
+    margin-bottom: 0.5rem;
+  }
+
+  .invoice-bank p {
+    margin: 0.15rem 0;
+  }
+
+  .invoice-bank .bank-label {
+    color: #666;
+    display: inline-block;
+    min-width: 6.5rem;
+  }
+
   @media (max-width: 600px) {
     .form-grid { grid-template-columns: 1fr; }
     .invoice-preview { padding: 1.5rem; }
@@ -301,6 +327,22 @@
     <div class="form-group full-width">
       <label for="description">Description of Services</label>
       <textarea id="description" placeholder="Software development services for the month of March 2026."></textarea>
+    </div>
+    <div class="form-group">
+      <label for="bank-name">Bank Name (optional)</label>
+      <input type="text" id="bank-name" placeholder="Revolut Bank">
+    </div>
+    <div class="form-group">
+      <label for="bic">SWIFT / BIC (optional)</label>
+      <input type="text" id="bic" placeholder="REVOLT21XXX">
+    </div>
+    <div class="form-group full-width">
+      <label for="bank-address">Bank Address (optional)</label>
+      <input type="text" id="bank-address" placeholder="1 Canada Square, London, UK">
+    </div>
+    <div class="form-group full-width">
+      <label for="iban">IBAN / Account Number (optional)</label>
+      <input type="text" id="iban" placeholder="RO27 REVO 0000 1186 7965 4321">
     </div>
     <div class="form-group full-width">
       <label for="notes">Footer Notes (optional)</label>
@@ -421,7 +463,11 @@
       hours: document.getElementById('hours').value,
       currency: document.getElementById('currency').value,
       description: document.getElementById('description').value,
-      notes: document.getElementById('notes').value
+      notes: document.getElementById('notes').value,
+      bankName: document.getElementById('bank-name').value,
+      bankAddress: document.getElementById('bank-address').value,
+      iban: document.getElementById('iban').value,
+      bic: document.getElementById('bic').value
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
     refreshProfiles();
@@ -445,6 +491,10 @@
     document.getElementById('currency').value = p.currency || 'EUR';
     document.getElementById('description').value = p.description || '';
     document.getElementById('notes').value = p.notes || '';
+    document.getElementById('bank-name').value = p.bankName || '';
+    document.getElementById('bank-address').value = p.bankAddress || '';
+    document.getElementById('iban').value = p.iban || '';
+    document.getElementById('bic').value = p.bic || '';
   }
 
   function deleteProfile() {
@@ -495,6 +545,11 @@
     const currency = document.getElementById('currency').value;
     const description = document.getElementById('description').value.trim();
     const notes = document.getElementById('notes').value.trim();
+    const rate = document.getElementById('rate').value ? parseFloat(document.getElementById('rate').value) : null;
+    const bankName = document.getElementById('bank-name').value.trim();
+    const bankAddress = document.getElementById('bank-address').value.trim();
+    const iban = document.getElementById('iban').value.trim();
+    const bic = document.getElementById('bic').value.trim();
 
     if (!toName || !amount || !periodStart || !periodEnd) {
       alert('Please fill in at least: company name, amount, period start and end.');
@@ -533,7 +588,7 @@
           <tr>
             <td>
               ${esc(description) || 'Services rendered'}
-              <div class="desc-cell">${formatDate(periodStart)} &mdash; ${formatDate(periodEnd)}${hours ? ' &middot; ' + hours + ' hours' : ''}</div>
+              <div class="desc-cell">${formatDate(periodStart)} &mdash; ${formatDate(periodEnd)}${hours ? ' &middot; ' + hours + ' hours' : ''}${rate ? ' &middot; ' + formatMoney(rate, currency) + '/hr' : ''}</div>
             </td>
             <td>${formatMoney(amount, currency)}</td>
           </tr>
@@ -543,6 +598,15 @@
         <span class="label">Total Due</span><br>
         <span class="amount">${formatMoney(amount, currency)}</span>
       </div>
+      ${(bankName || bankAddress || iban || bic) ? `
+        <div class="invoice-bank">
+          <h3>Payment Details</h3>
+          ${bankName ? `<p><span class="bank-label">Bank:</span> ${esc(bankName)}</p>` : ''}
+          ${bankAddress ? `<p><span class="bank-label">Bank Address:</span> ${esc(bankAddress)}</p>` : ''}
+          ${iban ? `<p><span class="bank-label">IBAN:</span> ${esc(iban)}</p>` : ''}
+          ${bic ? `<p><span class="bank-label">SWIFT/BIC:</span> ${esc(bic)}</p>` : ''}
+        </div>
+      ` : ''}
       ${notes ? `<div class="invoice-footer">${esc(notes)}</div>` : ''}
     `;
 
