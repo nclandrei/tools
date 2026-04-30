@@ -85,6 +85,19 @@ async function pinDate(page, isoDate) {
   })()`);
 }
 
+// ── Test: rate per hour with auto-compute ─────────────────────────────
+test('rate-per-hour times hours auto-fills the amount field', async (page) => {
+  await pinDate(page, '2026-04-30T12:00:00Z');
+  await page.goto(URL_BASE);
+  if ((await page.locator('#rate').count()) === 0) throw new Error('Missing #rate input');
+  await page.locator('#rate').fill('110');
+  await page.locator('#hours').fill('50');
+  await page.locator('#hours').blur();
+  const amount = await page.locator('#amount').inputValue();
+  if (parseFloat(amount) !== 5500)
+    throw new Error('amount expected 5500, got ' + amount);
+});
+
 // ── Test: client details is a multi-line textarea ─────────────────────
 test('client details field is a textarea preserving line breaks', async (page) => {
   await pinDate(page, '2026-04-30T12:00:00Z');
