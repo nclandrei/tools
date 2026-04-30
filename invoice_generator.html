@@ -7,6 +7,7 @@
 <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js"></script>
 <style>
   .container { max-width: 860px; }
 
@@ -96,8 +97,8 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 2.5rem;
-    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.2rem;
     border-bottom: 2px solid #7c3aed;
   }
 
@@ -124,7 +125,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
-    margin-bottom: 2.5rem;
+    margin-bottom: 2rem;
   }
 
   .invoice-parties h3 {
@@ -197,16 +198,24 @@
   }
 
   .invoice-footer {
-    margin-top: 2.5rem;
-    padding-top: 1.5rem;
+    margin-top: 1.8rem;
+    padding-top: 1.2rem;
     border-top: 1px solid #e5e5e0;
     font-size: 0.82rem;
     color: #999;
   }
 
+  /* Compact mode applied while capturing PDF, ensures one-page fit */
+  .invoice-preview.pdf-mode { padding: 2rem; }
+  .invoice-preview.pdf-mode .invoice-header { margin-bottom: 1.5rem; padding-bottom: 1rem; }
+  .invoice-preview.pdf-mode .invoice-parties { margin-bottom: 1.5rem; }
+  .invoice-preview.pdf-mode .invoice-table { margin-bottom: 1.2rem; }
+  .invoice-preview.pdf-mode .invoice-bank { margin-top: 1.4rem; padding-top: 1rem; }
+  .invoice-preview.pdf-mode .invoice-footer { margin-top: 1.4rem; padding-top: 1rem; }
+
   .invoice-bank {
-    margin-top: 2.5rem;
-    padding-top: 1.5rem;
+    margin-top: 1.8rem;
+    padding-top: 1.2rem;
     border-top: 1px solid #e5e5e0;
     font-size: 0.85rem;
     color: #333;
@@ -627,9 +636,32 @@
     return esc(s).replace(/\n/g, '<br>');
   }
 
-  // --- PDF download via print ---
+  // --- PDF download via html2pdf (avoids browser-injected URL/date/page footer) ---
   function downloadPDF() {
-    window.print();
+    const preview = document.getElementById('invoice-preview');
+    if (!preview.innerHTML.trim()) { alert('Generate the invoice first.'); return; }
+
+    const toName = document.getElementById('to-name').value.trim();
+    const periodStart = document.getElementById('period-start').value;
+    const periodEnd = document.getElementById('period-end').value;
+    const filename = generateInvoiceId(toName, periodStart, periodEnd) + '.pdf';
+
+    preview.classList.add('pdf-mode');
+
+    const opts = {
+      margin: [10, 10, 10, 10],
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all'] }
+    };
+
+    html2pdf().set(opts).from(preview).save().then(() => {
+      preview.classList.remove('pdf-mode');
+    }).catch(() => {
+      preview.classList.remove('pdf-mode');
+    });
   }
 
   init();
