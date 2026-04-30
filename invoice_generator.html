@@ -253,9 +253,9 @@
       <label for="to-name">Bill To (Company Name)</label>
       <input type="text" id="to-name" placeholder="Client Corp">
     </div>
-    <div class="form-group">
-      <label for="to-details">Client Details (address, etc.)</label>
-      <input type="text" id="to-details" placeholder="456 Oak Ave, Berlin, DE">
+    <div class="form-group full-width">
+      <label for="to-details">Client Details (address, country, etc.)</label>
+      <textarea id="to-details" placeholder="456 Oak Ave&#10;Berlin&#10;Germany"></textarea>
     </div>
     <div class="form-group">
       <label for="period-start">Period Start</label>
@@ -497,7 +497,7 @@
         </div>
         <div>
           <h3>Bill To</h3>
-          <p><strong>${esc(toName)}</strong><br>${esc(toDetails)}</p>
+          <p><strong>${esc(toName)}</strong><br>${escMulti(toDetails)}</p>
         </div>
       </div>
       <table class="invoice-table">
@@ -535,6 +535,10 @@
     const el = document.createElement('span');
     el.textContent = s;
     return el.innerHTML;
+  }
+
+  function escMulti(s) {
+    return esc(s).replace(/\n/g, '<br>');
   }
 
   // --- PDF download via print ---
