@@ -74,6 +74,51 @@
     padding: 0.45rem 0.9rem;
     font-size: 0.78rem;
   }
+
+  .settings {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem;
+    margin-top: 0.9rem;
+  }
+  .settings.open { display: block; }
+  .settings h2 {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 0.85rem;
+  }
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem 0.9rem;
+    margin-bottom: 1rem;
+  }
+  .settings-grid .field { display: flex; flex-direction: column; gap: 0.25rem; }
+  .settings-grid label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+  .settings-grid input {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.92rem;
+  }
+  .settings-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+  .settings-actions .btn { padding: 0.5rem 1rem; font-size: 0.82rem; }
+  @media (max-width: 480px) {
+    .settings-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -95,21 +140,75 @@
     <button class="btn btn-secondary" id="reset-btn">Reset</button>
     <button class="btn btn-secondary" id="skip-btn">Skip</button>
   </div>
+
+  <div class="settings-toggle">
+    <button class="btn btn-secondary" id="settings-btn">Settings</button>
+  </div>
+
+  <div class="settings" id="settings-panel">
+    <h2>Durations</h2>
+    <div class="settings-grid">
+      <div class="field">
+        <label for="focus-min">Focus (min)</label>
+        <input type="number" id="focus-min" min="1" max="180" step="1" value="25">
+      </div>
+      <div class="field">
+        <label for="short-min">Short break (min)</label>
+        <input type="number" id="short-min" min="1" max="60" step="1" value="5">
+      </div>
+      <div class="field">
+        <label for="long-min">Long break (min)</label>
+        <input type="number" id="long-min" min="1" max="120" step="1" value="15">
+      </div>
+      <div class="field">
+        <label for="cycles-input">Sessions before long break</label>
+        <input type="number" id="cycles-input" min="2" max="12" step="1" value="4">
+      </div>
+    </div>
+    <div class="settings-actions">
+      <button class="btn btn-secondary" id="settings-cancel">Cancel</button>
+      <button class="btn btn-primary" id="settings-save">Save</button>
+    </div>
+  </div>
 </div>
 
 <script>
 (() => {
+  const SETTINGS_KEY = 'pomodoro-timer-settings';
+  const DEFAULTS = { focus: 25, short: 5, long: 15, cycles: 4 };
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return { ...DEFAULTS };
+      const obj = JSON.parse(raw);
+      return {
+        focus:  clampInt(obj.focus,  1, 180, DEFAULTS.focus),
+        short:  clampInt(obj.short,  1, 60,  DEFAULTS.short),
+        long:   clampInt(obj.long,   1, 120, DEFAULTS.long),
+        cycles: clampInt(obj.cycles, 2, 12,  DEFAULTS.cycles),
+      };
+    } catch (e) { return { ...DEFAULTS }; }
+  }
+  function clampInt(v, lo, hi, fallback) {
+    const n = parseInt(v, 10);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(hi, Math.max(lo, n));
+  }
+  function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+  let settings = loadSettings();
   const MODES = {
-    focus: { label: 'Focus', minutes: 25, klass: 'focus' },
-    short: { label: 'Short break', minutes: 5, klass: 'short' },
-    long:  { label: 'Long break', minutes: 15, klass: 'long' },
+    focus: { label: 'Focus',       klass: 'focus' },
+    short: { label: 'Short break', klass: 'short' },
+    long:  { label: 'Long break',  klass: 'long' },
   };
-  const CYCLES_BEFORE_LONG = 4;
+  function modeMinutes(m) { return settings[m]; }
 
   let mode = 'focus';
   let completedFocus = 0;
   let cycleIndex = 0; // focus sessions since last long break
-  let durationSec = MODES[mode].minutes * 60;
+  let durationSec = modeMinutes(mode) * 60;
   let remainingSec = durationSec;
   let running = false;
   let endAt = 0;       // performance.now() ms when the current run will hit 0
@@ -122,6 +221,14 @@
   const startBtn = document.getElementById('start-btn');
   const resetBtn = document.getElementById('reset-btn');
   const skipBtn = document.getElementById('skip-btn');
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsPanel = document.getElementById('settings-panel');
+  const focusInput = document.getElementById('focus-min');
+  const shortInput = document.getElementById('short-min');
+  const longInput = document.getElementById('long-min');
+  const cyclesInput = document.getElementById('cycles-input');
+  const settingsSave = document.getElementById('settings-save');
+  const settingsCancel = document.getElementById('settings-cancel');
 
   function fmt(sec) {
     sec = Math.max(0, Math.ceil(sec));
@@ -141,19 +248,19 @@
 
   function setMode(next) {
     mode = next;
-    durationSec = MODES[mode].minutes * 60;
+    durationSec = modeMinutes(mode) * 60;
     remainingSec = durationSec;
     running = false;
     clearTimeout(tickHandle);
     render();
   }
 
-  function advance() {
+  function advance(autoStart) {
     // Called when the current session ends (timer hit 0) or on Skip.
     if (mode === 'focus') {
       completedFocus += 1;
       cycleIndex += 1;
-      if (cycleIndex >= CYCLES_BEFORE_LONG) {
+      if (cycleIndex >= settings.cycles) {
         cycleIndex = 0;
         setMode('long');
       } else {
@@ -162,6 +269,36 @@
     } else {
       setMode('focus');
     }
+    if (autoStart) start();
+  }
+
+  function fillSettingsInputs() {
+    focusInput.value = settings.focus;
+    shortInput.value = settings.short;
+    longInput.value = settings.long;
+    cyclesInput.value = settings.cycles;
+  }
+  function openSettings() {
+    fillSettingsInputs();
+    settingsPanel.classList.add('open');
+  }
+  function closeSettings() { settingsPanel.classList.remove('open'); }
+  function applySettings() {
+    settings = {
+      focus:  clampInt(focusInput.value,  1, 180, settings.focus),
+      short:  clampInt(shortInput.value,  1, 60,  settings.short),
+      long:   clampInt(longInput.value,   1, 120, settings.long),
+      cycles: clampInt(cyclesInput.value, 2, 12,  settings.cycles),
+    };
+    saveSettings(settings);
+    fillSettingsInputs();
+    // Reset current mode duration so display reflects the new value.
+    durationSec = modeMinutes(mode) * 60;
+    remainingSec = durationSec;
+    running = false;
+    clearTimeout(tickHandle);
+    closeSettings();
+    render();
   }
 
   function tick() {
@@ -170,7 +307,7 @@
     if (left <= 0) {
       remainingSec = 0;
       render();
-      advance();
+      advance(true);
       return;
     }
     remainingSec = left;
@@ -203,8 +340,14 @@
 
   startBtn.addEventListener('click', () => { running ? pause() : start(); });
   resetBtn.addEventListener('click', reset);
-  skipBtn.addEventListener('click', advance);
+  skipBtn.addEventListener('click', () => advance(false));
+  settingsBtn.addEventListener('click', () => {
+    settingsPanel.classList.contains('open') ? closeSettings() : openSettings();
+  });
+  settingsSave.addEventListener('click', applySettings);
+  settingsCancel.addEventListener('click', closeSettings);
 
+  fillSettingsInputs();
   render();
 })();
 </script>
