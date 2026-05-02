@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pomodoro Timer</title>
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .container { max-width: 520px; }
+
+  .timer-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 2.25rem 1.5rem 2rem;
+    text-align: center;
+    margin-bottom: 1.25rem;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .timer-card.focus { border-color: var(--accent); background: var(--accent-dim); }
+  .timer-card.short { border-color: var(--green); background: var(--green-dim); }
+  .timer-card.long  { border-color: var(--blue); background: var(--blue-dim); }
+
+  .mode-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+  }
+  .timer-card.focus .mode-label { color: var(--accent); }
+  .timer-card.short .mode-label { color: var(--green); }
+  .timer-card.long  .mode-label { color: var(--blue); }
+
+  .timer-display {
+    font-size: 4.2rem;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.4rem;
+  }
+
+  .session-line {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .session-line strong { color: var(--text); }
+
+  .controls {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .controls .btn {
+    padding: 0.7rem 1.5rem;
+    font-size: 0.92rem;
+    min-width: 92px;
+  }
+
+  .settings-toggle {
+    display: flex;
+    justify-content: center;
+    margin-top: 0.4rem;
+  }
+  .settings-toggle .btn {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.78rem;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Pomodoro Timer</h1>
+    <a href="/">&larr; All tools</a>
+  </header>
+  <p class="desc">Focus in 25-minute blocks with short and long breaks. State, mode, and settings live entirely in this tab &mdash; nothing is sent anywhere.</p>
+
+  <div id="timer-card" class="timer-card focus">
+    <div class="mode-label" id="mode-label">Focus</div>
+    <div class="timer-display" id="timer-display">25:00</div>
+    <div class="session-line">Completed sessions: <strong id="session-count">0</strong></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="start-btn">Start</button>
+    <button class="btn btn-secondary" id="reset-btn">Reset</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const FOCUS_MIN = 25;
+
+  let durationSec = FOCUS_MIN * 60;
+  let remainingSec = durationSec;
+  let running = false;
+  let endAt = 0;       // performance.now() ms when the current run will hit 0
+  let tickHandle = 0;
+
+  const display = document.getElementById('timer-display');
+  const startBtn = document.getElementById('start-btn');
+  const resetBtn = document.getElementById('reset-btn');
+
+  function fmt(sec) {
+    sec = Math.max(0, Math.ceil(sec));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function render() {
+    display.textContent = fmt(remainingSec);
+    startBtn.textContent = running ? 'Pause' : 'Start';
+  }
+
+  function tick() {
+    if (!running) return;
+    const left = (endAt - performance.now()) / 1000;
+    if (left <= 0) {
+      remainingSec = 0;
+      running = false;
+      render();
+      return;
+    }
+    remainingSec = left;
+    render();
+    tickHandle = setTimeout(tick, 200);
+  }
+
+  function start() {
+    if (running) return;
+    running = true;
+    endAt = performance.now() + remainingSec * 1000;
+    render();
+    tick();
+  }
+
+  function pause() {
+    if (!running) return;
+    remainingSec = Math.max(0, (endAt - performance.now()) / 1000);
+    running = false;
+    clearTimeout(tickHandle);
+    render();
+  }
+
+  function reset() {
+    running = false;
+    clearTimeout(tickHandle);
+    remainingSec = durationSec;
+    render();
+  }
+
+  startBtn.addEventListener('click', () => { running ? pause() : start(); });
+  resetBtn.addEventListener('click', reset);
+
+  render();
+})();
+</script>
+</body>
+</html>
