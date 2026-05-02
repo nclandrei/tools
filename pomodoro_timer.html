@@ -93,22 +93,35 @@
   <div class="controls">
     <button class="btn btn-primary" id="start-btn">Start</button>
     <button class="btn btn-secondary" id="reset-btn">Reset</button>
+    <button class="btn btn-secondary" id="skip-btn">Skip</button>
   </div>
 </div>
 
 <script>
 (() => {
-  const FOCUS_MIN = 25;
+  const MODES = {
+    focus: { label: 'Focus', minutes: 25, klass: 'focus' },
+    short: { label: 'Short break', minutes: 5, klass: 'short' },
+    long:  { label: 'Long break', minutes: 15, klass: 'long' },
+  };
+  const CYCLES_BEFORE_LONG = 4;
 
-  let durationSec = FOCUS_MIN * 60;
+  let mode = 'focus';
+  let completedFocus = 0;
+  let cycleIndex = 0; // focus sessions since last long break
+  let durationSec = MODES[mode].minutes * 60;
   let remainingSec = durationSec;
   let running = false;
   let endAt = 0;       // performance.now() ms when the current run will hit 0
   let tickHandle = 0;
 
+  const card = document.getElementById('timer-card');
+  const modeLabel = document.getElementById('mode-label');
   const display = document.getElementById('timer-display');
+  const sessionCount = document.getElementById('session-count');
   const startBtn = document.getElementById('start-btn');
   const resetBtn = document.getElementById('reset-btn');
+  const skipBtn = document.getElementById('skip-btn');
 
   function fmt(sec) {
     sec = Math.max(0, Math.ceil(sec));
@@ -119,7 +132,36 @@
 
   function render() {
     display.textContent = fmt(remainingSec);
+    modeLabel.textContent = MODES[mode].label;
+    sessionCount.textContent = String(completedFocus);
+    card.classList.remove('focus', 'short', 'long');
+    card.classList.add(MODES[mode].klass);
     startBtn.textContent = running ? 'Pause' : 'Start';
+  }
+
+  function setMode(next) {
+    mode = next;
+    durationSec = MODES[mode].minutes * 60;
+    remainingSec = durationSec;
+    running = false;
+    clearTimeout(tickHandle);
+    render();
+  }
+
+  function advance() {
+    // Called when the current session ends (timer hit 0) or on Skip.
+    if (mode === 'focus') {
+      completedFocus += 1;
+      cycleIndex += 1;
+      if (cycleIndex >= CYCLES_BEFORE_LONG) {
+        cycleIndex = 0;
+        setMode('long');
+      } else {
+        setMode('short');
+      }
+    } else {
+      setMode('focus');
+    }
   }
 
   function tick() {
@@ -127,8 +169,8 @@
     const left = (endAt - performance.now()) / 1000;
     if (left <= 0) {
       remainingSec = 0;
-      running = false;
       render();
+      advance();
       return;
     }
     remainingSec = left;
@@ -161,6 +203,7 @@
 
   startBtn.addEventListener('click', () => { running ? pause() : start(); });
   resetBtn.addEventListener('click', reset);
+  skipBtn.addEventListener('click', advance);
 
   render();
 })();
