@@ -308,20 +308,45 @@
       return longCm / longPx;
     }
 
-    // Fallback: pick the highest-confidence detection that has a known
-    // typical size and use its long dimension to derive cm-per-pixel.
+    // Fallback: derive cm-per-pixel from the median of all detections
+    // that have known typical sizes. Median (rather than highest-confidence)
+    // is robust to single misclassifications and to objects of unusual
+    // size — e.g. a single high-score "sports ball" detection won't
+    // skew the entire scene's scale.
     function scaleFromTypical(detections) {
       const candidates = detections
-        .filter((d) => TYPICAL_DIMS_CM[d.label])
-        .sort((a, b) => b.score - a.score);
-      const best = candidates[0];
-      if (!best) return null;
-      const dims = TYPICAL_DIMS_CM[best.label];
-      const { w: pxW, h: pxH } = bboxPx(best.box);
-      const longPx = Math.max(pxW, pxH);
-      const longCm = Math.max(dims.w, dims.h);
-      if (longPx <= 0) return null;
-      return longCm / longPx;
+        .map((d) => {
+          const dims = TYPICAL_DIMS_CM[d.label];
+          if (!dims) return null;
+          const { w: pxW, h: pxH } = bboxPx(d.box);
+          const longPx = Math.max(pxW, pxH);
+          const longCm = Math.max(dims.w, dims.h);
+          if (longPx <= 0) return null;
+          return { label: d.label, score: d.score, cmPerPx: longCm / longPx };
+        })
+        .filter((c) => c && isFinite(c.cmPerPx) && c.cmPerPx > 0);
+      if (!candidates.length) return null;
+      const sorted = candidates.slice().sort((a, b) => a.cmPerPx - b.cmPerPx);
+      return sorted[Math.floor(sorted.length / 2)].cmPerPx;
+    }
+
+    // Returns the detection that drove scaleFromTypical (the median),
+    // for UI labelling.
+    function typicalReferenceDetection(detections) {
+      const candidates = detections
+        .map((d) => {
+          const dims = TYPICAL_DIMS_CM[d.label];
+          if (!dims) return null;
+          const { w: pxW, h: pxH } = bboxPx(d.box);
+          const longPx = Math.max(pxW, pxH);
+          const longCm = Math.max(dims.w, dims.h);
+          if (longPx <= 0) return null;
+          return { d, cmPerPx: longCm / longPx };
+        })
+        .filter((c) => c && isFinite(c.cmPerPx) && c.cmPerPx > 0);
+      if (!candidates.length) return null;
+      const sorted = candidates.slice().sort((a, b) => a.cmPerPx - b.cmPerPx);
+      return sorted[Math.floor(sorted.length / 2)].d;
     }
 
     window.__ide = {
@@ -331,6 +356,7 @@
       estimateDimensions,
       scaleFromReference,
       scaleFromTypical,
+      typicalReferenceDetection,
     };
   </script>
 
@@ -552,10 +578,8 @@
         if (!cmPerPx) {
           cmPerPx = window.__ide.scaleFromTypical(lastDetections);
           if (cmPerPx) {
-            const top = lastDetections
-              .filter((d) => window.__ide.TYPICAL_DIMS_CM[d.label])
-              .sort((a, b) => b.score - a.score)[0];
-            source = `assumed ${top ? top.label : 'object'}`;
+            const med = window.__ide.typicalReferenceDetection(lastDetections);
+            source = `assumed ${med ? med.label : 'object'}`;
           }
         }
         drawOverlay(lastDetections);
