@@ -228,7 +228,40 @@ test('uploading an image renders bounding boxes with cm dimensions', async (page
     throw new Error('Overlay canvas size wrong: ' + JSON.stringify(overlay));
 });
 
-// ── Test 7: changing reference recomputes dimensions ────────────────────
+// ── Test 7: status row shows an "Analyzing image…" message during detection ─
+// Regression: previously the spinner kept showing "Model ready." while the
+// model was actually running inference, leaving the user without feedback.
+// We use a slow mock (resolves after a short delay) so we can observe the
+// in-progress status text.
+test('status shows an analyzing-image message while detection runs', async (page) => {
+  await page.addInitScript(() => {
+    window.__ide_mock = {
+      detect: () => new Promise((resolve) => {
+        setTimeout(() => resolve([
+          { label: 'cell phone', score: 0.9, box: { xmin: 350, ymin: 80, xmax: 470, ymax: 320 } },
+        ]), 700);
+      }),
+    };
+  });
+  await page.goto(URL_PAGE);
+  await page.locator('#fileInput').setInputFiles(await makeScenePng(page));
+
+  // While detection is in flight, the status row should be visible and
+  // its text should explicitly mention image analysis (so users know the
+  // photo is actively being processed — not just "Model ready.").
+  await page.waitForFunction(() => {
+    const row = document.getElementById('statusRow');
+    const text = (document.getElementById('statusText')?.textContent || '').toLowerCase();
+    return row && row.classList.contains('visible') && /analyz/.test(text);
+  }, null, { timeout: 4000 });
+
+  // After detection completes, the status row should disappear.
+  await page.waitForSelector('#detectionsList .detection-row', { timeout: 5000 });
+  const visible = await page.evaluate(() => document.getElementById('statusRow')?.classList.contains('visible'));
+  if (visible) throw new Error('Status row should be hidden after detection completes');
+});
+
+// ── Test 8: changing reference recomputes dimensions ────────────────────
 // Detections deliberately chosen so that "reference=credit-card" and
 // "reference=auto" derive DIFFERENT scales:
 //  - Auto picks the highest-confidence detection with a known typical
