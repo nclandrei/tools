@@ -229,10 +229,17 @@ test('uploading an image renders bounding boxes with cm dimensions', async (page
 });
 
 // ── Test 7: changing reference recomputes dimensions ────────────────────
+// Detections deliberately chosen so that "reference=credit-card" and
+// "reference=auto" derive DIFFERENT scales:
+//  - Auto picks the highest-confidence detection with a known typical
+//    size. With score(book) > score(credit card), the typical-class
+//    branch picks the book (24 cm tall, 240 px tall → 0.1 cm/px).
+//  - Reference=credit-card picks the CC bbox (200 px ↔ 8.56 cm →
+//    0.0428 cm/px).
 test('changing the reference type recomputes dimensions', async (page) => {
   await plantMock(page, [
-    { label: 'credit card', score: 0.92, box: { xmin: 50, ymin: 150, xmax: 250, ymax: 276 } },
-    { label: 'cell phone',  score: 0.88, box: { xmin: 350, ymin: 80, xmax: 470, ymax: 320 } },
+    { label: 'credit card', score: 0.7,  box: { xmin: 50,  ymin: 150, xmax: 250, ymax: 276 } },
+    { label: 'book',        score: 0.95, box: { xmin: 350, ymin: 80,  xmax: 520, ymax: 320 } },
   ]);
   await page.goto(URL_PAGE);
 
@@ -240,25 +247,30 @@ test('changing the reference type recomputes dimensions', async (page) => {
   await page.locator('#fileInput').setInputFiles(await makeScenePng(page));
   await page.waitForSelector('#detectionsList .detection-row', { timeout: 5000 });
 
-  const phoneTextCC = await page.locator('#detectionsList .detection-row', { hasText: 'cell phone' }).textContent();
-  const mCC = phoneTextCC.match(/([0-9]+(?:\.[0-9]+)?)\s*[×x]\s*([0-9]+(?:\.[0-9]+)?)/i);
-  if (!mCC) throw new Error('No dim w/CC ref');
+  const bookTextCC = await page.locator('#detectionsList .detection-row', { hasText: 'book' }).textContent();
+  const mCC = bookTextCC.match(/([0-9]+(?:\.[0-9]+)?)\s*[×x]\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if (!mCC) throw new Error('No dim w/CC ref: ' + bookTextCC);
+  // Book bbox 170×240 px at 0.0428 cm/px ≈ 7.3×10.3 cm
+  if (Math.abs(parseFloat(mCC[2]) - 10.27) > 0.3)
+    throw new Error('Book height w/CC ref expected ≈10.3 cm, got ' + mCC[2]);
 
-  // Switch to A4 (21×29.7 cm) — there's no A4 in our fake detections,
-  // so it falls back to typical-class sizing for the cell phone (~15 cm tall).
-  await page.locator('#referenceSelect').selectOption('a4-paper');
-  // Algorithm should re-run automatically.
+  // Switch to auto → falls back to typical-class size on the book (24 cm).
+  await page.locator('#referenceSelect').selectOption('auto');
   await page.waitForFunction(
     (prev) => {
       const row = Array.from(document.querySelectorAll('#detectionsList .detection-row'))
-        .find(r => /cell phone/i.test(r.textContent));
+        .find(r => /book/i.test(r.textContent));
       return row && row.textContent !== prev;
     },
-    phoneTextCC,
+    bookTextCC,
     { timeout: 5000 },
   );
-  const phoneTextA4 = await page.locator('#detectionsList .detection-row', { hasText: 'cell phone' }).textContent();
-  if (phoneTextA4 === phoneTextCC) throw new Error('Phone dimension did not change after reference switch');
+  const bookTextAuto = await page.locator('#detectionsList .detection-row', { hasText: 'book' }).textContent();
+  if (bookTextAuto === bookTextCC) throw new Error('Book dimension did not change after reference switch');
+  const mAuto = bookTextAuto.match(/([0-9]+(?:\.[0-9]+)?)\s*[×x]\s*([0-9]+(?:\.[0-9]+)?)/i);
+  // After fallback the book reports its typical size (≈17×24 cm).
+  if (Math.abs(parseFloat(mAuto[2]) - 24) > 1)
+    throw new Error('Book height w/auto expected ≈24 cm, got ' + mAuto[2]);
 });
 
 try {
