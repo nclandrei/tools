@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Dimension Estimator</title>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    .container { max-width: 960px; }
+    header { margin-bottom: 1.75rem; }
+    h1 { font-size: 1.75rem; }
+
+    .controls {
+      display: flex; gap: .75rem; flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .controls label {
+      display: flex; align-items: center; gap: .4rem;
+      font-size: .85rem; color: var(--text-muted);
+    }
+    select { padding: .4rem .6rem; font-size: .85rem; cursor: pointer; }
+
+    .drop-zone { position: relative; padding: 2.5rem 1.5rem; }
+    .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .drop-icon { font-size: 2rem; margin-bottom: .5rem; }
+
+    .preview-wrap { display: none; animation: fadeUp .3s ease; }
+    .preview-wrap.visible { display: block; }
+    .canvas-wrap {
+      position: relative;
+      max-width: 100%;
+      margin: 0 auto;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .canvas-wrap canvas {
+      display: block; max-width: 100%; height: auto;
+    }
+    .canvas-wrap canvas#overlayCanvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+    }
+
+    .status-row {
+      display: none;
+      align-items: center; gap: .6rem;
+      margin-top: 1rem; font-size: .9rem; color: var(--text-muted);
+      justify-content: center;
+    }
+    .status-row.visible { display: flex; }
+    .status-row .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    .detections-panel {
+      display: none;
+      margin-top: 1.25rem;
+      padding: 1rem 1.1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      animation: fadeUp .3s ease;
+    }
+    .detections-panel.visible { display: block; }
+    .detections-panel h3 {
+      font-size: .9rem; font-weight: 600; margin-bottom: .6rem;
+    }
+    .scale-line {
+      font-size: .85rem; color: var(--text-muted); margin-bottom: .8rem;
+    }
+    .scale-line code {
+      background: var(--surface-alt, var(--bg));
+      padding: .1rem .4rem; border-radius: 4px;
+    }
+
+    .detection-row {
+      display: flex; align-items: center; gap: .7rem;
+      padding: .5rem .2rem;
+      border-top: 1px dashed var(--border);
+      font-size: .9rem;
+    }
+    .detection-row:first-of-type { border-top: none; }
+    .swatch {
+      width: 14px; height: 14px; border-radius: 3px;
+      flex-shrink: 0; border: 1px solid rgba(0,0,0,.15);
+    }
+    .row-label {
+      flex: 1 1 auto; font-weight: 500;
+    }
+    .row-conf {
+      font-family: monospace; font-size: .78rem;
+      color: var(--text-muted);
+      padding: .1rem .4rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    .row-dim {
+      font-family: monospace; font-size: .85rem;
+      color: var(--text);
+    }
+    .row-dim.fallback { color: var(--text-muted); font-style: italic; }
+
+    .actions-bar { display: flex; gap: .6rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
+
+    .empty-msg {
+      font-size: .9rem; color: var(--text-muted);
+      text-align: center; padding: .5rem 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Image Dimension Estimator</h1>
+      <a href="/">&larr; all tools</a>
+    </header>
+
+    <p class="desc">Detects objects in a photo and estimates their real-world dimensions. Pick a reference of known size for accuracy, otherwise typical class sizes are used. Runs entirely in your browser.</p>
+
+    <div class="controls">
+      <label>
+        Reference
+        <select id="referenceSelect">
+          <option value="auto" selected>Auto (typical sizes)</option>
+          <option value="credit-card">Credit card (8.56 × 5.4 cm)</option>
+          <option value="a4-paper">A4 paper (21 × 29.7 cm)</option>
+          <option value="us-letter">US Letter (21.6 × 27.9 cm)</option>
+          <option value="us-dollar">US dollar bill (15.6 × 6.6 cm)</option>
+          <option value="euro-coin">€1 coin (2.32 cm dia)</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">&#128207;</div>
+      <p>Drop an image here, click to select, or take a photo</p>
+      <p style="font-size:.8rem; margin-top:.4rem; color:var(--text-muted)">Supports JPEG, PNG, WebP</p>
+      <input type="file" id="fileInput" accept="image/*" capture="environment">
+    </div>
+
+    <div class="preview-wrap" id="previewWrap">
+      <div class="canvas-wrap">
+        <canvas id="imageCanvas"></canvas>
+        <canvas id="overlayCanvas"></canvas>
+      </div>
+
+      <div class="status-row" id="statusRow">
+        <div class="spinner"></div>
+        <span id="statusText">Loading model…</span>
+      </div>
+
+      <div class="detections-panel" id="detectionsPanel">
+        <h3>Detected objects</h3>
+        <p class="scale-line" id="scaleLine"></p>
+        <div id="detectionsList"></div>
+      </div>
+
+      <div class="actions-bar">
+        <button class="btn" id="resetBtn">New Image</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Pure dimension-estimation algorithm (kept testable). ---
+    // Typical real-world sizes for common COCO classes (in cm). Each entry
+    // describes the object's natural orientation: w = horizontal, h = vertical.
+    // Numbers are reasonable averages, not precise.
+    const TYPICAL_DIMS_CM = {
+      person:        { w: 50,  h: 170 },
+      bicycle:       { w: 175, h: 110 },
+      car:           { w: 180, h: 150 },
+      motorcycle:    { w: 80,  h: 130 },
+      bus:           { w: 250, h: 320 },
+      truck:         { w: 230, h: 280 },
+      'traffic light': { w: 30, h: 90 },
+      'fire hydrant':  { w: 40, h: 80 },
+      'stop sign':     { w: 75, h: 75 },
+      bench:         { w: 150, h: 80 },
+      bird:          { w: 25,  h: 20 },
+      cat:           { w: 45,  h: 25 },
+      dog:           { w: 70,  h: 50 },
+      horse:         { w: 200, h: 160 },
+      sheep:         { w: 110, h: 90 },
+      cow:           { w: 230, h: 150 },
+      elephant:      { w: 600, h: 320 },
+      bear:          { w: 200, h: 110 },
+      zebra:         { w: 230, h: 150 },
+      giraffe:       { w: 250, h: 500 },
+      backpack:      { w: 30,  h: 45 },
+      umbrella:      { w: 100, h: 90 },
+      handbag:       { w: 30,  h: 25 },
+      tie:           { w: 8,   h: 145 },
+      suitcase:      { w: 55,  h: 75 },
+      frisbee:       { w: 27,  h: 27 },
+      skis:          { w: 10,  h: 170 },
+      snowboard:     { w: 30,  h: 155 },
+      'sports ball': { w: 22,  h: 22 },
+      kite:          { w: 80,  h: 100 },
+      'baseball bat': { w: 7,  h: 85 },
+      'baseball glove': { w: 25, h: 30 },
+      skateboard:    { w: 20,  h: 80 },
+      surfboard:     { w: 55,  h: 215 },
+      'tennis racket': { w: 30, h: 70 },
+      bottle:        { w: 7,   h: 25 },
+      'wine glass':  { w: 7,   h: 18 },
+      cup:           { w: 8,   h: 9 },
+      fork:          { w: 2.5, h: 20 },
+      knife:         { w: 2.5, h: 22 },
+      spoon:         { w: 4,   h: 18 },
+      bowl:          { w: 18,  h: 7 },
+      banana:        { w: 4,   h: 18 },
+      apple:         { w: 8,   h: 8 },
+      sandwich:      { w: 12,  h: 5 },
+      orange:        { w: 8,   h: 8 },
+      broccoli:      { w: 12,  h: 14 },
+      carrot:        { w: 3,   h: 18 },
+      'hot dog':     { w: 15,  h: 4 },
+      pizza:         { w: 30,  h: 30 },
+      donut:         { w: 10,  h: 10 },
+      cake:          { w: 22,  h: 8 },
+      chair:         { w: 45,  h: 90 },
+      couch:         { w: 200, h: 90 },
+      'potted plant': { w: 25, h: 35 },
+      bed:           { w: 160, h: 50 },
+      'dining table': { w: 120, h: 75 },
+      toilet:        { w: 40,  h: 75 },
+      tv:            { w: 110, h: 65 },
+      laptop:        { w: 33,  h: 22 },
+      mouse:         { w: 6,   h: 10 },
+      remote:        { w: 5,   h: 18 },
+      keyboard:      { w: 45,  h: 14 },
+      'cell phone':  { w: 7.5, h: 15 },
+      microwave:     { w: 50,  h: 30 },
+      oven:          { w: 60,  h: 60 },
+      toaster:       { w: 30,  h: 20 },
+      sink:          { w: 60,  h: 25 },
+      refrigerator:  { w: 70,  h: 175 },
+      book:          { w: 17,  h: 24 },
+      clock:         { w: 25,  h: 25 },
+      vase:          { w: 12,  h: 25 },
+      scissors:      { w: 8,   h: 18 },
+      'teddy bear':  { w: 25,  h: 35 },
+      'hair drier':  { w: 8,   h: 25 },
+      toothbrush:    { w: 1.5, h: 19 },
+      // Synonyms emitted by some checkpoints.
+      cellphone:     { w: 7.5, h: 15 },
+      smartphone:    { w: 7.5, h: 15 },
+      phone:         { w: 7.5, h: 15 },
+      'mobile phone': { w: 7.5, h: 15 },
+      'credit card': { w: 8.56, h: 5.4 },
+      card:          { w: 8.56, h: 5.4 },
+    };
+
+    // Known references the user can pick. Each maps to {w,h} cm and an
+    // optional matcher to find the reference in the detection list.
+    const REFERENCES = {
+      'credit-card': { w: 8.56, h: 5.4, match: /credit card|card/i },
+      'a4-paper':    { w: 21, h: 29.7, match: /paper|book|sheet|a4/i },
+      'us-letter':   { w: 21.6, h: 27.9, match: /paper|book|sheet|letter/i },
+      'us-dollar':   { w: 15.6, h: 6.6, match: /dollar|bill|note/i },
+      'euro-coin':   { w: 2.32, h: 2.32, match: /coin|euro/i },
+    };
+
+    function bboxPx(box) {
+      return { w: Math.max(0, box.xmax - box.xmin), h: Math.max(0, box.ymax - box.ymin) };
+    }
+
+    // Convert detected boxes to {label, score, box, widthCm, heightCm}
+    // using a single cm-per-pixel scale.
+    function estimateDimensions(detections, cmPerPx) {
+      return detections.map((d) => {
+        const { w, h } = bboxPx(d.box);
+        return {
+          label: d.label,
+          score: d.score,
+          box: d.box,
+          widthCm: w * cmPerPx,
+          heightCm: h * cmPerPx,
+        };
+      });
+    }
+
+    // Find a detection that looks like the chosen reference, then derive
+    // cm-per-pixel from its real-world long-side. Returns null if no
+    // candidate is found.
+    function scaleFromReference(detections, referenceKey) {
+      const ref = REFERENCES[referenceKey];
+      if (!ref) return null;
+      const candidates = detections
+        .filter((d) => ref.match.test(d.label))
+        .sort((a, b) => b.score - a.score);
+      const best = candidates[0];
+      if (!best) return null;
+      const { w: pxW, h: pxH } = bboxPx(best.box);
+      const longPx = Math.max(pxW, pxH);
+      const longCm = Math.max(ref.w, ref.h);
+      if (longPx <= 0) return null;
+      return longCm / longPx;
+    }
+
+    // Fallback: derive cm-per-pixel from the median of all detections
+    // that have known typical sizes. Median (rather than highest-confidence)
+    // is robust to single misclassifications and to objects of unusual
+    // size — e.g. a single high-score "sports ball" detection won't
+    // skew the entire scene's scale.
+    function scaleFromTypical(detections) {
+      const candidates = detections
+        .map((d) => {
+          const dims = TYPICAL_DIMS_CM[d.label];
+          if (!dims) return null;
+          const { w: pxW, h: pxH } = bboxPx(d.box);
+          const longPx = Math.max(pxW, pxH);
+          const longCm = Math.max(dims.w, dims.h);
+          if (longPx <= 0) return null;
+          return { label: d.label, score: d.score, cmPerPx: longCm / longPx };
+        })
+        .filter((c) => c && isFinite(c.cmPerPx) && c.cmPerPx > 0);
+      if (!candidates.length) return null;
+      const sorted = candidates.slice().sort((a, b) => a.cmPerPx - b.cmPerPx);
+      return sorted[Math.floor(sorted.length / 2)].cmPerPx;
+    }
+
+    // Returns the detection that drove scaleFromTypical (the median),
+    // for UI labelling.
+    function typicalReferenceDetection(detections) {
+      const candidates = detections
+        .map((d) => {
+          const dims = TYPICAL_DIMS_CM[d.label];
+          if (!dims) return null;
+          const { w: pxW, h: pxH } = bboxPx(d.box);
+          const longPx = Math.max(pxW, pxH);
+          const longCm = Math.max(dims.w, dims.h);
+          if (longPx <= 0) return null;
+          return { d, cmPerPx: longCm / longPx };
+        })
+        .filter((c) => c && isFinite(c.cmPerPx) && c.cmPerPx > 0);
+      if (!candidates.length) return null;
+      const sorted = candidates.slice().sort((a, b) => a.cmPerPx - b.cmPerPx);
+      return sorted[Math.floor(sorted.length / 2)].d;
+    }
+
+    window.__ide = {
+      TYPICAL_DIMS_CM,
+      REFERENCES,
+      bboxPx,
+      estimateDimensions,
+      scaleFromReference,
+      scaleFromTypical,
+      typicalReferenceDetection,
+    };
+  </script>
+
+  <script type="module">
+    // Real detector: lazily loaded YOLOS-tiny via transformers.js.
+    // Skipped automatically when window.__ide_mock is set (tests).
+    if (!window.__ide_mock) {
+      let mod;
+      try {
+        mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.2/dist/transformers.min.js');
+      } catch (err) {
+        // Offline / blocked CDN. The page still works for a user that
+        // re-loads with connectivity; we just don't expose the detector.
+        console.warn('transformers.js failed to load:', err && err.message ? err.message : err);
+        mod = null;
+      }
+    if (mod) {
+      const { pipeline, env } = mod;
+      env.allowLocalModels = false;
+
+      const MODEL_ID = 'Xenova/yolos-tiny';
+      let detectorPromise = null;
+
+      function loadDetector() {
+        if (detectorPromise) return detectorPromise;
+        const status = document.getElementById('statusText');
+        const ensureStatusVisible = () => {
+          const row = document.getElementById('statusRow');
+          if (row && !row.classList.contains('visible')) row.classList.add('visible');
+        };
+        if (status) { status.textContent = 'Loading model (first run only, ~22 MB)…'; ensureStatusVisible(); }
+        detectorPromise = pipeline('object-detection', MODEL_ID, {
+          progress_callback: (p) => {
+            if (!status) return;
+            if (p.status === 'progress' && p.total) {
+              const pct = Math.round((p.loaded / p.total) * 100);
+              status.textContent = `Loading model… ${pct}%`;
+              ensureStatusVisible();
+            } else if (p.status === 'ready') {
+              status.textContent = 'Model ready.';
+            }
+          },
+        }).catch((err) => { detectorPromise = null; throw err; });
+        return detectorPromise;
+      }
+
+      window.__ide_detect = async (file) => {
+        const detector = await loadDetector();
+        const url = URL.createObjectURL(file);
+        try {
+          const out = await detector(url, { threshold: 0.5, percentage: false });
+          return Array.isArray(out) ? out : [out];
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      };
+    }
+    }
+  </script>
+
+  <script>
+    (() => {
+      const dropZone        = document.getElementById('dropZone');
+      const fileInput       = document.getElementById('fileInput');
+      const previewWrap     = document.getElementById('previewWrap');
+      const imageCanvas     = document.getElementById('imageCanvas');
+      const overlayCanvas   = document.getElementById('overlayCanvas');
+      const resetBtn        = document.getElementById('resetBtn');
+      const statusRow       = document.getElementById('statusRow');
+      const statusText      = document.getElementById('statusText');
+      const detectionsPanel = document.getElementById('detectionsPanel');
+      const detectionsList  = document.getElementById('detectionsList');
+      const scaleLine       = document.getElementById('scaleLine');
+      const referenceSelect = document.getElementById('referenceSelect');
+
+      let currentBlobUrl = null;
+      let lastDetections = null;     // raw detections from the model
+      let lastImageDims  = null;     // { w, h } in original image px
+
+      const COLORS = ['#7c3aed', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899', '#06b6d4', '#84cc16'];
+
+      function showStatus(msg) {
+        statusText.textContent = msg;
+        statusRow.classList.add('visible');
+      }
+      function hideStatus() { statusRow.classList.remove('visible'); }
+
+      async function detect(file) {
+        if (window.__ide_mock && typeof window.__ide_mock.detect === 'function') {
+          return await window.__ide_mock.detect(file);
+        }
+        if (typeof window.__ide_detect === 'function') {
+          return await window.__ide_detect(file);
+        }
+        throw new Error('No detector loaded.');
+      }
+
+      async function loadImage(file) {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        const p = new Promise((res, rej) => {
+          img.onload = () => res(img);
+          img.onerror = rej;
+        });
+        img.src = url;
+        const loaded = await p;
+        currentBlobUrl = url;
+        return loaded;
+      }
+
+      function drawImage(img) {
+        imageCanvas.width = img.naturalWidth;
+        imageCanvas.height = img.naturalHeight;
+        overlayCanvas.width = img.naturalWidth;
+        overlayCanvas.height = img.naturalHeight;
+        const ctx = imageCanvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        lastImageDims = { w: img.naturalWidth, h: img.naturalHeight };
+      }
+
+      function drawOverlay(detections) {
+        const ctx = overlayCanvas.getContext('2d');
+        ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        const lineW = Math.max(2, Math.round(overlayCanvas.width / 400));
+        ctx.lineWidth = lineW;
+        ctx.font = `${Math.max(12, Math.round(overlayCanvas.width / 50))}px Inter, sans-serif`;
+        ctx.textBaseline = 'top';
+        detections.forEach((d, i) => {
+          const color = COLORS[i % COLORS.length];
+          const { xmin, ymin, xmax, ymax } = d.box;
+          ctx.strokeStyle = color;
+          ctx.fillStyle = color;
+          ctx.strokeRect(xmin, ymin, xmax - xmin, ymax - ymin);
+          const text = d.label;
+          const padX = 6, padY = 4;
+          const tw = ctx.measureText(text).width;
+          ctx.fillRect(xmin, Math.max(0, ymin - 22 - padY), tw + padX * 2, 22 + padY);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(text, xmin + padX, Math.max(0, ymin - 22));
+        });
+      }
+
+      function fmtCm(n) {
+        if (!isFinite(n) || n <= 0) return '?';
+        if (n < 10) return n.toFixed(1);
+        return Math.round(n).toString();
+      }
+
+      function renderRows(detections, cmPerPx, refSource) {
+        detectionsList.innerHTML = '';
+        if (!detections.length) {
+          const div = document.createElement('div');
+          div.className = 'empty-msg';
+          div.textContent = 'No recognisable objects in this image.';
+          detectionsList.appendChild(div);
+          scaleLine.textContent = '';
+          return;
+        }
+
+        if (cmPerPx) {
+          const note = refSource === 'reference'
+            ? 'Scale derived from your selected reference.'
+            : `Scale estimated from typical class sizes (${refSource}).`;
+          scaleLine.innerHTML = `${note} <code>${(cmPerPx * 10).toFixed(3)} mm/px</code>`;
+        } else {
+          scaleLine.textContent = 'No reference identified — showing typical sizes per class.';
+        }
+
+        detections.forEach((d, i) => {
+          const row = document.createElement('div');
+          row.className = 'detection-row';
+          const swatch = document.createElement('span');
+          swatch.className = 'swatch';
+          swatch.style.background = COLORS[i % COLORS.length];
+          row.appendChild(swatch);
+
+          const label = document.createElement('span');
+          label.className = 'row-label';
+          label.textContent = d.label;
+          row.appendChild(label);
+
+          const conf = document.createElement('span');
+          conf.className = 'row-conf';
+          conf.textContent = Math.round(d.score * 100) + '%';
+          row.appendChild(conf);
+
+          const dim = document.createElement('span');
+          dim.className = 'row-dim';
+          if (cmPerPx) {
+            const { w: pxW, h: pxH } = window.__ide.bboxPx(d.box);
+            const wCm = pxW * cmPerPx;
+            const hCm = pxH * cmPerPx;
+            dim.textContent = `${fmtCm(wCm)} × ${fmtCm(hCm)} cm`;
+          } else {
+            const typ = window.__ide.TYPICAL_DIMS_CM[d.label];
+            if (typ) {
+              dim.textContent = `~${fmtCm(typ.w)} × ${fmtCm(typ.h)} cm`;
+              dim.classList.add('fallback');
+            } else {
+              dim.textContent = '— unknown —';
+              dim.classList.add('fallback');
+            }
+          }
+          row.appendChild(dim);
+
+          detectionsList.appendChild(row);
+        });
+      }
+
+      function recompute() {
+        if (!lastDetections) return;
+        const refKey = referenceSelect.value;
+        let cmPerPx = null;
+        let source = '';
+        if (refKey !== 'auto') {
+          cmPerPx = window.__ide.scaleFromReference(lastDetections, refKey);
+          if (cmPerPx) source = 'reference';
+        }
+        if (!cmPerPx) {
+          cmPerPx = window.__ide.scaleFromTypical(lastDetections);
+          if (cmPerPx) {
+            const med = window.__ide.typicalReferenceDetection(lastDetections);
+            source = `assumed ${med ? med.label : 'object'}`;
+          }
+        }
+        drawOverlay(lastDetections);
+        renderRows(lastDetections, cmPerPx, source || 'no scale');
+        detectionsPanel.classList.add('visible');
+      }
+
+      async function showImage(file) {
+        if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+        dropZone.style.display = 'none';
+        previewWrap.classList.add('visible');
+        detectionsPanel.classList.remove('visible');
+        showStatus('Loading image…');
+        let img;
+        try {
+          img = await loadImage(file);
+        } catch (err) {
+          showStatus('Failed to load image: ' + (err && err.message ? err.message : err));
+          return;
+        }
+        drawImage(img);
+        showStatus('Detecting objects…');
+        try {
+          const detections = await detect(file);
+          lastDetections = detections || [];
+          hideStatus();
+          recompute();
+        } catch (err) {
+          console.error(err);
+          showStatus('Detection failed: ' + (err && err.message ? err.message : err));
+        }
+      }
+
+      function reset() {
+        if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+        lastDetections = null;
+        lastImageDims = null;
+        previewWrap.classList.remove('visible');
+        detectionsPanel.classList.remove('visible');
+        hideStatus();
+        dropZone.style.display = '';
+        fileInput.value = '';
+        const ctx = imageCanvas.getContext('2d');
+        ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+        const octx = overlayCanvas.getContext('2d');
+        octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+      }
+
+      fileInput.addEventListener('change', () => {
+        const f = fileInput.files && fileInput.files[0];
+        if (f) showImage(f);
+      });
+
+      ['dragenter', 'dragover'].forEach(ev =>
+        dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+      ['dragleave', 'drop'].forEach(ev =>
+        dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
+      dropZone.addEventListener('drop', e => {
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f && f.type.startsWith('image/')) showImage(f);
+      });
+
+      document.addEventListener('paste', e => {
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (const it of items) {
+          if (it.type.startsWith('image/')) { showImage(it.getAsFile()); return; }
+        }
+      });
+
+      referenceSelect.addEventListener('change', recompute);
+      resetBtn.addEventListener('click', reset);
+    })();
+  </script>
+</body>
+</html>
