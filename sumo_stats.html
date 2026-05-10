@@ -1060,7 +1060,7 @@ function parseH2H(html) {
     const winner = src1.includes('hoshi_shiro') ? 1 : 2;
 
     // Kimarite
-    const kimarite = tds[4].textContent.trim().replace(/ /g, '');
+    const kimarite = tds[4].textContent.trim().replace(/ /g, '');
 
     // Rikishi 2 rank
     const opp2 = tds[6].textContent.trim();
@@ -1321,6 +1321,17 @@ function bi(label, val) {
 Chart.defaults.color = '#e8e0d0';
 Chart.defaults.font.family = 'Inter';
 
+const ZOOM_OPTS = {
+  zoom: {
+    wheel: { enabled: true, modifierKey: null },
+    pinch: { enabled: true },
+    drag: { enabled: false },
+    mode: 'x',
+  },
+  pan: { enabled: true, mode: 'x' },
+  limits: { x: { minRange: 2 } },
+};
+
 function gatherLabels() {
   const s = new Set();
   [0, 1].forEach(i => { if (data[i]) data[i].basho.forEach(b => s.add(b.date)); });
@@ -1358,6 +1369,7 @@ function drawWR() {
       plugins: {
         legend: { display: ds.length > 1 },
         tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(1)}%` } },
+        zoom: ZOOM_OPTS,
       },
     }
   });
@@ -1402,6 +1414,7 @@ function drawRank() {
       plugins: {
         legend: { display: ds.length > 1 },
         tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw !== null ? rankLbl(c.parsed.y) : '—'}` } },
+        zoom: ZOOM_OPTS,
       },
     }
   });
