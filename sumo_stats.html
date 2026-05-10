@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sumo Stats</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
 <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
@@ -1058,7 +1060,7 @@ function parseH2H(html) {
     const winner = src1.includes('hoshi_shiro') ? 1 : 2;
 
     // Kimarite
-    const kimarite = tds[4].textContent.trim().replace(/\u00a0/g, '');
+    const kimarite = tds[4].textContent.trim().replace(/ /g, '');
 
     // Rikishi 2 rank
     const opp2 = tds[6].textContent.trim();
