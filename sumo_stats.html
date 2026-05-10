@@ -357,8 +357,11 @@ main {
   border: 1px solid var(--border);
   border-radius: var(--r);
   padding: 1.5rem;
+  overflow: hidden;
   animation: fadeUp 0.5s ease-out;
 }
+
+.ch-wrap canvas { max-width: 100%; }
 
 .ch-card.full { grid-column: 1 / -1; }
 
@@ -407,6 +410,7 @@ table.bt tr:hover td { background: var(--border); }
   border-radius: var(--r);
   padding: 1.5rem 2rem;
   margin-bottom: 2rem;
+  overflow: hidden;
   animation: fadeUp 0.5s ease-out;
 }
 
