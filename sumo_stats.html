@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sumo Stats</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
 <script>document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
@@ -371,7 +373,26 @@ main {
   font-weight: 600;
   color: var(--gold);
   margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
+
+.zoom-reset {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.7rem;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.zoom-reset:hover { border-color: var(--gold-dim); color: var(--text); }
 
 .ch-wrap { position: relative; height: 280px; }
 
@@ -659,6 +680,12 @@ $('#q2').onkeydown = e => { if (e.key === 'Enter') search(1); };
 document.addEventListener('click', e => {
   if (!e.target.closest('#sg1')) $('#dd1').classList.remove('active');
   if (!e.target.closest('#sg2')) $('#dd2').classList.remove('active');
+
+  const reset = e.target.closest('.zoom-reset');
+  if (reset) {
+    const c = charts[reset.dataset.chart];
+    if (c && typeof c.resetZoom === 'function') c.resetZoom();
+  }
 });
 
 async function pFetch(url) {
@@ -1058,7 +1085,7 @@ function parseH2H(html) {
     const winner = src1.includes('hoshi_shiro') ? 1 : 2;
 
     // Kimarite
-    const kimarite = tds[4].textContent.trim().replace(/\u00a0/g, '');
+    const kimarite = tds[4].textContent.trim().replace(/ /g, '');
 
     // Rikishi 2 rank
     const opp2 = tds[6].textContent.trim();
@@ -1229,8 +1256,8 @@ function render() {
   h += '<div class="charts">';
   const anyBasho = (has0 && data[0].basho.length > 0) || (has1 && data[1].basho.length > 0);
   if (anyBasho) {
-    h += '<div class="ch-card"><div class="ch-title">Win Rate per Basho</div><div class="ch-wrap"><canvas id="cWR"></canvas></div></div>';
-    h += '<div class="ch-card"><div class="ch-title">Rank Progression</div><div class="ch-wrap"><canvas id="cRank"></canvas></div></div>';
+    h += '<div class="ch-card"><div class="ch-title"><span>Win Rate per Basho</span><button type="button" class="zoom-reset" data-chart="wr" title="Reset zoom">Reset zoom</button></div><div class="ch-wrap"><canvas id="cWR"></canvas></div></div>';
+    h += '<div class="ch-card"><div class="ch-title"><span>Rank Progression</span><button type="button" class="zoom-reset" data-chart="rank" title="Reset zoom">Reset zoom</button></div><div class="ch-wrap"><canvas id="cRank"></canvas></div></div>';
   }
 
   if (has0 && data[0].totalW > 0) h += `<div class="ch-card"><div class="ch-title">${esc(data[0].shikona)} — Career W/L</div><div class="ch-wrap"><canvas id="cD0"></canvas></div></div>`;
@@ -1319,6 +1346,17 @@ function bi(label, val) {
 Chart.defaults.color = '#e8e0d0';
 Chart.defaults.font.family = 'Inter';
 
+const ZOOM_OPTS = {
+  zoom: {
+    wheel: { enabled: true, modifierKey: null },
+    pinch: { enabled: true },
+    drag: { enabled: false },
+    mode: 'x',
+  },
+  pan: { enabled: true, mode: 'x' },
+  limits: { x: { minRange: 2 } },
+};
+
 function gatherLabels() {
   const s = new Set();
   [0, 1].forEach(i => { if (data[i]) data[i].basho.forEach(b => s.add(b.date)); });
@@ -1356,6 +1394,7 @@ function drawWR() {
       plugins: {
         legend: { display: ds.length > 1 },
         tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(1)}%` } },
+        zoom: ZOOM_OPTS,
       },
     }
   });
@@ -1400,6 +1439,7 @@ function drawRank() {
       plugins: {
         legend: { display: ds.length > 1 },
         tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw !== null ? rankLbl(c.parsed.y) : '—'}` } },
+        zoom: ZOOM_OPTS,
       },
     }
   });
