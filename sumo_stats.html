@@ -300,6 +300,25 @@ main {
   margin-top: 0.2rem;
 }
 
+.rank-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+.rank-line .rank-l {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  margin-right: 0.3rem;
+}
+.rank-line .rank-v {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .card-body { padding: 1.5rem 2rem; }
 
 .bio {
@@ -1308,7 +1327,10 @@ function profileCard(d, idx) {
     <div class="card" style="border-top: 3px solid ${accent};">
       <div class="card-head">
         <div class="shikona" style="color:${accent}">${esc(d.shikona) || 'Unknown'}</div>
-        <div class="highest-rank">${esc(d.highestRank)}</div>
+        <div class="rank-line">
+          ${d.currentRank ? `<span><span class="rank-l">Current</span><span class="rank-v">${esc(d.currentRank)}</span></span>` : ''}
+          ${d.highestRank ? `<span><span class="rank-l">Highest</span><span class="rank-v">${esc(d.highestRank)}</span></span>` : ''}
+        </div>
       </div>
       <div class="card-body">
         <div class="bio">
