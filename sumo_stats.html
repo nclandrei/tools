@@ -300,6 +300,25 @@ main {
   margin-top: 0.2rem;
 }
 
+.rank-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+.rank-line .rank-l {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  margin-right: 0.3rem;
+}
+.rank-line .rank-v {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .card-body { padding: 1.5rem 2rem; }
 
 .bio {
@@ -838,7 +857,7 @@ async function loadRikishi(slot, id, name) {
 // ─── Parse Profile ────────────────────────────────────────
 function parseProfile(doc) {
   const p = {
-    shikona: '', highestRank: '', realName: '', birthDate: '',
+    shikona: '', highestRank: '', currentRank: '', realName: '', birthDate: '',
     shusshin: '', heya: '', height: '', weight: '', debut: '',
     intai: '', careerRecord: '', makuuchiRecord: '',
     yusho: 0, junYusho: 0, kinboshi: 0,
@@ -952,6 +971,10 @@ function parseProfile(doc) {
   });
 
   p.basho.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+
+  if (p.basho.length > 0) {
+    p.currentRank = p.basho[p.basho.length - 1].rank || '';
+  }
 
   if (p.totalW === 0 && p.basho.length > 0) {
     p.totalW = p.basho.reduce((s, b) => s + b.w, 0);
@@ -1304,7 +1327,10 @@ function profileCard(d, idx) {
     <div class="card" style="border-top: 3px solid ${accent};">
       <div class="card-head">
         <div class="shikona" style="color:${accent}">${esc(d.shikona) || 'Unknown'}</div>
-        <div class="highest-rank">${esc(d.highestRank)}</div>
+        <div class="rank-line">
+          ${d.currentRank ? `<span><span class="rank-l">Current</span><span class="rank-v">${esc(d.currentRank)}</span></span>` : ''}
+          ${d.highestRank ? `<span><span class="rank-l">Highest</span><span class="rank-v">${esc(d.highestRank)}</span></span>` : ''}
+        </div>
       </div>
       <div class="card-body">
         <div class="bio">
