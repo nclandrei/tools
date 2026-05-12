@@ -838,7 +838,7 @@ async function loadRikishi(slot, id, name) {
 // ─── Parse Profile ────────────────────────────────────────
 function parseProfile(doc) {
   const p = {
-    shikona: '', highestRank: '', realName: '', birthDate: '',
+    shikona: '', highestRank: '', currentRank: '', realName: '', birthDate: '',
     shusshin: '', heya: '', height: '', weight: '', debut: '',
     intai: '', careerRecord: '', makuuchiRecord: '',
     yusho: 0, junYusho: 0, kinboshi: 0,
@@ -952,6 +952,10 @@ function parseProfile(doc) {
   });
 
   p.basho.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+
+  if (p.basho.length > 0) {
+    p.currentRank = p.basho[p.basho.length - 1].rank || '';
+  }
 
   if (p.totalW === 0 && p.basho.length > 0) {
     p.totalW = p.basho.reduce((s, b) => s + b.w, 0);
