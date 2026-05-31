@@ -289,8 +289,16 @@
       <label for="to-name">Bill To (Company Name)</label>
       <input type="text" id="to-name" placeholder="Client Corp">
     </div>
+    <div class="form-group">
+      <label for="to-registration-number">Client Registration Number</label>
+      <input type="text" id="to-registration-number" placeholder="HRB 123456">
+    </div>
+    <div class="form-group">
+      <label for="to-country">Client Country</label>
+      <input type="text" id="to-country" placeholder="Germany">
+    </div>
     <div class="form-group full-width">
-      <label for="to-details">Client Details (address, country, etc.)</label>
+      <label for="to-details">Client Details (address, VAT, etc.)</label>
       <textarea id="to-details" placeholder="456 Oak Ave&#10;Berlin&#10;Germany"></textarea>
     </div>
     <div class="form-group">
@@ -365,7 +373,7 @@
     <button class="btn btn-secondary" onclick="saveProfile()">Save as Profile</button>
   </div>
 
-  <div id="preview-section">
+  <div id="preview-section" style="display:none">
     <div class="invoice-preview" id="invoice-preview"></div>
     <div class="actions">
       <button class="btn btn-primary" onclick="downloadPDF()">Download PDF</button>
@@ -459,7 +467,12 @@
   function saveProfile() {
     if (!storageAvailable()) return;
     const toName = document.getElementById('to-name').value.trim();
-    if (!toName) { alert('Enter a company name first.'); return; }
+    const toRegistrationNumber = document.getElementById('to-registration-number').value.trim();
+    const toCountry = document.getElementById('to-country').value.trim();
+    if (!toName || !toRegistrationNumber || !toCountry) {
+      alert('Enter the client company name, registration number, and country first.');
+      return;
+    }
 
     const profiles = getProfiles();
     const key = toName;
@@ -467,6 +480,8 @@
       fromName: document.getElementById('from-name').value,
       fromDetails: document.getElementById('from-details').value,
       toName: toName,
+      toRegistrationNumber: toRegistrationNumber,
+      toCountry: toCountry,
       toDetails: document.getElementById('to-details').value,
       amount: document.getElementById('amount').value,
       rate: document.getElementById('rate').value,
@@ -494,6 +509,8 @@
     document.getElementById('from-name').value = p.fromName || '';
     document.getElementById('from-details').value = p.fromDetails || '';
     document.getElementById('to-name').value = p.toName || '';
+    document.getElementById('to-registration-number').value = p.toRegistrationNumber || '';
+    document.getElementById('to-country').value = p.toCountry || '';
     document.getElementById('to-details').value = p.toDetails || '';
     document.getElementById('amount').value = p.amount || '';
     document.getElementById('rate').value = p.rate || '';
@@ -545,6 +562,8 @@
     const fromName = document.getElementById('from-name').value.trim();
     const fromDetails = document.getElementById('from-details').value.trim();
     const toName = document.getElementById('to-name').value.trim();
+    const toRegistrationNumber = document.getElementById('to-registration-number').value.trim();
+    const toCountry = document.getElementById('to-country').value.trim();
     const toDetails = document.getElementById('to-details').value.trim();
     const periodStart = document.getElementById('period-start').value;
     const periodEnd = document.getElementById('period-end').value;
@@ -561,12 +580,18 @@
     const iban = document.getElementById('iban').value.trim();
     const bic = document.getElementById('bic').value.trim();
 
-    if (!toName || !amount || !periodStart || !periodEnd) {
-      alert('Please fill in at least: company name, amount, period start and end.');
+    if (!toName || !toRegistrationNumber || !toCountry || !amount || !periodStart || !periodEnd) {
+      alert('Please fill in at least: company name, registration number, country, amount, period start and end.');
       return;
     }
 
     const invoiceId = generateInvoiceId(toName, periodStart, periodEnd);
+    const billToHtml = [
+      `<strong>${esc(toName)}</strong>`,
+      `Registration No: ${esc(toRegistrationNumber)}`,
+      `Country: ${esc(toCountry)}`,
+      toDetails ? escMulti(toDetails) : ''
+    ].filter(Boolean).join('<br>');
 
     const html = `
       <div class="invoice-header">
@@ -584,7 +609,7 @@
         </div>
         <div>
           <h3>Bill To</h3>
-          <p><strong>${esc(toName)}</strong><br>${escMulti(toDetails)}</p>
+          <p>${billToHtml}</p>
         </div>
       </div>
       <table class="invoice-table">
